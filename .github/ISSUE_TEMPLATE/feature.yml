@@ -1,0 +1,44 @@
+name: Feature
+description: Propose an implementation task with measurable acceptance criteria
+title: "[Feature]: "
+labels: ["type:feature", "status:triage"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: Describe the user-visible or research-visible outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: State what is included and excluded.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Provide a checkable list, including tests and documentation.
+      placeholder: "- [ ] ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: owner
+    attributes:
+      label: Primary owner role
+      options: [Architect, Documenter, Programmer, Reviewer]
+    validations:
+      required: true
+  - type: checkboxes
+    id: risk
+    attributes:
+      label: Risk review
+      options:
+        - label: This changes metric or label semantics.
+        - label: This affects report interpretation or legal/compliance language.
+        - label: This introduces or changes a dataset.
+        - label: This affects paper claims or reproducibility.
+

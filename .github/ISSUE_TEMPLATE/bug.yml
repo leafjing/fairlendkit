@@ -1,0 +1,38 @@
+name: Bug
+description: Report reproducible incorrect behavior
+title: "[Bug]: "
+labels: ["type:bug", "status:triage"]
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Use public or synthetic data only. Never attach confidential data.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and affected semantics
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data safety
+      options:
+        - label: I confirm the reproduction contains no confidential or proprietary data.
+          required: true
+
