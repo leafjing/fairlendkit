@@ -9,6 +9,8 @@ from fairlendkit.report import (
     AuditResult,
     Limitation,
     PractitionerReviewNote,
+    ReportedMetricValue,
+    UndefinedReason,
     WarningRecord,
 )
 
@@ -114,3 +116,30 @@ def test_defined_metric_requires_positive_sample_count(example_payload):
 
     with pytest.raises(ValidationError, match="sample_count zero"):
         AuditResult.model_validate(example_payload)
+
+
+def test_undefined_reason_is_typed_and_round_trips(example_payload):
+    result = AuditResult.model_validate(example_payload)
+    reason = result.observed_metrics[1].value.undefined_reason
+
+    assert reason is not None
+    assert reason.code.value == "no_unfavorable_outcomes"
+    assert "No unfavorable observed outcomes" in reason.message
+
+
+def test_undefined_reason_rejects_noncanonical_message():
+    with pytest.raises(ValidationError, match="must match canonical text"):
+        UndefinedReason(
+            code="empty_population",
+            message="Insufficient data.",
+        )
+
+
+def test_undefined_value_requires_structured_reason():
+    with pytest.raises(ValidationError, match="requires undefined_reason"):
+        ReportedMetricValue(
+            value=None,
+            numerator=None,
+            denominator=0.0,
+            undefined_reason=None,
+        )

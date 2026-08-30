@@ -26,24 +26,16 @@ all renderer outputs structurally consistent.
 
 ## Metric values and undefined reasons
 
-Observed values use the `MetricValue` contract defined in
-[Metric contracts](metric-contracts.md). A defined result contains a finite
-numeric `value` and no `undefined_reason`. An undefined result contains
-`value=null` and a non-empty reason. Numeric zero remains a defined value.
+Observed values use `ReportedMetricValue`. A defined result contains a finite
+numeric `value` and `undefined_reason=null`. An undefined result contains
+`value=null` and a required typed `UndefinedReason` object. Numeric zero remains
+a defined value.
 
-The current canonical natural-language reasons produced by core metrics are:
-
-- `no records or positive weight`
-- `no favorable outcomes or positive weight`
-- `no unfavorable outcomes or positive weight`
-- `comparison selection rate is undefined`
-- `reference selection rate is undefined`
-- `reference selection rate is zero`
-- `comparison true-positive rate is undefined`
-- `reference true-positive rate is undefined`
-
-New automated reasons require documentation and tests before use. Renderers
-must reproduce the stored reason and must not invent an interpretation.
+`UndefinedReasonCode` is a closed enumeration aligned with the canonical
+undefined-reason vocabulary. Each code maps to exactly one fixed neutral
+message; mismatched or arbitrary free text fails validation. Renderers must
+reproduce the stored code and message and must not invent an interpretation.
+Adding or changing a code or canonical message requires Schema version review.
 
 ## Group direction
 

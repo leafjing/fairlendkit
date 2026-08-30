@@ -9,10 +9,13 @@ from fairlendkit.report.models import (
     MetricName,
     ObservedMetric,
     PractitionerReviewNote,
+    ReportedMetricValue,
     RunMetadata,
     ScreeningFlag,
     StatisticalUncertainty,
     UncertaintyMethod,
+    UndefinedReason,
+    UndefinedReasonCode,
     ValidationEvidence,
     WarningRecord,
 )
@@ -26,11 +29,13 @@ __all__ = [
     "MetricName",
     "ObservedMetric",
     "PractitionerReviewNote",
+    "ReportedMetricValue",
     "RunMetadata",
     "ScreeningFlag",
     "StatisticalUncertainty",
     "UncertaintyMethod",
+    "UndefinedReason",
+    "UndefinedReasonCode",
     "ValidationEvidence",
     "WarningRecord",
 ]
-

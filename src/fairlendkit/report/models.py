@@ -11,8 +11,6 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 from fairlendkit.config import AuditConfig
 from fairlendkit.config.models import Label
-from fairlendkit.metrics import MetricValue
-
 AUDIT_RESULT_SCHEMA_VERSION = "1.0"
 Identifier = Annotated[str, Field(min_length=1, pattern=r"^[a-z][a-z0-9_.-]*$")]
 
@@ -39,6 +37,92 @@ class UncertaintyMethod(StrEnum):
     BOOTSTRAP_PERCENTILE = "bootstrap_percentile"
 
 
+class UndefinedReasonCode(StrEnum):
+    EMPTY_POPULATION = "empty_population"
+    ZERO_TOTAL_WEIGHT = "zero_total_weight"
+    NO_FAVORABLE_OUTCOMES = "no_favorable_outcomes"
+    ZERO_FAVORABLE_OUTCOME_WEIGHT = "zero_favorable_outcome_weight"
+    NO_UNFAVORABLE_OUTCOMES = "no_unfavorable_outcomes"
+    ZERO_UNFAVORABLE_OUTCOME_WEIGHT = "zero_unfavorable_outcome_weight"
+    COMPARISON_METRIC_UNDEFINED = "comparison_metric_undefined"
+    REFERENCE_METRIC_UNDEFINED = "reference_metric_undefined"
+    ZERO_REFERENCE_SELECTION_RATE = "zero_reference_selection_rate"
+
+
+CANONICAL_UNDEFINED_MESSAGES = {
+    UndefinedReasonCode.EMPTY_POPULATION: "No records are available for this metric.",
+    UndefinedReasonCode.ZERO_TOTAL_WEIGHT: (
+        "The metric population has no positive total weight."
+    ),
+    UndefinedReasonCode.NO_FAVORABLE_OUTCOMES: (
+        "No favorable observed outcomes are available for this metric."
+    ),
+    UndefinedReasonCode.ZERO_FAVORABLE_OUTCOME_WEIGHT: (
+        "Favorable observed outcomes have no positive total weight."
+    ),
+    UndefinedReasonCode.NO_UNFAVORABLE_OUTCOMES: (
+        "No unfavorable observed outcomes are available for this metric."
+    ),
+    UndefinedReasonCode.ZERO_UNFAVORABLE_OUTCOME_WEIGHT: (
+        "Unfavorable observed outcomes have no positive total weight."
+    ),
+    UndefinedReasonCode.COMPARISON_METRIC_UNDEFINED: (
+        "The comparison-group input metric is undefined."
+    ),
+    UndefinedReasonCode.REFERENCE_METRIC_UNDEFINED: (
+        "The reference-group input metric is undefined."
+    ),
+    UndefinedReasonCode.ZERO_REFERENCE_SELECTION_RATE: (
+        "The reference-group selection rate is zero, so the ratio is undefined."
+    ),
+}
+
+
+class UndefinedReason(ResultModel):
+    """Closed reason code paired with its canonical neutral message."""
+
+    code: UndefinedReasonCode
+    message: Annotated[str, Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def validate_canonical_message(self) -> "UndefinedReason":
+        expected = CANONICAL_UNDEFINED_MESSAGES[self.code]
+        if self.message != expected:
+            raise ValueError(f"message must match canonical text for {self.code.value!r}")
+        return self
+
+
+class ReportedMetricValue(ResultModel):
+    """Finite value or structured undefined reason stored in AuditResult."""
+
+    value: float | None
+    numerator: float | None
+    denominator: float | None
+    undefined_reason: UndefinedReason | None
+
+    @model_validator(mode="after")
+    def validate_state(self) -> "ReportedMetricValue":
+        for name, evidence in (
+            ("numerator", self.numerator),
+            ("denominator", self.denominator),
+        ):
+            if evidence is not None and not math.isfinite(evidence):
+                raise ValueError(f"{name} must be finite or null")
+        if self.value is None:
+            if self.undefined_reason is None:
+                raise ValueError("an undefined value requires undefined_reason")
+        else:
+            if not math.isfinite(self.value):
+                raise ValueError("a defined value must be finite")
+            if self.undefined_reason is not None:
+                raise ValueError("a defined value cannot have undefined_reason")
+        return self
+
+    @property
+    def is_defined(self) -> bool:
+        return self.value is not None
+
+
 class AuditGroup(ResultModel):
     """Explicit attribute values identifying one audit group."""
 
@@ -50,7 +134,7 @@ class ObservedMetric(ResultModel):
 
     key: Identifier
     metric: MetricName
-    value: MetricValue
+    value: ReportedMetricValue
     sample_count: int = Field(ge=0)
     group: AuditGroup | None = None
     comparison_group: AuditGroup | None = None
