@@ -12,7 +12,7 @@
 1. Configuration and data validation
 2. Performance, selection, error, and calibration metrics
 3. Threshold scanning and fairness-accuracy frontier
-4. Exploratory proxy-risk screening
+4. Exploratory screening for potential proxy-risk indicators
 5. HTML, JSON, and CSV reporting
 6. Synthetic end-to-end example
 7. Public-data example with documented limitations
@@ -43,4 +43,3 @@ The project will prioritize a small number of verifiable external uses over vani
 - Behavioral changes require tests and documentation in the same pull request.
 - Methodology changes must identify affected paper claims and report fields.
 - Security, legal-interpretation, data-rights, or label-semantics concerns block release until reviewed.
-

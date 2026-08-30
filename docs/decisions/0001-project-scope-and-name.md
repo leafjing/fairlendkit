@@ -5,7 +5,7 @@
 
 ## Decision
 
-The project and Python package are named `FairLendKit` and `fairlendkit`. V1 delivers metrics, threshold analysis, exploratory proxy-risk screening, and reproducible audit reports. Mitigation is deferred to V1.1.
+The project and Python package are named `FairLendKit` and `fairlendkit`. V1 delivers metrics, threshold analysis, exploratory screening for potential proxy-risk indicators, and reproducible audit reports. Mitigation is deferred to V1.1.
 
 ## Rationale
 
@@ -16,4 +16,3 @@ The scope supports the practitioner-framework paper while keeping the first rele
 - V1 reports observations and screening indicators, not compliance conclusions.
 - The repository must use only public, appropriately licensed, or synthetic data.
 - Future scope changes require a new ADR and corresponding updates to requirements, methodology, tests, and paper alignment.
-
