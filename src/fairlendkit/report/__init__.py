@@ -1,0 +1,41 @@
+"""Canonical report contract consumed by every output renderer."""
+
+from fairlendkit.report.models import (
+    AUDIT_RESULT_SCHEMA_VERSION,
+    AuditGroup,
+    AuditResult,
+    ExclusionRecord,
+    Limitation,
+    MetricName,
+    ObservedMetric,
+    PractitionerReviewNote,
+    ReportedMetricValue,
+    RunMetadata,
+    ScreeningFlag,
+    StatisticalUncertainty,
+    UncertaintyMethod,
+    UndefinedReason,
+    UndefinedReasonCode,
+    ValidationEvidence,
+    WarningRecord,
+)
+
+__all__ = [
+    "AUDIT_RESULT_SCHEMA_VERSION",
+    "AuditGroup",
+    "AuditResult",
+    "ExclusionRecord",
+    "Limitation",
+    "MetricName",
+    "ObservedMetric",
+    "PractitionerReviewNote",
+    "ReportedMetricValue",
+    "RunMetadata",
+    "ScreeningFlag",
+    "StatisticalUncertainty",
+    "UncertaintyMethod",
+    "UndefinedReason",
+    "UndefinedReasonCode",
+    "ValidationEvidence",
+    "WarningRecord",
+]
