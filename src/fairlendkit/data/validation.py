@@ -50,12 +50,15 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
     if eligible.empty:
         raise DataValidationError("no eligible rows remain after missing-value handling")
 
-    if config.favorable_label not in set(eligible[config.outcome_column].unique()):
+    if not _contains_typed_value(
+        eligible[config.outcome_column], config.favorable_label
+    ):
         raise DataValidationError("favorable_label is not present in outcome_column")
 
     if config.decision_column is not None:
-        decision_values = set(eligible[config.decision_column].unique())
-        if config.favorable_decision_label not in decision_values:
+        if not _contains_typed_value(
+            eligible[config.decision_column], config.favorable_decision_label
+        ):
             raise DataValidationError(
                 "favorable_decision_label is not present in decision_column"
             )
@@ -74,9 +77,8 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
 
     small_groups: list[str] = []
     for attribute in config.protected_attributes:
-        values = set(eligible[attribute].unique())
         reference = config.reference_groups[attribute]
-        if reference not in values:
+        if not _contains_typed_value(eligible[attribute], reference):
             raise DataValidationError(
                 f"reference group {reference!r} is not present in {attribute!r}"
             )
@@ -113,3 +115,24 @@ def _is_finite_number(value: object) -> bool:
     except (TypeError, ValueError):
         return False
 
+
+def _contains_typed_value(series: pd.Series, expected: object) -> bool:
+    """Match categorical values without Python's ``True == 1`` coercion."""
+
+    return any(_typed_values_equal(actual, expected) for actual in series.unique())
+
+
+def _typed_values_equal(actual: object, expected: object) -> bool:
+    if pd.api.types.is_bool(actual) or pd.api.types.is_bool(expected):
+        return (
+            pd.api.types.is_bool(actual)
+            and pd.api.types.is_bool(expected)
+            and bool(actual) is bool(expected)
+        )
+    if pd.api.types.is_integer(actual) or pd.api.types.is_integer(expected):
+        return (
+            pd.api.types.is_integer(actual)
+            and pd.api.types.is_integer(expected)
+            and int(actual) == int(expected)
+        )
+    return type(actual) is type(expected) and bool(actual == expected)

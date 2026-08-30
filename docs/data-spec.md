@@ -50,6 +50,13 @@ cannot be reassigned after construction. Orchestration code must serialize the
 validated configuration at run start so nested input mappings cannot alter the
 recorded run metadata.
 
+Every input column has exactly one semantic role. Outcome, score, observed
+decision, sample weight, protected-attribute, and candidate-feature columns
+must all be distinct. Candidate features also cannot repeat or overlap any core
+column; callers that intentionally screen a transformed copy must provide it
+under a distinct column name. Role overlap is treated as ambiguous semantics
+and fails configuration validation.
+
 For a derived decision, `ge` is valid only with
 `higher_is_more_favorable`, and `le` only with
 `lower_is_more_favorable`. This redundancy is intentional: inconsistent score
@@ -67,7 +74,7 @@ distinct from the observed outcome and `favorable_label`.
 
 Column names in the configuration map directly to tabular input columns.
 Categorical group and label values retain their input types: for example, the
-integer `1` and string `"1"` are different values. The favorable outcome and
+boolean `True`, integer `1`, and string `"1"` are three different values. The favorable outcome and
 any favorable decision label must occur in eligible data. Every configured
 reference group must occur in its protected-attribute column; an unknown group
 is a validation error.

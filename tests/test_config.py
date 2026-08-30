@@ -96,3 +96,29 @@ def test_threshold_schema_records_inclusive_boundary_semantics():
 
     assert "score >= threshold" in properties["threshold_operator"]["description"]
     assert "score <= threshold" in properties["threshold_operator"]["description"]
+
+
+@pytest.mark.parametrize(
+    ("overrides", "conflicting_roles"),
+    [
+        ({"score_column": "outcome"}, "outcome_column, score_column"),
+        (
+            {
+                "protected_attributes": ("score",),
+                "reference_groups": {"score": "A"},
+            },
+            "score_column, protected_attributes[0]",
+        ),
+        ({"sample_weight_column": "outcome"}, "outcome_column, sample_weight_column"),
+        ({"candidate_proxy_features": ("score",)}, "score_column, candidate_proxy_features[0]"),
+        (
+            {"candidate_proxy_features": ("proxy", "proxy")},
+            "candidate_proxy_features[0], candidate_proxy_features[1]",
+        ),
+    ],
+)
+def test_columns_cannot_share_semantic_roles(overrides, conflicting_roles):
+    with pytest.raises(ValidationError, match="exactly one semantic role") as error:
+        AuditConfig(**config_values(**overrides))
+
+    assert conflicting_roles in str(error.value)

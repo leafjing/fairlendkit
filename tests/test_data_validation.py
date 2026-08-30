@@ -77,3 +77,28 @@ def test_multiple_protected_attributes_require_known_references():
     summary = validate_audit_data(data, config)
 
     assert summary.eligible_rows == 3
+
+
+def test_boolean_favorable_label_does_not_match_integer_one():
+    with pytest.raises(DataValidationError, match="favorable_label is not present"):
+        validate_audit_data(make_data(), make_config(favorable_label=True))
+
+
+def test_boolean_reference_group_does_not_match_integer_one():
+    data = make_data().assign(group=[1, 1, 2])
+
+    with pytest.raises(DataValidationError, match="reference group"):
+        validate_audit_data(data, make_config(reference_groups={"group": True}))
+
+
+def test_boolean_favorable_decision_does_not_match_integer_one():
+    data = make_data().assign(decision=[1, 0, 1])
+    config = make_config(
+        decision_column="decision",
+        decision_threshold=None,
+        threshold_operator=None,
+        favorable_decision_label=True,
+    )
+
+    with pytest.raises(DataValidationError, match="favorable_decision_label"):
+        validate_audit_data(data, config)

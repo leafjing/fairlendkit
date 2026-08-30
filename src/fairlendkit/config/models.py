@@ -76,6 +76,34 @@ class AuditConfig(BaseModel):
                 "reference_groups must contain exactly one explicit value for "
                 "each protected attribute"
             )
+        column_roles: list[tuple[str, str]] = [
+            (self.outcome_column, "outcome_column"),
+            (self.score_column, "score_column"),
+            *(
+                (column, f"protected_attributes[{index}]")
+                for index, column in enumerate(self.protected_attributes)
+            ),
+            *(
+                (column, f"candidate_proxy_features[{index}]")
+                for index, column in enumerate(self.candidate_proxy_features)
+            ),
+        ]
+        if self.decision_column is not None:
+            column_roles.append((self.decision_column, "decision_column"))
+        if self.sample_weight_column is not None:
+            column_roles.append((self.sample_weight_column, "sample_weight_column"))
+        roles_by_column: dict[str, list[str]] = {}
+        for column, role in column_roles:
+            roles_by_column.setdefault(column, []).append(role)
+        conflicts = {
+            column: roles for column, roles in roles_by_column.items() if len(roles) > 1
+        }
+        if conflicts:
+            details = "; ".join(
+                f"{column!r}: {', '.join(roles)}"
+                for column, roles in sorted(conflicts.items())
+            )
+            raise ValueError(f"columns must have exactly one semantic role; {details}")
         has_observed_decision = self.decision_column is not None
         has_derived_decision = self.decision_threshold is not None
         if has_observed_decision == has_derived_decision:
