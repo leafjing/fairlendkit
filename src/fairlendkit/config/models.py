@@ -19,6 +19,13 @@ class ScoreDirection(StrEnum):
     LOWER_IS_MORE_FAVORABLE = "lower_is_more_favorable"
 
 
+class ThresholdOperator(StrEnum):
+    """Comparison used to derive the configured favorable decision."""
+
+    GREATER_THAN_OR_EQUAL = "ge"
+    LESS_THAN_OR_EQUAL = "le"
+
+
 class AuditConfig(BaseModel):
     """Validated semantic and column contract for one audit run.
 
@@ -34,9 +41,10 @@ class AuditConfig(BaseModel):
     score_direction: ScoreDirection
     protected_attributes: tuple[ColumnName, ...] = Field(min_length=1)
     reference_groups: dict[ColumnName, Label] = Field(min_length=1)
+    favorable_decision_label: Label
     decision_column: ColumnName | None = None
-    favorable_decision_label: Label | None = None
     decision_threshold: float | None = None
+    threshold_operator: ThresholdOperator | None = None
     sample_weight_column: ColumnName | None = None
     candidate_proxy_features: tuple[ColumnName, ...] = ()
     minimum_group_size: int = Field(default=30, ge=1)
@@ -54,15 +62,25 @@ class AuditConfig(BaseModel):
                 "reference_groups must contain exactly one explicit value for "
                 "each protected attribute"
             )
-        if (self.decision_column is None) != (self.favorable_decision_label is None):
+        has_observed_decision = self.decision_column is not None
+        has_derived_decision = self.decision_threshold is not None
+        if has_observed_decision == has_derived_decision:
             raise ValueError(
-                "decision_column and favorable_decision_label must be configured together"
+                "configure exactly one of decision_column or decision_threshold"
             )
-        if self.decision_column is not None and self.decision_threshold is not None:
+        if has_derived_decision != (self.threshold_operator is not None):
             raise ValueError(
-                "configure either an observed decision_column or a decision_threshold, not both"
+                "decision_threshold and threshold_operator must be configured together"
             )
         if self.decision_threshold is not None and not math.isfinite(self.decision_threshold):
             raise ValueError("decision_threshold must be finite")
+        expected_operator = {
+            ScoreDirection.HIGHER_IS_MORE_FAVORABLE: ThresholdOperator.GREATER_THAN_OR_EQUAL,
+            ScoreDirection.LOWER_IS_MORE_FAVORABLE: ThresholdOperator.LESS_THAN_OR_EQUAL,
+        }[self.score_direction]
+        if self.threshold_operator is not None and self.threshold_operator != expected_operator:
+            raise ValueError(
+                "threshold_operator is inconsistent with score_direction: "
+                f"expected {expected_operator.value!r}"
+            )
         return self
-

@@ -23,14 +23,15 @@ confidential data and artifacts must not be committed to the repository.
   may also form intersectional slices.
 - `reference_groups` (mapping): exactly one explicit reference value for every
   protected attribute. No demographic group is selected by default.
+- `favorable_decision_label` (`str | int | bool`): value representing the
+  beneficial action. It is required and distinct from `favorable_label`.
+- Exactly one decision source:
+  - `decision_column`: column containing observed actions; or
+  - `decision_threshold` and `threshold_operator`: finite threshold and explicit
+    comparison (`ge` or `le`) used to derive the favorable decision.
 
 ## Optional configuration
 
-- `decision_column` and `favorable_decision_label`: observed decision semantics;
-  both must be supplied together.
-- `decision_threshold`: finite threshold used to derive decisions from scores.
-  It is mutually exclusive with `decision_column`. Scores are not assumed to be
-  probabilities, so the contract does not impose a 0-to-1 threshold range.
 - `sample_weight_column`: finite, non-negative weights with a positive total.
 - `candidate_proxy_features`: columns selected for potential proxy-risk
   screening.
@@ -44,6 +45,13 @@ Unknown configuration fields are rejected. Top-level configuration fields
 cannot be reassigned after construction. Orchestration code must serialize the
 validated configuration at run start so nested input mappings cannot alter the
 recorded run metadata.
+
+For a derived decision, `ge` is valid only with
+`higher_is_more_favorable`, and `le` only with
+`lower_is_more_favorable`. This redundancy is intentional: inconsistent score
+and decision directions fail validation instead of silently reversing results.
+Scores are not assumed to be probabilities, so the contract does not impose a
+0-to-1 threshold range.
 
 ## Data mappings and values
 
@@ -71,7 +79,9 @@ config = AuditConfig(
     score_direction=ScoreDirection.HIGHER_IS_MORE_FAVORABLE,
     protected_attributes=("group",),
     reference_groups={"group": "reference"},
+    favorable_decision_label=1,
     decision_threshold=0.6,
+    threshold_operator="ge",
 )
 summary = validate_audit_data(frame, config)
 ```

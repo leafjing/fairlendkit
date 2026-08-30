@@ -12,6 +12,9 @@ def make_config(**overrides):
         "score_direction": "higher_is_more_favorable",
         "protected_attributes": ("group",),
         "reference_groups": {"group": "A"},
+        "favorable_decision_label": 1,
+        "decision_threshold": 0.5,
+        "threshold_operator": "ge",
         "minimum_group_size": 2,
     }
     values.update(overrides)
@@ -74,4 +77,3 @@ def test_multiple_protected_attributes_require_known_references():
     summary = validate_audit_data(data, config)
 
     assert summary.eligible_rows == 3
-

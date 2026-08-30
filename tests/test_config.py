@@ -14,6 +14,9 @@ def config_values(**overrides):
         "score_direction": ScoreDirection.HIGHER_IS_MORE_FAVORABLE,
         "protected_attributes": ("group",),
         "reference_groups": {"group": "A"},
+        "favorable_decision_label": 1,
+        "decision_threshold": 0.5,
+        "threshold_operator": "ge",
     }
     values.update(overrides)
     return values
@@ -22,7 +25,10 @@ def config_values(**overrides):
 def test_score_direction_is_explicit_and_reversible():
     higher = AuditConfig(**config_values())
     lower = AuditConfig(
-        **config_values(score_direction=ScoreDirection.LOWER_IS_MORE_FAVORABLE)
+        **config_values(
+            score_direction=ScoreDirection.LOWER_IS_MORE_FAVORABLE,
+            threshold_operator="le",
+        )
     )
 
     assert higher.score_direction != lower.score_direction
@@ -45,12 +51,22 @@ def test_reference_group_required_for_every_protected_attribute():
 
 
 def test_observed_and_threshold_decisions_are_mutually_exclusive():
-    with pytest.raises(ValidationError, match="either an observed"):
+    with pytest.raises(ValidationError, match="exactly one"):
         AuditConfig(
             **config_values(
                 decision_column="approved",
-                favorable_decision_label=1,
                 decision_threshold=0.5,
             )
         )
 
+
+def test_a_decision_source_is_required():
+    with pytest.raises(ValidationError, match="exactly one"):
+        AuditConfig(
+            **config_values(decision_threshold=None, threshold_operator=None)
+        )
+
+
+def test_threshold_operator_must_match_score_direction():
+    with pytest.raises(ValidationError, match="inconsistent with score_direction"):
+        AuditConfig(**config_values(threshold_operator="le"))
