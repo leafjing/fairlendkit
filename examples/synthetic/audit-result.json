@@ -40,6 +40,23 @@
       "group": {"attributes": {"audit_group": "reference"}},
       "comparison_group": null,
       "reference_group": null
+    },
+    {
+      "key": "false-positive.comparison",
+      "metric": "false_positive_rate",
+      "value": {
+        "value": null,
+        "numerator": null,
+        "denominator": 0.0,
+        "undefined_reason": {
+          "code": "no_unfavorable_outcomes",
+          "message": "No unfavorable observed outcomes are available for this metric."
+        }
+      },
+      "sample_count": 2,
+      "group": {"attributes": {"audit_group": "comparison"}},
+      "comparison_group": null,
+      "reference_group": null
     }
   ],
   "screening_flags": [],
@@ -61,4 +78,3 @@
   ],
   "practitioner_review_notes": []
 }
-
