@@ -1,0 +1,24 @@
+{
+  "reference": {
+    "favorable_outcome": [true, true, false, false],
+    "favorable_decision": [true, false, true, false],
+    "selection_rate": 0.5,
+    "true_positive_rate": 0.5,
+    "false_positive_rate": 0.5,
+    "false_negative_rate": 0.5
+  },
+  "comparison": {
+    "favorable_outcome": [true, true, false, false],
+    "favorable_decision": [true, false, false, false],
+    "selection_rate": 0.25,
+    "true_positive_rate": 0.5,
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.5
+  },
+  "comparison_to_reference": {
+    "adverse_impact_ratio": 0.5,
+    "demographic_parity_difference": -0.25,
+    "equal_opportunity_difference": 0.0
+  }
+}
+
