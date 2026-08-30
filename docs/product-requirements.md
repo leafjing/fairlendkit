@@ -2,7 +2,9 @@
 
 ## Mission
 
-Provide a reproducible, credit-specific audit workflow that connects model scores to lending decisions, observed disparities, threshold sensitivity, potential proxy risks, and review-ready evidence.
+Provide a reproducible, credit-specific audit workflow that connects model scores to lending decisions, observed disparities, threshold sensitivity, potential proxy-risk indicators, and review-ready evidence.
+
+The [canonical glossary](glossary.md) defines the normative vocabulary used by requirements, configuration, reports, examples, and papers.
 
 ## Primary users
 
@@ -18,7 +20,7 @@ Provide a reproducible, credit-specific audit workflow that connects model score
 3. Measure group selection and outcome disparities.
 4. Measure group error and calibration disparities.
 5. Scan decision thresholds and construct a fairness-accuracy frontier.
-6. Screen candidate features for potential proxy risk.
+6. Screen candidate features for potential proxy-risk indicators.
 7. Generate reproducible reports with uncertainty and limitations.
 
 Mitigation and re-audit are deferred to V1.1.
@@ -27,10 +29,11 @@ Mitigation and re-audit are deferred to V1.1.
 
 - Observed outcome (`y_true`)
 - Model score (`y_score`)
-- Protected-group attribute used for the audit
+- Protected attribute used to form audit groups
 - Explicit reference group
 - Explicit favorable outcome and score direction
-- Optional observed decision and candidate proxy features
+- Explicit favorable decision meaning
+- Optional observed decision and candidate features for proxy-risk screening
 
 The configuration must define label semantics. FairLendKit must never infer whether a larger score represents higher creditworthiness or higher default risk.
 
@@ -54,4 +57,3 @@ Given the versioned synthetic example, one documented CLI command must generate 
 - Processing proprietary Capital One data, models, code, or intellectual property
 - Serving as a production loan-decision engine
 - Inferring protected attributes for operational lending decisions
-
