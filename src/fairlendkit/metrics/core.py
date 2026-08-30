@@ -20,6 +20,22 @@ class MetricValue:
     denominator: float | None
     undefined_reason: str | None = None
 
+    def __post_init__(self) -> None:
+        evidence = (self.numerator, self.denominator)
+        if any(
+            value is not None and not _is_finite_metric_number(value)
+            for value in evidence
+        ):
+            raise ValueError("metric evidence must be finite numeric values or None")
+        if self.value is None:
+            if not self.undefined_reason:
+                raise ValueError("an undefined metric requires undefined_reason")
+            return
+        if not _is_finite_metric_number(self.value):
+            raise ValueError("a defined metric value must be finite")
+        if self.undefined_reason is not None:
+            raise ValueError("a defined metric cannot have undefined_reason")
+
     @property
     def is_defined(self) -> bool:
         return self.value is not None
@@ -135,6 +151,8 @@ def adverse_impact_ratio(
 ) -> MetricValue:
     """Return comparison selection rate divided by reference selection rate."""
 
+    _validate_unit_rate(comparison_selection_rate, "comparison selection rate")
+    _validate_unit_rate(reference_selection_rate, "reference selection rate")
     if not comparison_selection_rate.is_defined:
         return MetricValue(None, None, None, "comparison selection rate is undefined")
     if not reference_selection_rate.is_defined:
@@ -158,6 +176,8 @@ def demographic_parity_difference(
 ) -> MetricValue:
     """Return comparison minus reference selection rate."""
 
+    _validate_unit_rate(comparison_selection_rate, "comparison selection rate")
+    _validate_unit_rate(reference_selection_rate, "reference selection rate")
     return _difference(
         comparison_selection_rate, reference_selection_rate, "selection rate"
     )
@@ -169,6 +189,8 @@ def equal_opportunity_difference(
 ) -> MetricValue:
     """Return comparison minus reference true-positive rate."""
 
+    _validate_unit_rate(comparison_true_positive_rate, "comparison true-positive rate")
+    _validate_unit_rate(reference_true_positive_rate, "reference true-positive rate")
     return _difference(
         comparison_true_positive_rate,
         reference_true_positive_rate,
@@ -185,6 +207,21 @@ def _difference(comparison: MetricValue, reference: MetricValue, name: str) -> M
         comparison.value - reference.value,
         comparison.value,
         reference.value,
+    )
+
+
+def _validate_unit_rate(metric: MetricValue, name: str) -> None:
+    if not isinstance(metric, MetricValue):
+        raise TypeError(f"{name} must be a MetricValue")
+    if metric.value is not None and not 0.0 <= metric.value <= 1.0:
+        raise ValueError(f"{name} must be within [0, 1]")
+
+
+def _is_finite_metric_number(value: object) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
     )
 
 
@@ -251,4 +288,9 @@ def _validated_weights(weights: Sequence[float] | None, length: int) -> list[flo
         raise ValueError("weights and metric inputs must have equal lengths")
     if any(not math.isfinite(value) or value < 0 for value in normalized):
         raise ValueError("weights must be finite and non-negative")
-    return normalized
+    maximum = max(normalized, default=0.0)
+    if maximum == 0.0:
+        return normalized
+    # Scale invariance preserves every implemented weighted rate while keeping
+    # sums finite even when callers provide values near the float limit.
+    return [value / maximum for value in normalized]

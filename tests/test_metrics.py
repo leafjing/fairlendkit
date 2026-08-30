@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from fairlendkit.metrics import (
+    MetricValue,
     accuracy,
     adverse_impact_ratio,
     brier_score,
@@ -112,3 +113,58 @@ def test_performance_and_calibration_contracts():
 def test_metric_inputs_require_normalized_booleans():
     with pytest.raises(TypeError, match="normalized boolean"):
         selection_rate([1, 0])
+
+
+def test_hand_calculated_weighted_selection_rate(hand_fixture):
+    weighted = hand_fixture["weighted"]
+
+    result = selection_rate(weighted["favorable_decision"], weighted["weights"])
+
+    assert result.value == weighted["selection_rate"]
+    assert result.numerator == pytest.approx(1 / 3)
+    assert result.denominator == pytest.approx(4 / 3)
+
+
+def test_extreme_finite_weights_are_scaled_without_overflow():
+    result = selection_rate([True, False], [1e308, 1e308])
+
+    assert result.value == 0.5
+    assert result.numerator == 1.0
+    assert result.denominator == 2.0
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -float("inf")])
+def test_metric_value_rejects_non_finite_values(invalid):
+    with pytest.raises(ValueError, match="defined metric value must be finite"):
+        MetricValue(invalid, 1.0, 1.0)
+
+
+def test_metric_value_rejects_non_finite_evidence():
+    with pytest.raises(ValueError, match="metric evidence must be finite"):
+        MetricValue(0.5, 1.0, float("inf"))
+
+
+def test_metric_value_rejects_undefined_state_without_reason():
+    with pytest.raises(ValueError, match="requires undefined_reason"):
+        MetricValue(None, None, None)
+
+
+@pytest.mark.parametrize(
+    "disparity",
+    [adverse_impact_ratio, demographic_parity_difference],
+)
+@pytest.mark.parametrize("invalid_rate", [-0.01, 1.01, 2.0])
+def test_selection_disparities_reject_out_of_range_rates(disparity, invalid_rate):
+    invalid = MetricValue(invalid_rate, invalid_rate, 1.0)
+    valid = MetricValue(0.5, 0.5, 1.0)
+
+    with pytest.raises(ValueError, match=r"within \[0, 1\]"):
+        disparity(invalid, valid)
+
+
+def test_equal_opportunity_difference_rejects_out_of_range_rate():
+    invalid = MetricValue(1.1, 1.1, 1.0)
+    valid = MetricValue(0.5, 0.5, 1.0)
+
+    with pytest.raises(ValueError, match=r"within \[0, 1\]"):
+        equal_opportunity_difference(invalid, valid)

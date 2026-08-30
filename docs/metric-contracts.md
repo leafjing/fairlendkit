@@ -10,6 +10,18 @@ Every result records its value, numerator, denominator, and undefined reason.
 must be finite and non-negative; a zero total weight produces an undefined
 metric.
 
+For numerical stability, supplied weights are divided by their largest positive
+value before numerator and denominator evidence is accumulated. This does not
+change a weighted rate or mean, because both terms use the same positive scale,
+and prevents individually finite extreme weights from overflowing their sum.
+The recorded numerator and denominator are therefore normalized weight units,
+not necessarily the raw weight total.
+
+Public disparity functions accept only defined finite rate values in `[0, 1]`
+or a well-formed undefined `MetricValue` with a non-empty reason. `NaN`,
+infinity, out-of-range rates, non-finite evidence, and contradictory
+defined/undefined states fail validation.
+
 ## Outcome and decision metrics
 
 ### Selection rate
@@ -129,4 +141,3 @@ comparison group has selection rate `0.25`. Therefore AIR is `0.50`, demographic
 parity difference is `-0.25`, and equal opportunity difference is `0.00`.
 Tests also cover zero denominators, defined zeros, label-direction reversal,
 and reference-group reversal.
-
