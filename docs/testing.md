@@ -62,9 +62,11 @@ undefined-versus-zero confusion.
 
 | Case | Expected evidence |
 | --- | --- |
-| Zero comparison denominator | Ratio is explicitly undefined, never infinity, zero, or a compliance conclusion; counts and warning are preserved. |
-| No favorable outcomes | Selection and true-positive-related denominators follow the metric contract; undefined values are distinct from zero. |
-| No unfavorable outcomes | False-positive-related denominators follow the metric contract; undefined values are distinct from zero. |
+| Zero reference-group selection rate (AIR denominator) | AIR is explicitly undefined, never infinity, zero, or a compliance conclusion; both groups' counts and selection rates and the warning are preserved. |
+| Zero comparison-group selection rate with non-zero reference-group rate | AIR is the valid value `0`, not undefined; the comparison direction, both groups' counts, and both selection rates are preserved. |
+| No favorable decisions | Selection rate is the valid value `0`; AIR follows its group-rate denominator policy and remains distinct from outcome-conditioned metrics. |
+| No favorable outcomes | True-positive-related metrics follow their outcome-conditioned denominator contracts; undefined values are distinct from zero and from decision-based selection rates. |
+| No unfavorable outcomes | False-positive-related metrics follow their outcome-conditioned denominator contracts; undefined values are distinct from zero and from decision-based selection rates. |
 | Threshold `0` and `1` | Boundary inclusion matches the declared operator and score direction; decisions and counts are hand-checked. |
 | Missing protected group or reference group | Validation fails when the configured reference is absent; missing values follow the documented include/exclude policy and exclusions are counted. |
 | Tiny groups | Counts are reported and comparisons are warned or suppressed at the configured minimum; no confident screening claim is emitted. |
