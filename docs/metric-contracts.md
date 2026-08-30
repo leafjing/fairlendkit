@@ -5,10 +5,10 @@ functions consume boolean indicators normalized from the explicit
 `AuditConfig`: `True` means the configured favorable outcome or favorable
 decision. This prevents raw `0`/`1` encodings from silently changing direction.
 
-Every result records its value, numerator, denominator, and undefined reason.
-`None` means undefined and is never replaced by numeric zero. Optional weights
-must be finite and non-negative; a zero total weight produces an undefined
-metric.
+Every result records its value, numerator, denominator, and a reason from the
+[canonical undefined-reason vocabulary](undefined-reasons.md). `None` means
+undefined and is never replaced by numeric zero. Optional weights must be
+finite and non-negative; a zero total weight produces an undefined metric.
 
 For numerical stability, supplied weights are divided by their largest positive
 value before numerator and denominator evidence is accumulated. This does not
