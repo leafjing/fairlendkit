@@ -70,3 +70,29 @@ def test_a_decision_source_is_required():
 def test_threshold_operator_must_match_score_direction():
     with pytest.raises(ValidationError, match="inconsistent with score_direction"):
         AuditConfig(**config_values(threshold_operator="le"))
+
+
+@pytest.mark.parametrize(
+    ("direction", "operator", "score", "expected"),
+    [
+        ("higher_is_more_favorable", "ge", 0.5, True),
+        ("higher_is_more_favorable", "ge", 0.499, False),
+        ("lower_is_more_favorable", "le", 0.5, True),
+        ("lower_is_more_favorable", "le", 0.501, False),
+    ],
+)
+def test_derived_decision_threshold_is_inclusive(
+    direction, operator, score, expected
+):
+    config = AuditConfig(
+        **config_values(score_direction=direction, threshold_operator=operator)
+    )
+
+    assert config.is_favorable_decision_score(score) is expected
+
+
+def test_threshold_schema_records_inclusive_boundary_semantics():
+    properties = AuditConfig.model_json_schema()["properties"]
+
+    assert "score >= threshold" in properties["threshold_operator"]["description"]
+    assert "score <= threshold" in properties["threshold_operator"]["description"]

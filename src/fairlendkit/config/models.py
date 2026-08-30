@@ -41,10 +41,24 @@ class AuditConfig(BaseModel):
     score_direction: ScoreDirection
     protected_attributes: tuple[ColumnName, ...] = Field(min_length=1)
     reference_groups: dict[ColumnName, Label] = Field(min_length=1)
-    favorable_decision_label: Label
+    favorable_decision_label: Label = Field(
+        description=(
+            "Value representing the beneficial decision. For a derived decision, "
+            "a score satisfying the inclusive threshold rule receives this meaning."
+        )
+    )
     decision_column: ColumnName | None = None
-    decision_threshold: float | None = None
-    threshold_operator: ThresholdOperator | None = None
+    decision_threshold: float | None = Field(
+        default=None,
+        description="Finite score boundary used to derive a favorable decision.",
+    )
+    threshold_operator: ThresholdOperator | None = Field(
+        default=None,
+        description=(
+            "Inclusive comparison: ge means score >= threshold; "
+            "le means score <= threshold."
+        ),
+    )
     sample_weight_column: ColumnName | None = None
     candidate_proxy_features: tuple[ColumnName, ...] = ()
     minimum_group_size: int = Field(default=30, ge=1)
@@ -84,3 +98,23 @@ class AuditConfig(BaseModel):
                 f"expected {expected_operator.value!r}"
             )
         return self
+
+    def is_favorable_decision_score(self, score: float) -> bool:
+        """Return whether a score satisfies the inclusive derived-decision rule.
+
+        This method is available only for threshold-derived decisions. ``True``
+        means the record receives the meaning in ``favorable_decision_label``;
+        it does not describe the observed outcome or ``favorable_label``.
+        """
+
+        if self.decision_threshold is None or self.threshold_operator is None:
+            raise ValueError("configuration uses an observed decision_column")
+        try:
+            numeric_score = float(score)
+        except (TypeError, ValueError) as error:
+            raise ValueError("score must be a finite number") from error
+        if not math.isfinite(numeric_score):
+            raise ValueError("score must be a finite number")
+        if self.threshold_operator == ThresholdOperator.GREATER_THAN_OR_EQUAL:
+            return numeric_score >= self.decision_threshold
+        return numeric_score <= self.decision_threshold

@@ -1,5 +1,8 @@
 # Data specification and `AuditConfig`
 
+The [canonical glossary](glossary.md) is the normative vocabulary for this
+contract.
+
 ## Contract boundary
 
 An audit combines a tabular dataset with an explicit `AuditConfig`. FairLendKit
@@ -24,17 +27,18 @@ confidential data and artifacts must not be committed to the repository.
 - `reference_groups` (mapping): exactly one explicit reference value for every
   protected attribute. No demographic group is selected by default.
 - `favorable_decision_label` (`str | int | bool`): value representing the
-  beneficial action. It is required and distinct from `favorable_label`.
+  beneficial action. It is required and distinct from `favorable_label`, which
+  describes the observed outcome.
 - Exactly one decision source:
   - `decision_column`: column containing observed actions; or
   - `decision_threshold` and `threshold_operator`: finite threshold and explicit
-    comparison (`ge` or `le`) used to derive the favorable decision.
+    inclusive comparison (`ge` means score `>=` threshold; `le` means score
+    `<=` threshold) used to derive the favorable decision.
 
 ## Optional configuration
 
 - `sample_weight_column`: finite, non-negative weights with a positive total.
-- `candidate_proxy_features`: columns selected for potential proxy-risk
-  screening.
+- `candidate_proxy_features`: candidate feature columns selected for screening.
 - `minimum_group_size` (default `30`, minimum `1`): groups below this size are
   returned as warnings in the validation summary; they are not silently removed.
 - `confidence_level` (default `0.95`, exclusive range 0 to 1).
@@ -52,6 +56,12 @@ For a derived decision, `ge` is valid only with
 and decision directions fail validation instead of silently reversing results.
 Scores are not assumed to be probabilities, so the contract does not impose a
 0-to-1 threshold range.
+
+A score satisfying the inclusive threshold rule receives the meaning recorded
+by `favorable_decision_label`. For example, with threshold `0.6`, operator
+`ge`, and favorable decision label `"approved"`, scores equal to or greater
+than `0.6` are derived favorable decisions. This derived decision remains
+distinct from the observed outcome and `favorable_label`.
 
 ## Data mappings and values
 
@@ -84,6 +94,7 @@ config = AuditConfig(
     threshold_operator="ge",
 )
 summary = validate_audit_data(frame, config)
+assert config.is_favorable_decision_score(0.6)
 ```
 
 `ValidationSummary` records input, eligible, and excluded row counts plus stable
