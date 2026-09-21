@@ -17,6 +17,19 @@ confidential data and artifacts must not be committed to the repository.
 
 - `outcome_column` (`str`): observed outcome or ground-truth column.
 - `score_column` (`str`): finite numeric model score.
+- `population_definition` (`str`): non-blank description of the population
+  represented by the audit.
+- `sampling_definition` (`str`): non-blank, independent description of how
+  records were selected from that population, including when no sampling was
+  performed.
+- `score_type`: `probability` or `ranking`; the toolkit does not infer
+  calibration semantics from score values.
+- `dataset_version` and `model_version`: non-blank identifiers or explicit
+  `null` when unavailable.
+- `data_as_of`: timezone-aware extraction/as-of timestamp or explicit `null`
+  when unavailable.
+- `execution_timestamp`: timezone-aware timestamp for this audit execution,
+  recorded separately from `data_as_of`.
 - `favorable_label` (`str | int | bool`): value in the outcome column that
   represents the favorable outcome.
 - `score_direction`: `higher_is_more_favorable` or
@@ -49,6 +62,12 @@ Unknown configuration fields are rejected. Top-level configuration fields
 cannot be reassigned after construction. Orchestration code must serialize the
 validated configuration at run start so nested input mappings cannot alter the
 recorded run metadata.
+
+All run-context fields are required in the configuration. Only
+`dataset_version`, `model_version`, and `data_as_of` accept explicit `null` when
+the value is unavailable. Blank definitions, blank version identifiers,
+unsupported score types, naive timestamps, and omitted fields fail configuration
+validation before any data validation or metric calculation.
 
 Every input column has exactly one semantic role. Outcome, score, observed
 decision, sample weight, protected-attribute, and candidate-feature columns
@@ -92,6 +111,13 @@ from fairlendkit import AuditConfig, ScoreDirection, validate_audit_data
 config = AuditConfig(
     outcome_column="repaid",
     score_column="creditworthiness_score",
+    population_definition="All completed applications in 2026 Q2",
+    sampling_definition="All eligible records; no sampling",
+    score_type="ranking",
+    dataset_version="applications-2026q2-v1",
+    model_version="underwriting-v3.2",
+    data_as_of="2026-07-01T00:00:00Z",
+    execution_timestamp="2026-07-02T12:30:00Z",
     favorable_label=1,
     score_direction=ScoreDirection.HIGHER_IS_MORE_FAVORABLE,
     protected_attributes=("group",),

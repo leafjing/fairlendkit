@@ -8,6 +8,13 @@ def make_config(**overrides):
     values = {
         "outcome_column": "outcome",
         "score_column": "score",
+        "population_definition": "Completed applications in the review period",
+        "sampling_definition": "All eligible records; no sampling",
+        "score_type": "ranking",
+        "dataset_version": "applications-v1",
+        "model_version": None,
+        "data_as_of": "2026-07-01T00:00:00Z",
+        "execution_timestamp": "2026-07-02T12:30:00Z",
         "favorable_label": 1,
         "score_direction": "higher_is_more_favorable",
         "protected_attributes": ("group",),

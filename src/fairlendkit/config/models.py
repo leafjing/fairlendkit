@@ -6,10 +6,11 @@ import math
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 Label = str | int | bool
 ColumnName = Annotated[str, Field(min_length=1)]
+NonBlankText = Annotated[str, Field(min_length=1, pattern=r".*\S.*")]
 
 
 class ScoreDirection(StrEnum):
@@ -26,6 +27,13 @@ class ThresholdOperator(StrEnum):
     LESS_THAN_OR_EQUAL = "le"
 
 
+class ScoreType(StrEnum):
+    """Whether scores have probability semantics or only ranking semantics."""
+
+    PROBABILITY = "probability"
+    RANKING = "ranking"
+
+
 class AuditConfig(BaseModel):
     """Validated semantic and column contract for one audit run.
 
@@ -33,10 +41,21 @@ class AuditConfig(BaseModel):
     silently ignored.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        protected_namespaces=(),
+    )
 
     outcome_column: ColumnName
     score_column: ColumnName
+    population_definition: NonBlankText
+    sampling_definition: NonBlankText
+    score_type: ScoreType
+    dataset_version: NonBlankText | None
+    model_version: NonBlankText | None
+    data_as_of: AwareDatetime | None
+    execution_timestamp: AwareDatetime
     favorable_label: Label
     score_direction: ScoreDirection
     protected_attributes: tuple[ColumnName, ...] = Field(min_length=1)
