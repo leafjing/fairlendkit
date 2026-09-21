@@ -2,7 +2,7 @@
 
 ## Product summary
 
-FairLendKit is an open-source, credit-specific audit framework for examining group outcome disparities, model-performance disparities, decision-threshold sensitivity, and potential proxy-risk indicators. It turns an explicitly configured dataset and model semantics into reproducible, review-ready technical evidence.
+FairLendKit is an open-source, credit-specific audit framework for examining group outcome disparities, model-performance disparities, decision-threshold sensitivity, and potential proxy-risk indicators. It turns an explicitly configured dataset and model semantics into reproducible, review-ready technical evidence and places that evidence within a human-owned risk-review workflow.
 
 FairLendKit exists because general-purpose fairness libraries expose useful metrics but do not, by themselves, provide the semantic checks, credit-specific workflow, uncertainty context, provenance, and reporting boundaries needed for a defensible practitioner review. The project connects those pieces without turning a statistical screen into a legal conclusion.
 
@@ -28,12 +28,20 @@ Given an eligible dataset and an explicit audit configuration, a practitioner ca
 
 V1 measures and reports. Mitigation experiments and before/after re-auditing are deferred to V1.1.
 
+The practitioner workflow is: analytical finding, risk assessment, investigation,
+decision, and remediation or monitoring. FairLendKit owns the reproducible
+analysis and transparent review prompts; accountable Model Risk, Compliance,
+Business, Credit, Audit, or Governance stakeholders own interpretation and action.
+
 ## Differentiators
 
 - **Credit-specific semantics:** favorable outcome, score direction, decision meaning, audit groups, and reference group are explicit and validated.
 - **Evidence, not verdicts:** observed metrics, screening flags, uncertainty, limitations, and practitioner notes remain separate. Automated reports do not declare legal compliance.
 - **Reproducibility:** outputs preserve configuration, input fingerprint, package version, execution time, warnings, and metric definitions.
 - **Complete review artifact:** threshold analysis and proxy-risk screening use the same validated inputs and typed result model as the primary group analysis.
+- **Actionable without overclaiming:** transparent screening flags connect findings
+  to non-prescriptive investigation prompts while keeping human ownership and
+  legal interpretation outside the automated result.
 - **Publicly verifiable examples:** committed examples use public, appropriately licensed, or synthetic data and document their limitations.
 
 ## Non-goals
@@ -81,4 +89,3 @@ Stars, downloads, and repository traffic may be reported as context, but they ar
 - [Architecture](architecture.md)
 - [Methodology and guardrails](methodology-and-guardrails.md)
 - [Roadmap](roadmap.md)
-

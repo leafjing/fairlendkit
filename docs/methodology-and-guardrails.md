@@ -56,3 +56,29 @@ Reports separate:
 
 The terms `compliant`, `non-compliant`, `legal`, and `illegal` must not be generated as automated conclusions.
 
+## Findings and follow-up
+
+FairLendKit must keep the following stages distinct:
+
+1. Analytical finding: a reproducible observation or validation result.
+2. Risk assessment: human evaluation of severity, likelihood, scope, and context.
+3. Investigation: data, control, business-rule, model, threshold, or feature review.
+4. Decision: an accountable owner determines the disposition and rationale.
+5. Remediation or monitoring: approved action, tracking, and subsequent review.
+
+The report may suggest relevant investigation categories, but it must not claim
+that an observed disparity identifies its cause. A reviewer may conclude that no
+further action is warranted, provided the rationale and evidence are documented.
+
+Flag thresholds must be configurable or normatively documented, versioned, and
+shown with the supporting values. Arbitrary or undisclosed red/amber/green logic
+is prohibited.
+
+## Audience layers
+
+Executive summaries communicate scope, population, key observations, data-quality
+concerns, follow-up areas, and important limitations without omitting uncertainty.
+Reviewer detail includes counts, definitions, comparison groups, thresholds,
+confidence intervals, exclusions, warnings, and reproducibility metadata. The two
+layers must be generated from the same typed result and cannot make conflicting
+claims.
