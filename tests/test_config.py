@@ -10,6 +10,13 @@ def config_values(**overrides):
     values = {
         "outcome_column": "outcome",
         "score_column": "score",
+        "population_definition": "Completed applications in the review period",
+        "sampling_definition": "All eligible records; no sampling",
+        "score_type": "ranking",
+        "dataset_version": "applications-v1",
+        "model_version": None,
+        "data_as_of": "2026-07-01T00:00:00Z",
+        "execution_timestamp": "2026-07-02T12:30:00Z",
         "favorable_label": 1,
         "score_direction": ScoreDirection.HIGHER_IS_MORE_FAVORABLE,
         "protected_attributes": ("group",),
@@ -20,6 +27,75 @@ def config_values(**overrides):
     }
     values.update(overrides)
     return values
+
+
+@pytest.mark.parametrize("field", ["population_definition", "sampling_definition"])
+@pytest.mark.parametrize("value", ["", "   ", "\t\n"])
+def test_run_context_definitions_must_be_non_blank(field, value):
+    with pytest.raises(ValidationError):
+        AuditConfig(**config_values(**{field: value}))
+
+
+@pytest.mark.parametrize("field", ["dataset_version", "model_version"])
+def test_versions_must_be_non_blank_or_explicitly_unavailable(field):
+    with pytest.raises(ValidationError):
+        AuditConfig(**config_values(**{field: "  "}))
+
+    assert getattr(AuditConfig(**config_values(**{field: None})), field) is None
+
+
+def test_score_type_is_explicit_and_closed():
+    config = AuditConfig(**config_values(score_type="probability"))
+
+    assert config.score_type == "probability"
+
+    with pytest.raises(ValidationError):
+        AuditConfig(**config_values(score_type="unknown"))
+
+
+@pytest.mark.parametrize("field", ["data_as_of", "execution_timestamp"])
+def test_run_context_timestamps_require_timezone(field):
+    with pytest.raises(ValidationError):
+        AuditConfig(**config_values(**{field: "2026-07-01T00:00:00"}))
+
+
+def test_run_context_serialization_keeps_as_of_and_execution_times_distinct():
+    config = AuditConfig(**config_values())
+    serialized = config.model_dump(mode="json")
+
+    assert serialized["data_as_of"] == "2026-07-01T00:00:00Z"
+    assert serialized["execution_timestamp"] == "2026-07-02T12:30:00Z"
+    assert serialized["data_as_of"] != serialized["execution_timestamp"]
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "population_definition",
+        "sampling_definition",
+        "score_type",
+        "dataset_version",
+        "model_version",
+        "data_as_of",
+        "execution_timestamp",
+    ],
+)
+def test_run_context_fields_are_explicitly_required(field):
+    values = config_values()
+    del values[field]
+
+    with pytest.raises(ValidationError, match="Field required"):
+        AuditConfig(**values)
+
+
+def test_nullable_run_context_fields_require_explicit_null_when_unavailable():
+    config = AuditConfig(
+        **config_values(dataset_version=None, model_version=None, data_as_of=None)
+    )
+
+    assert config.dataset_version is None
+    assert config.model_version is None
+    assert config.data_as_of is None
 
 
 def test_score_direction_is_explicit_and_reversible():
