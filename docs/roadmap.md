@@ -9,14 +9,28 @@
 
 ## V1 — Reproducible audit workflow
 
-1. Configuration and data validation
-2. Performance, selection, error, and calibration metrics
-3. Threshold scanning and fairness-accuracy frontier
-4. Exploratory screening for potential proxy-risk indicators
-5. HTML, JSON, and CSV reporting
-6. Synthetic end-to-end example
-7. Public-data example with documented limitations
-8. Packaging, CI, documentation, contribution guide, and citation metadata
+1. Structural and semantic validation, including explicit population, label,
+   score, decision, reference-group, and unknown-value treatment
+2. Data-quality observations covering missingness by group, sample sufficiency,
+   unexpected categories, freshness, and version/distribution change where a
+   baseline is available
+3. A small, well-tested core of performance, selection, error, calibration, and
+   disparity metrics with counts, uncertainty, and applicability guidance
+4. Robust handling of small groups, imbalance, sparse outcomes, zero
+   denominators, invalid inputs, and undefined or unreliable metrics
+5. Threshold scanning and fairness-accuracy frontier
+6. Layered HTML, JSON, and CSV reporting from one typed result model: executive
+   summary, reviewer detail, transparent screening flags, and audit trail
+7. Non-prescriptive investigation prompts and an integration contract for human
+   ownership, disposition, remediation, and monitoring records
+8. Exploratory screening for potential proxy-risk indicators
+9. Synthetic end-to-end example and public-data example with documented
+   limitations and realistic practitioner interpretation
+10. Packaging, CI, documentation, contribution guide, and citation metadata
+
+V1 prioritizes correctness, transparency, reproducibility, and usability before
+breadth. A metric or flag is not release-ready until its semantics, applicability,
+edge cases, tests, report representation, and limitations are documented.
 
 ## V1.1 — Mitigation experiments
 
