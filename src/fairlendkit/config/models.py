@@ -60,6 +60,7 @@ class AuditConfig(BaseModel):
     score_direction: ScoreDirection
     protected_attributes: tuple[ColumnName, ...] = Field(min_length=1)
     reference_groups: dict[ColumnName, Label] = Field(min_length=1)
+    allowed_groups: dict[ColumnName, tuple[Label, ...]] = Field(min_length=1)
     favorable_decision_label: Label = Field(
         description=(
             "Value representing the beneficial decision. For a derived decision, "
@@ -83,11 +84,13 @@ class AuditConfig(BaseModel):
     minimum_group_size: int = Field(default=30, ge=1)
     confidence_level: float = Field(default=0.95, gt=0.0, lt=1.0)
     missing_value_policy: Literal["exclude", "error"] = "error"
+    unknown_group_policy: Literal["exclude", "error"] = "error"
 
     @model_validator(mode="after")
     def validate_semantics(self) -> "AuditConfig":
         protected = set(self.protected_attributes)
         references = set(self.reference_groups)
+        allowed = set(self.allowed_groups)
         if len(protected) != len(self.protected_attributes):
             raise ValueError("protected_attributes must not contain duplicates")
         if protected != references:
@@ -95,6 +98,22 @@ class AuditConfig(BaseModel):
                 "reference_groups must contain exactly one explicit value for "
                 "each protected attribute"
             )
+        if protected != allowed:
+            raise ValueError(
+                "allowed_groups must contain exactly one explicit value list for "
+                "each protected attribute"
+            )
+        for attribute, values in self.allowed_groups.items():
+            if not values:
+                raise ValueError(f"allowed_groups[{attribute!r}] must not be empty")
+            if _has_typed_duplicates(values):
+                raise ValueError(
+                    f"allowed_groups[{attribute!r}] must not contain duplicates"
+                )
+            if not _contains_typed_value(values, self.reference_groups[attribute]):
+                raise ValueError(
+                    f"reference_groups[{attribute!r}] must belong to allowed_groups"
+                )
         column_roles: list[tuple[str, str]] = [
             (self.outcome_column, "outcome_column"),
             (self.score_column, "score_column"),
@@ -165,3 +184,19 @@ class AuditConfig(BaseModel):
         if self.threshold_operator == ThresholdOperator.GREATER_THAN_OR_EQUAL:
             return numeric_score >= self.decision_threshold
         return numeric_score <= self.decision_threshold
+
+
+def _contains_typed_value(values: tuple[Label, ...], expected: Label) -> bool:
+    return any(_typed_values_equal(value, expected) for value in values)
+
+
+def _has_typed_duplicates(values: tuple[Label, ...]) -> bool:
+    return any(
+        _typed_values_equal(value, earlier)
+        for index, value in enumerate(values)
+        for earlier in values[:index]
+    )
+
+
+def _typed_values_equal(actual: object, expected: object) -> bool:
+    return type(actual) is type(expected) and actual == expected

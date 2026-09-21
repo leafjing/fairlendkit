@@ -12,7 +12,10 @@ The project is designed for reproducible practitioner review using public or syn
 - Reproducible HTML, JSON, and CSV audit outputs
 - Synthetic reference workflow and a documented public-data case study
 
-See the [Product brief](docs/product-brief.md), [Product requirements](docs/product-requirements.md), [Canonical glossary](docs/glossary.md), [Architecture](docs/architecture.md), [Metric contracts](docs/metric-contracts.md), [Methodology and guardrails](docs/methodology-and-guardrails.md), and [Roadmap](docs/roadmap.md).
+See the [Product brief](docs/product-brief.md), [Product requirements](docs/product-requirements.md), [Canonical glossary](docs/glossary.md), [Architecture](docs/architecture.md), [Metric contracts](docs/metric-contracts.md), [Report schema](docs/report-schema.md), [Methodology and guardrails](docs/methodology-and-guardrails.md), and [Roadmap](docs/roadmap.md).
+
+Implementation is tracked as ordered, testable work packages in the
+[V1 implementation plan](docs/implementation-plan.md).
 
 ## Status
 

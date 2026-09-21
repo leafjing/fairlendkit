@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 
 from fairlendkit import AuditConfig, DataValidationError, validate_audit_data
 
@@ -19,6 +20,7 @@ def make_config(**overrides):
         "score_direction": "higher_is_more_favorable",
         "protected_attributes": ("group",),
         "reference_groups": {"group": "A"},
+        "allowed_groups": {"group": ("A", "B")},
         "favorable_decision_label": 1,
         "decision_threshold": 0.5,
         "threshold_operator": "ge",
@@ -44,7 +46,7 @@ def test_missing_column_fails_validation():
 
 
 def test_unknown_reference_group_fails_validation():
-    with pytest.raises(DataValidationError, match="not present"):
+    with pytest.raises(ValidationError, match="must belong to allowed_groups"):
         validate_audit_data(make_data(), make_config(reference_groups={"group": "C"}))
 
 
@@ -79,6 +81,7 @@ def test_multiple_protected_attributes_require_known_references():
     config = make_config(
         protected_attributes=("group", "region"),
         reference_groups={"group": "A", "region": "north"},
+        allowed_groups={"group": ("A", "B"), "region": ("north", "south")},
     )
 
     summary = validate_audit_data(data, config)
@@ -94,8 +97,14 @@ def test_boolean_favorable_label_does_not_match_integer_one():
 def test_boolean_reference_group_does_not_match_integer_one():
     data = make_data().assign(group=[1, 1, 2])
 
-    with pytest.raises(DataValidationError, match="reference group"):
-        validate_audit_data(data, make_config(reference_groups={"group": True}))
+    with pytest.raises(ValidationError, match="must belong to allowed_groups"):
+        validate_audit_data(
+            data,
+            make_config(
+                reference_groups={"group": True},
+                allowed_groups={"group": (1, 2)},
+            ),
+        )
 
 
 def test_boolean_favorable_decision_does_not_match_integer_one():
@@ -109,3 +118,120 @@ def test_boolean_favorable_decision_does_not_match_integer_one():
 
     with pytest.raises(DataValidationError, match="favorable_decision_label"):
         validate_audit_data(data, config)
+
+
+def test_unknown_group_is_not_silently_excluded_by_default():
+    data = make_data().assign(group=["A", "B", "C"])
+
+    with pytest.raises(DataValidationError, match="unknown protected groups"):
+        validate_audit_data(data, make_config())
+
+
+def test_missing_and_unknown_exclusions_are_orthogonal_and_deduplicated():
+    data = pd.DataFrame(
+        {
+            "outcome": [1, 0, 1, 0],
+            "score": [0.9, None, 0.7, 0.2],
+            "group": ["A", "C", None, "C"],
+        }
+    )
+    summary = validate_audit_data(
+        data,
+        make_config(
+            missing_value_policy="exclude",
+            unknown_group_policy="exclude",
+            minimum_group_size=1,
+        ),
+    )
+
+    assert summary.eligible_rows == 1
+    assert summary.excluded_rows == 3
+    assert summary.exclusion_reason_counts == {
+        "missing_required_value": 2,
+        "unknown_protected_group": 2,
+    }
+    unknown_evidence = next(
+        item
+        for item in summary.exclusion_evidence
+        if item.reason == "unknown_protected_group"
+    )
+    assert unknown_evidence.attribute == "group"
+    assert unknown_evidence.observed_value == "C"
+    assert unknown_evidence.count == 2
+
+
+def test_allowed_groups_use_type_sensitive_membership():
+    data = make_data().assign(group=[1, True, 2])
+    config = make_config(
+        reference_groups={"group": 1},
+        allowed_groups={"group": (1, 2)},
+        unknown_group_policy="exclude",
+        minimum_group_size=1,
+    )
+
+    summary = validate_audit_data(data, config)
+
+    assert summary.eligible_rows == 2
+    assert summary.exclusion_reason_counts["unknown_protected_group"] == 1
+
+
+def test_small_group_counts_keep_boolean_and_integer_groups_distinct():
+    data = make_data().assign(group=[1, True, True])
+    config = make_config(
+        reference_groups={"group": 1},
+        allowed_groups={"group": (1, True)},
+        minimum_group_size=2,
+    )
+
+    summary = validate_audit_data(data, config)
+
+    assert summary.small_groups == ("group=1",)
+
+
+def test_validation_does_not_mutate_input_dataframe():
+    data = pd.DataFrame(
+        {
+            "outcome": pd.Series([1, 0, 1], dtype="Int64"),
+            "score": pd.Series([0.9, float("nan"), 0.7], dtype="float64"),
+            "group": pd.Series(["A", "C", None], dtype="string"),
+        },
+        index=pd.Index([10, 20, 30], name="application_id"),
+    )
+    before = data.copy(deep=True)
+
+    with pytest.raises(DataValidationError):
+        validate_audit_data(
+            data,
+            make_config(
+                missing_value_policy="exclude",
+                unknown_group_policy="exclude",
+            ),
+        )
+
+    pd.testing.assert_frame_equal(data, before, check_dtype=True, check_names=True)
+
+
+def test_rejected_run_retains_all_reason_codes_and_evidence():
+    data = pd.DataFrame(
+        {
+            "outcome": [1, 0, 1],
+            "score": [0.9, None, 0.7],
+            "group": ["A", "C", None],
+        }
+    )
+
+    with pytest.raises(DataValidationError) as caught:
+        validate_audit_data(data, make_config())
+
+    assert caught.value.reason_counts == {
+        "missing_required_value": 2,
+        "unknown_protected_group": 1,
+    }
+    assert {
+        (item.reason, item.attribute, item.observed_value, item.count)
+        for item in caught.value.evidence
+    } == {
+        ("missing_required_value", "group", None, 1),
+        ("missing_required_value", "score", None, 1),
+        ("unknown_protected_group", "group", "C", 1),
+    }

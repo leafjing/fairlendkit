@@ -7,10 +7,22 @@ from dataclasses import dataclass
 import pandas as pd
 
 from fairlendkit.config import AuditConfig
+from fairlendkit.data.contracts import ExclusionEvidence, ExclusionReason
 
 
 class DataValidationError(ValueError):
     """Raised when audit data does not satisfy its declared contract."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason_counts: dict[ExclusionReason, int] | None = None,
+        evidence: tuple[ExclusionEvidence, ...] = (),
+    ) -> None:
+        super().__init__(message)
+        self.reason_counts = dict(reason_counts or {})
+        self.evidence = evidence
 
 
 @dataclass(frozen=True)
@@ -21,6 +33,8 @@ class ValidationSummary:
     eligible_rows: int
     excluded_rows: int
     small_groups: tuple[str, ...]
+    exclusion_reason_counts: dict[ExclusionReason, int]
+    exclusion_evidence: tuple[ExclusionEvidence, ...]
 
 
 def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSummary:
@@ -41,14 +55,63 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
 
     relevant = data[list(sorted(required))]
     missing_rows = relevant.isna().any(axis=1)
+    unknown_rows = pd.Series(False, index=data.index)
+    evidence = [
+        ExclusionEvidence(
+            reason=ExclusionReason.MISSING_REQUIRED_VALUE,
+            attribute=column,
+            observed_value=None,
+            count=int(relevant[column].isna().sum()),
+        )
+        for column in sorted(required)
+        if relevant[column].isna().any()
+    ]
+    for attribute in config.protected_attributes:
+        present = data[attribute].notna()
+        allowed = config.allowed_groups[attribute]
+        known = data[attribute].map(
+            lambda value: not pd.isna(value)
+            and any(_typed_values_equal(value, item) for item in allowed)
+        )
+        attribute_unknown = present & ~known
+        if attribute_unknown.any():
+            for value, count in _typed_value_counts(data.loc[attribute_unknown, attribute]):
+                evidence.append(
+                    ExclusionEvidence(
+                        reason=ExclusionReason.UNKNOWN_PROTECTED_GROUP,
+                        attribute=attribute,
+                        observed_value=value,
+                        count=count,
+                    )
+                )
+            unknown_rows |= attribute_unknown
+
+    reason_counts = {
+        ExclusionReason.MISSING_REQUIRED_VALUE: int(missing_rows.sum()),
+        ExclusionReason.UNKNOWN_PROTECTED_GROUP: int(unknown_rows.sum()),
+    }
+    rejected_reasons = []
     if missing_rows.any() and config.missing_value_policy == "error":
+        rejected_reasons.append(
+            f"{reason_counts[ExclusionReason.MISSING_REQUIRED_VALUE]} rows contain "
+            "missing required values"
+        )
+    if unknown_rows.any() and config.unknown_group_policy == "error":
+        rejected_reasons.append(
+            f"{reason_counts[ExclusionReason.UNKNOWN_PROTECTED_GROUP]} rows contain "
+            "unknown protected groups"
+        )
+    if rejected_reasons:
         raise DataValidationError(
-            f"{int(missing_rows.sum())} rows contain missing required values"
+            "; ".join(rejected_reasons),
+            reason_counts=reason_counts,
+            evidence=tuple(evidence),
         )
 
-    eligible = data.loc[~missing_rows]
+    excluded = missing_rows | unknown_rows
+    eligible = data.loc[~excluded]
     if eligible.empty:
-        raise DataValidationError("no eligible rows remain after missing-value handling")
+        raise DataValidationError("no eligible rows remain after exclusion handling")
 
     if not _contains_typed_value(
         eligible[config.outcome_column], config.favorable_label
@@ -82,17 +145,19 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
             raise DataValidationError(
                 f"reference group {reference!r} is not present in {attribute!r}"
             )
-        counts = eligible.groupby(attribute, dropna=False).size()
+        counts = _typed_value_counts(eligible[attribute])
         small_groups.extend(
-            f"{attribute}={value!r}" for value, count in counts.items()
+            f"{attribute}={value!r}" for value, count in counts
             if count < config.minimum_group_size
         )
 
     return ValidationSummary(
         input_rows=len(data),
         eligible_rows=len(eligible),
-        excluded_rows=int(missing_rows.sum()),
+        excluded_rows=int(excluded.sum()),
         small_groups=tuple(sorted(small_groups)),
+        exclusion_reason_counts=reason_counts,
+        exclusion_evidence=tuple(evidence),
     )
 
 
@@ -136,3 +201,17 @@ def _typed_values_equal(actual: object, expected: object) -> bool:
             and int(actual) == int(expected)
         )
     return type(actual) is type(expected) and bool(actual == expected)
+
+
+def _typed_value_counts(series: pd.Series) -> list[tuple[object, int]]:
+    """Count values without merging Python-equal values such as ``True`` and ``1``."""
+
+    counts: list[list[object | int]] = []
+    for value in series.tolist():
+        for entry in counts:
+            if _typed_values_equal(value, entry[0]):
+                entry[1] = int(entry[1]) + 1
+                break
+        else:
+            counts.append([value, 1])
+    return [(entry[0], int(entry[1])) for entry in counts]
