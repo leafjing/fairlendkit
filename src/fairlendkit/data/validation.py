@@ -13,6 +13,17 @@ from fairlendkit.data.contracts import ExclusionEvidence, ExclusionReason
 class DataValidationError(ValueError):
     """Raised when audit data does not satisfy its declared contract."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason_counts: dict[ExclusionReason, int] | None = None,
+        evidence: tuple[ExclusionEvidence, ...] = (),
+    ) -> None:
+        super().__init__(message)
+        self.reason_counts = dict(reason_counts or {})
+        self.evidence = evidence
+
 
 @dataclass(frozen=True)
 class ValidationSummary:
@@ -44,13 +55,17 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
 
     relevant = data[list(sorted(required))]
     missing_rows = relevant.isna().any(axis=1)
-    if missing_rows.any() and config.missing_value_policy == "error":
-        raise DataValidationError(
-            f"{int(missing_rows.sum())} rows contain missing required values"
-        )
-
     unknown_rows = pd.Series(False, index=data.index)
-    evidence: list[ExclusionEvidence] = []
+    evidence = [
+        ExclusionEvidence(
+            reason=ExclusionReason.MISSING_REQUIRED_VALUE,
+            attribute=column,
+            observed_value=None,
+            count=int(relevant[column].isna().sum()),
+        )
+        for column in sorted(required)
+        if relevant[column].isna().any()
+    ]
     for attribute in config.protected_attributes:
         present = data[attribute].notna()
         allowed = config.allowed_groups[attribute]
@@ -71,9 +86,26 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
                 )
             unknown_rows |= attribute_unknown
 
+    reason_counts = {
+        ExclusionReason.MISSING_REQUIRED_VALUE: int(missing_rows.sum()),
+        ExclusionReason.UNKNOWN_PROTECTED_GROUP: int(unknown_rows.sum()),
+    }
+    rejected_reasons = []
+    if missing_rows.any() and config.missing_value_policy == "error":
+        rejected_reasons.append(
+            f"{reason_counts[ExclusionReason.MISSING_REQUIRED_VALUE]} rows contain "
+            "missing required values"
+        )
     if unknown_rows.any() and config.unknown_group_policy == "error":
+        rejected_reasons.append(
+            f"{reason_counts[ExclusionReason.UNKNOWN_PROTECTED_GROUP]} rows contain "
+            "unknown protected groups"
+        )
+    if rejected_reasons:
         raise DataValidationError(
-            f"{int(unknown_rows.sum())} rows contain unknown protected groups"
+            "; ".join(rejected_reasons),
+            reason_counts=reason_counts,
+            evidence=tuple(evidence),
         )
 
     excluded = missing_rows | unknown_rows
@@ -124,10 +156,7 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
         eligible_rows=len(eligible),
         excluded_rows=int(excluded.sum()),
         small_groups=tuple(sorted(small_groups)),
-        exclusion_reason_counts={
-            ExclusionReason.MISSING_REQUIRED_VALUE: int(missing_rows.sum()),
-            ExclusionReason.UNKNOWN_PROTECTED_GROUP: int(unknown_rows.sum()),
-        },
+        exclusion_reason_counts=reason_counts,
         exclusion_evidence=tuple(evidence),
     )
 

@@ -150,9 +150,14 @@ def test_missing_and_unknown_exclusions_are_orthogonal_and_deduplicated():
         "missing_required_value": 2,
         "unknown_protected_group": 2,
     }
-    assert summary.exclusion_evidence[0].attribute == "group"
-    assert summary.exclusion_evidence[0].observed_value == "C"
-    assert summary.exclusion_evidence[0].count == 2
+    unknown_evidence = next(
+        item
+        for item in summary.exclusion_evidence
+        if item.reason == "unknown_protected_group"
+    )
+    assert unknown_evidence.attribute == "group"
+    assert unknown_evidence.observed_value == "C"
+    assert unknown_evidence.count == 2
 
 
 def test_allowed_groups_use_type_sensitive_membership():
@@ -191,3 +196,29 @@ def test_validation_does_not_mutate_input_dataframe():
         )
 
     pd.testing.assert_frame_equal(data, before, check_dtype=True, check_names=True)
+
+
+def test_rejected_run_retains_all_reason_codes_and_evidence():
+    data = pd.DataFrame(
+        {
+            "outcome": [1, 0, 1],
+            "score": [0.9, None, 0.7],
+            "group": ["A", "C", None],
+        }
+    )
+
+    with pytest.raises(DataValidationError) as caught:
+        validate_audit_data(data, make_config())
+
+    assert caught.value.reason_counts == {
+        "missing_required_value": 2,
+        "unknown_protected_group": 1,
+    }
+    assert {
+        (item.reason, item.attribute, item.observed_value, item.count)
+        for item in caught.value.evidence
+    } == {
+        ("missing_required_value", "group", None, 1),
+        ("missing_required_value", "score", None, 1),
+        ("unknown_protected_group", "group", "C", 1),
+    }
