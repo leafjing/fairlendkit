@@ -145,9 +145,9 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
             raise DataValidationError(
                 f"reference group {reference!r} is not present in {attribute!r}"
             )
-        counts = eligible.groupby(attribute, dropna=False).size()
+        counts = _typed_value_counts(eligible[attribute])
         small_groups.extend(
-            f"{attribute}={value!r}" for value, count in counts.items()
+            f"{attribute}={value!r}" for value, count in counts
             if count < config.minimum_group_size
         )
 

@@ -175,6 +175,19 @@ def test_allowed_groups_use_type_sensitive_membership():
     assert summary.exclusion_reason_counts["unknown_protected_group"] == 1
 
 
+def test_small_group_counts_keep_boolean_and_integer_groups_distinct():
+    data = make_data().assign(group=[1, True, True])
+    config = make_config(
+        reference_groups={"group": 1},
+        allowed_groups={"group": (1, True)},
+        minimum_group_size=2,
+    )
+
+    summary = validate_audit_data(data, config)
+
+    assert summary.small_groups == ("group=1",)
+
+
 def test_validation_does_not_mutate_input_dataframe():
     data = pd.DataFrame(
         {

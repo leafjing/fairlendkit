@@ -25,4 +25,3 @@ class ExclusionEvidence:
     count: int
     attribute: str | None = None
     observed_value: object | None = None
-
