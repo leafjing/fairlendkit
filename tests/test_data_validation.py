@@ -168,3 +168,26 @@ def test_allowed_groups_use_type_sensitive_membership():
 
     assert summary.eligible_rows == 2
     assert summary.exclusion_reason_counts["unknown_protected_group"] == 1
+
+
+def test_validation_does_not_mutate_input_dataframe():
+    data = pd.DataFrame(
+        {
+            "outcome": pd.Series([1, 0, 1], dtype="Int64"),
+            "score": pd.Series([0.9, float("nan"), 0.7], dtype="float64"),
+            "group": pd.Series(["A", "C", None], dtype="string"),
+        },
+        index=pd.Index([10, 20, 30], name="application_id"),
+    )
+    before = data.copy(deep=True)
+
+    with pytest.raises(DataValidationError):
+        validate_audit_data(
+            data,
+            make_config(
+                missing_value_policy="exclude",
+                unknown_group_policy="exclude",
+            ),
+        )
+
+    pd.testing.assert_frame_equal(data, before, check_dtype=True, check_names=True)
