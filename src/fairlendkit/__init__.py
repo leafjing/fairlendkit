@@ -1,13 +1,21 @@
 """Public package interface for FairLendKit."""
 
 from fairlendkit.config import AuditConfig, ScoreDirection, ScoreType, ThresholdOperator
-from fairlendkit.data import DataValidationError, ValidationSummary, validate_audit_data
+from fairlendkit.data import (
+    DataValidationError,
+    ExclusionEvidence,
+    ExclusionReason,
+    ValidationSummary,
+    validate_audit_data,
+)
 from fairlendkit.report import AuditResult
 
 __all__ = [
     "AuditConfig",
     "AuditResult",
     "DataValidationError",
+    "ExclusionEvidence",
+    "ExclusionReason",
     "ScoreDirection",
     "ScoreType",
     "ThresholdOperator",

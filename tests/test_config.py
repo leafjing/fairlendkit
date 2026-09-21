@@ -21,6 +21,7 @@ def config_values(**overrides):
         "score_direction": ScoreDirection.HIGHER_IS_MORE_FAVORABLE,
         "protected_attributes": ("group",),
         "reference_groups": {"group": "A"},
+        "allowed_groups": {"group": ("A", "B")},
         "favorable_decision_label": 1,
         "decision_threshold": 0.5,
         "threshold_operator": "ge",
@@ -122,6 +123,7 @@ def test_reference_group_required_for_every_protected_attribute():
             **config_values(
                 protected_attributes=("group", "region"),
                 reference_groups={"group": "A"},
+                allowed_groups={"group": ("A",), "region": ("north",)},
             )
         )
 
@@ -182,6 +184,7 @@ def test_threshold_schema_records_inclusive_boundary_semantics():
             {
                 "protected_attributes": ("score",),
                 "reference_groups": {"score": "A"},
+                "allowed_groups": {"score": ("A",)},
             },
             "score_column, protected_attributes[0]",
         ),
@@ -198,3 +201,34 @@ def test_columns_cannot_share_semantic_roles(overrides, conflicting_roles):
         AuditConfig(**config_values(**overrides))
 
     assert conflicting_roles in str(error.value)
+
+
+def test_allowed_groups_required_for_every_protected_attribute():
+    with pytest.raises(ValidationError, match="allowed_groups must contain exactly"):
+        AuditConfig(
+            **config_values(
+                protected_attributes=("group", "region"),
+                reference_groups={"group": "A", "region": "north"},
+            )
+        )
+
+
+def test_reference_group_must_be_in_type_sensitive_allowed_groups():
+    with pytest.raises(ValidationError, match="must belong to allowed_groups"):
+        AuditConfig(
+            **config_values(
+                reference_groups={"group": True},
+                allowed_groups={"group": (1,)},
+            )
+        )
+
+
+def test_allowed_groups_reject_type_sensitive_duplicates_only():
+    config = AuditConfig(
+        **config_values(
+            reference_groups={"group": True},
+            allowed_groups={"group": (True, 1, "1")},
+        )
+    )
+
+    assert config.allowed_groups["group"] == (True, 1, "1")
