@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
+from numbers import Real
 
 import pandas as pd
 
@@ -35,27 +37,29 @@ class ValidationSummary:
     small_groups: tuple[str, ...]
     exclusion_reason_counts: dict[ExclusionReason, int]
     exclusion_evidence: tuple[ExclusionEvidence, ...]
+    reason_counts: tuple[tuple[str, int], ...]
+    duplicate_rows: int
 
 
 def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSummary:
-    """Validate required columns, semantics, values, and configured groups.
-
-    Missing rows are counted when ``missing_value_policy`` is ``exclude``;
-    actual filtering remains an orchestration responsibility so it is explicit
-    and traceable in the eventual audit result.
-    """
+    """Validate every row condition against the unchanged original frame."""
 
     required = _required_columns(config)
     missing_columns = sorted(required.difference(data.columns))
     if missing_columns:
         raise DataValidationError(f"missing required columns: {', '.join(missing_columns)}")
-
     if data.empty:
         raise DataValidationError("audit data must contain at least one row")
 
     relevant = data[list(sorted(required))]
     missing_rows = relevant.isna().any(axis=1)
+    duplicate_rows = _duplicate_mask(data, config)
+    non_finite_rows = pd.Series(False, index=data.index)
+    for column in _numeric_columns(config):
+        non_finite_rows |= data[column].map(_is_infinite_number)
+
     unknown_rows = pd.Series(False, index=data.index)
+    unexpected_rows = pd.Series(False, index=data.index)
     evidence = [
         ExclusionEvidence(
             reason=ExclusionReason.MISSING_REQUIRED_VALUE,
@@ -67,13 +71,7 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
         if relevant[column].isna().any()
     ]
     for attribute in config.protected_attributes:
-        present = data[attribute].notna()
-        allowed = config.allowed_groups[attribute]
-        known = data[attribute].map(
-            lambda value: not pd.isna(value)
-            and any(_typed_values_equal(value, item) for item in allowed)
-        )
-        attribute_unknown = present & ~known
+        attribute_unknown = _outside_typed_set(data[attribute], config.allowed_groups[attribute])
         if attribute_unknown.any():
             for value, count in _typed_value_counts(data.loc[attribute_unknown, attribute]):
                 evidence.append(
@@ -85,58 +83,53 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
                     )
                 )
             unknown_rows |= attribute_unknown
+    for column, expected in config.expected_categories.items():
+        unexpected_rows |= _outside_typed_set(data[column], expected)
 
-    reason_counts = {
-        ExclusionReason.MISSING_REQUIRED_VALUE: int(missing_rows.sum()),
-        ExclusionReason.UNKNOWN_PROTECTED_GROUP: int(unknown_rows.sum()),
+    masks = {
+        ExclusionReason.MISSING_REQUIRED_VALUE: missing_rows,
+        ExclusionReason.UNKNOWN_PROTECTED_GROUP: unknown_rows,
+        ExclusionReason.DUPLICATE_RECORD: duplicate_rows,
+        ExclusionReason.NON_FINITE_NUMERIC: non_finite_rows,
+        ExclusionReason.UNEXPECTED_CATEGORY: unexpected_rows,
     }
-    rejected_reasons = []
+    counts = {reason: int(mask.sum()) for reason, mask in masks.items() if mask.any()}
+    rejected: list[str] = []
     if missing_rows.any() and config.missing_value_policy == "error":
-        rejected_reasons.append(
-            f"{reason_counts[ExclusionReason.MISSING_REQUIRED_VALUE]} rows contain "
-            "missing required values"
-        )
+        rejected.append(f"{int(missing_rows.sum())} rows contain missing required values")
     if unknown_rows.any() and config.unknown_group_policy == "error":
-        rejected_reasons.append(
-            f"{reason_counts[ExclusionReason.UNKNOWN_PROTECTED_GROUP]} rows contain "
-            "unknown protected groups"
-        )
-    if rejected_reasons:
+        rejected.append(f"{int(unknown_rows.sum())} rows contain unknown protected groups")
+    if duplicate_rows.any() and config.duplicate_policy == "error":
+        rejected.append(f"{int(duplicate_rows.sum())} rows are duplicate records")
+    if non_finite_rows.any():
+        rejected.append(f"{int(non_finite_rows.sum())} rows contain non-finite numeric values")
+    if unexpected_rows.any():
+        rejected.append(f"{int(unexpected_rows.sum())} rows contain unexpected categories")
+    if rejected:
         raise DataValidationError(
-            "; ".join(rejected_reasons),
-            reason_counts=reason_counts,
-            evidence=tuple(evidence),
+            "; ".join(rejected), reason_counts=counts, evidence=tuple(evidence)
         )
 
-    excluded = missing_rows | unknown_rows
+    excluded = pd.Series(False, index=data.index)
+    if config.missing_value_policy == "exclude":
+        excluded |= missing_rows
+    if config.unknown_group_policy == "exclude":
+        excluded |= unknown_rows
+    if config.duplicate_policy == "exclude":
+        excluded |= duplicate_rows
     eligible = data.loc[~excluded]
     if eligible.empty:
         raise DataValidationError("no eligible rows remain after exclusion handling")
 
-    if not _contains_typed_value(
-        eligible[config.outcome_column], config.favorable_label
-    ):
+    _validate_numeric_columns(eligible, config)
+    if config.record_id_column is not None and _duplicate_mask(eligible, config).any():
+        raise DataValidationError("record_id_column must be unique in eligible data")
+    if not _contains_typed_value(eligible[config.outcome_column], config.favorable_label):
         raise DataValidationError("favorable_label is not present in outcome_column")
-
-    if config.decision_column is not None:
-        if not _contains_typed_value(
-            eligible[config.decision_column], config.favorable_decision_label
-        ):
-            raise DataValidationError(
-                "favorable_decision_label is not present in decision_column"
-            )
-
-    if not pd.api.types.is_numeric_dtype(eligible[config.score_column]):
-        raise DataValidationError("score_column must be numeric")
-    if not pd.Series(eligible[config.score_column]).map(_is_finite_number).all():
-        raise DataValidationError("score_column must contain only finite numeric values")
-
-    if config.sample_weight_column is not None:
-        weights = eligible[config.sample_weight_column]
-        if not pd.api.types.is_numeric_dtype(weights) or not weights.map(_is_finite_number).all():
-            raise DataValidationError("sample weights must be finite numeric values")
-        if (weights < 0).any() or float(weights.sum()) <= 0:
-            raise DataValidationError("sample weights must be non-negative with a positive sum")
+    if config.decision_column is not None and not _contains_typed_value(
+        eligible[config.decision_column], config.favorable_decision_label
+    ):
+        raise DataValidationError("favorable_decision_label is not present in decision_column")
 
     small_groups: list[str] = []
     for attribute in config.protected_attributes:
@@ -145,19 +138,22 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
             raise DataValidationError(
                 f"reference group {reference!r} is not present in {attribute!r}"
             )
-        counts = _typed_value_counts(eligible[attribute])
         small_groups.extend(
-            f"{attribute}={value!r}" for value, count in counts
+            f"{attribute}={value!r}"
+            for value, count in _typed_value_counts(eligible[attribute])
             if count < config.minimum_group_size
         )
 
+    ordered_counts = tuple(sorted((reason.value, count) for reason, count in counts.items()))
     return ValidationSummary(
         input_rows=len(data),
         eligible_rows=len(eligible),
         excluded_rows=int(excluded.sum()),
         small_groups=tuple(sorted(small_groups)),
-        exclusion_reason_counts=reason_counts,
+        exclusion_reason_counts=counts,
         exclusion_evidence=tuple(evidence),
+        reason_counts=ordered_counts,
+        duplicate_rows=int(duplicate_rows.sum()),
     )
 
 
@@ -168,22 +164,60 @@ def _required_columns(config: AuditConfig) -> set[str]:
         *config.protected_attributes,
         *config.candidate_proxy_features,
     }
-    for optional in (config.decision_column, config.sample_weight_column):
+    for optional in (
+        config.decision_column,
+        config.sample_weight_column,
+        config.record_id_column,
+    ):
         if optional is not None:
             columns.add(optional)
     return columns
 
 
-def _is_finite_number(value: object) -> bool:
-    try:
-        return bool(pd.notna(value) and float(value) not in (float("inf"), float("-inf")))
-    except (TypeError, ValueError):
+def _numeric_columns(config: AuditConfig) -> tuple[str, ...]:
+    if config.sample_weight_column is None:
+        return (config.score_column,)
+    return (config.score_column, config.sample_weight_column)
+
+
+def _validate_numeric_columns(data: pd.DataFrame, config: AuditConfig) -> None:
+    scores = data[config.score_column]
+    if pd.api.types.is_bool_dtype(scores.dtype) or not pd.api.types.is_numeric_dtype(scores):
+        raise DataValidationError("score_column must have a non-boolean numeric dtype")
+    if config.sample_weight_column is not None:
+        weights = data[config.sample_weight_column]
+        if pd.api.types.is_bool_dtype(weights.dtype) or not pd.api.types.is_numeric_dtype(weights):
+            raise DataValidationError("sample weights must have a non-boolean numeric dtype")
+        if (weights < 0).any() or float(weights.sum()) <= 0:
+            raise DataValidationError("sample weights must be non-negative with a positive sum")
+
+
+def _duplicate_mask(data: pd.DataFrame, config: AuditConfig) -> pd.Series:
+    if config.record_id_column is None:
+        return data.duplicated(keep=False)
+    identifiers = data[config.record_id_column]
+    counts = _typed_value_counts(identifiers[identifiers.notna()])
+    repeated = tuple(value for value, count in counts if count > 1)
+    return identifiers.map(
+        lambda value: bool(pd.notna(value))
+        and any(_typed_values_equal(value, item) for item in repeated)
+    )
+
+
+def _outside_typed_set(series: pd.Series, allowed: tuple[object, ...]) -> pd.Series:
+    return series.map(
+        lambda value: bool(pd.notna(value))
+        and not any(_typed_values_equal(value, item) for item in allowed)
+    )
+
+
+def _is_infinite_number(value: object) -> bool:
+    if not isinstance(value, Real) or pd.api.types.is_bool(value):
         return False
+    return math.isinf(float(value))
 
 
 def _contains_typed_value(series: pd.Series, expected: object) -> bool:
-    """Match categorical values without Python's ``True == 1`` coercion."""
-
     return any(_typed_values_equal(actual, expected) for actual in series.unique())
 
 
@@ -204,8 +238,6 @@ def _typed_values_equal(actual: object, expected: object) -> bool:
 
 
 def _typed_value_counts(series: pd.Series) -> list[tuple[object, int]]:
-    """Count values without merging Python-equal values such as ``True`` and ``1``."""
-
     counts: list[list[object | int]] = []
     for value in series.tolist():
         for entry in counts:

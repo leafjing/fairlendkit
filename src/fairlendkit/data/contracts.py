@@ -15,6 +15,9 @@ class ExclusionReason(StrEnum):
 
     MISSING_REQUIRED_VALUE = "missing_required_value"
     UNKNOWN_PROTECTED_GROUP = "unknown_protected_group"
+    DUPLICATE_RECORD = "duplicate_record"
+    NON_FINITE_NUMERIC = "non_finite_numeric"
+    UNEXPECTED_CATEGORY = "unexpected_category"
 
 
 @dataclass(frozen=True)

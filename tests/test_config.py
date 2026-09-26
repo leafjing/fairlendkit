@@ -232,3 +232,38 @@ def test_allowed_groups_reject_type_sensitive_duplicates_only():
     )
 
     assert config.allowed_groups["group"] == (True, 1, "1")
+
+
+def test_structural_configuration_serializes_with_stable_defaults():
+    config = AuditConfig(**config_values())
+
+    assert config.model_dump(mode="json")["duplicate_policy"] == "error"
+    assert config.record_id_column is None
+    assert config.expected_categories == {}
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"expected_categories": {"score": (1,)}}, "expected_categories keys"),
+        ({"expected_categories": {"outcome": ()}}, "must not be empty"),
+        ({"expected_categories": {"outcome": (1, 1)}}, "must not contain duplicates"),
+        ({"expected_categories": {"outcome": (0,)}}, "favorable_label"),
+        ({"expected_categories": {"group": ("B",)}}, "reference group"),
+        ({"record_id_column": "score"}, "exactly one semantic role"),
+    ],
+)
+def test_structural_configuration_rejects_invalid_contracts(overrides, message):
+    with pytest.raises(ValidationError, match=message):
+        AuditConfig(**config_values(**overrides))
+
+
+def test_expected_categories_are_type_sensitive():
+    config = AuditConfig(
+        **config_values(
+            favorable_label=True,
+            expected_categories={"outcome": (True, 1, "1")},
+        )
+    )
+
+    assert config.expected_categories["outcome"] == (True, 1, "1")

@@ -34,6 +34,14 @@ class ScoreType(StrEnum):
     RANKING = "ranking"
 
 
+class DuplicatePolicy(StrEnum):
+    """How rows belonging to a duplicate set are handled."""
+
+    ERROR = "error"
+    EXCLUDE = "exclude"
+    ALLOW = "allow"
+
+
 class AuditConfig(BaseModel):
     """Validated semantic and column contract for one audit run.
 
@@ -85,6 +93,9 @@ class AuditConfig(BaseModel):
     confidence_level: float = Field(default=0.95, gt=0.0, lt=1.0)
     missing_value_policy: Literal["exclude", "error"] = "error"
     unknown_group_policy: Literal["exclude", "error"] = "error"
+    duplicate_policy: DuplicatePolicy = DuplicatePolicy.ERROR
+    record_id_column: ColumnName | None = None
+    expected_categories: dict[ColumnName, tuple[Label, ...]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_semantics(self) -> "AuditConfig":
@@ -130,6 +141,8 @@ class AuditConfig(BaseModel):
             column_roles.append((self.decision_column, "decision_column"))
         if self.sample_weight_column is not None:
             column_roles.append((self.sample_weight_column, "sample_weight_column"))
+        if self.record_id_column is not None:
+            column_roles.append((self.record_id_column, "record_id_column"))
         roles_by_column: dict[str, list[str]] = {}
         for column, role in column_roles:
             roles_by_column.setdefault(column, []).append(role)
@@ -163,6 +176,40 @@ class AuditConfig(BaseModel):
                 "threshold_operator is inconsistent with score_direction: "
                 f"expected {expected_operator.value!r}"
             )
+        categorical_columns = {self.outcome_column, *self.protected_attributes}
+        if self.decision_column is not None:
+            categorical_columns.add(self.decision_column)
+        invalid_expected = sorted(set(self.expected_categories) - categorical_columns)
+        if invalid_expected:
+            raise ValueError(
+                "expected_categories keys must name outcome_column, decision_column, "
+                "or a protected attribute: " + ", ".join(invalid_expected)
+            )
+        for column, values in self.expected_categories.items():
+            if not values:
+                raise ValueError(f"expected_categories[{column!r}] must not be empty")
+            if _has_typed_duplicates(values):
+                raise ValueError(
+                    f"expected_categories[{column!r}] must not contain duplicates"
+                )
+        required_values = {
+            self.outcome_column: ("favorable_label", self.favorable_label),
+            **{
+                attribute: ("reference group", self.reference_groups[attribute])
+                for attribute in self.protected_attributes
+            },
+        }
+        if self.decision_column is not None:
+            required_values[self.decision_column] = (
+                "favorable_decision_label",
+                self.favorable_decision_label,
+            )
+        for column, (name, value) in required_values.items():
+            expected = self.expected_categories.get(column)
+            if expected is not None and not _contains_typed_value(expected, value):
+                raise ValueError(
+                    f"{name} must belong to expected_categories[{column!r}]"
+                )
         return self
 
     def is_favorable_decision_score(self, score: float) -> bool:
