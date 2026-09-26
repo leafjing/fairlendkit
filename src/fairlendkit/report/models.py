@@ -11,6 +11,13 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 from fairlendkit.config import AuditConfig
 from fairlendkit.config.models import Label
+from fairlendkit.data.contracts import (
+    APPLICABILITY_STATEMENT,
+    ValidationLayerId,
+    ValidationLayerResult,
+    ValidationStatus,
+    make_issue,
+)
 AUDIT_RESULT_SCHEMA_VERSION = "1.0"
 Identifier = Annotated[str, Field(min_length=1, pattern=r"^[a-z][a-z0-9_.-]*$")]
 
@@ -240,6 +247,43 @@ class ValidationEvidence(ResultModel):
     analyzed_rows: int = Field(ge=0)
     exclusions: tuple[ExclusionRecord, ...]
     warnings: tuple[WarningRecord, ...]
+    status: ValidationStatus
+    technical_validation: ValidationStatus
+    applicability: Literal["not_assessed"]
+    applicability_statement: Literal[APPLICABILITY_STATEMENT]
+    reason_counts: tuple[tuple[str, int], ...]
+    duplicate_rows: int = Field(ge=0)
+    small_groups: tuple[str, ...]
+    layers: tuple[ValidationLayerResult, ...]
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_flat_v1_validation(cls, value: object) -> object:
+        if not isinstance(value, dict) or "layers" in value:
+            return value
+        migrated = dict(value)
+        warnings = migrated.get("warnings", ())
+        reliability_issues = ()
+        # Released flat fixtures had no typed mapping from arbitrary warning codes.
+        # They remain in ``warnings``; the additive layered view does not invent one.
+        data_quality_issue = make_issue("comparison_baseline_unavailable")
+        layers = (
+            ValidationLayerResult(layer="structural", status="passed", issues=()),
+            ValidationLayerResult(layer="semantic", status="passed", issues=()),
+            ValidationLayerResult(layer="analytical_reliability", status="passed", issues=reliability_issues),
+            ValidationLayerResult(layer="data_quality", status="not_evaluated", issues=(data_quality_issue,)),
+        )
+        migrated.update(
+            status="passed" if not warnings else "warning",
+            technical_validation="passed",
+            applicability="not_assessed",
+            applicability_statement=APPLICABILITY_STATEMENT,
+            reason_counts=tuple(sorted((item["code"], item["count"]) for item in migrated.get("exclusions", ()))),
+            duplicate_rows=0,
+            small_groups=(),
+            layers=layers,
+        )
+        return migrated
 
     @model_validator(mode="after")
     def validate_counts(self) -> "ValidationEvidence":
@@ -248,7 +292,25 @@ class ValidationEvidence(ResultModel):
             raise ValueError(
                 "analyzed rows plus exclusion counts must equal input rows"
             )
+        if tuple(layer.layer for layer in self.layers) != tuple(ValidationLayerId):
+            raise ValueError("validation layers must use canonical order")
+        layer_status = {layer.layer: layer.status for layer in self.layers}
+        expected_technical = (
+            ValidationStatus.FAILED
+            if ValidationStatus.FAILED in (layer_status[ValidationLayerId.STRUCTURAL], layer_status[ValidationLayerId.SEMANTIC])
+            else ValidationStatus.WARNING
+            if ValidationStatus.WARNING in (layer_status[ValidationLayerId.STRUCTURAL], layer_status[ValidationLayerId.SEMANTIC])
+            else ValidationStatus.PASSED
+        )
+        if self.technical_validation != expected_technical:
+            raise ValueError("technical_validation must derive from structural and semantic layers")
+        if self.technical_validation == ValidationStatus.FAILED:
+            raise ValueError("AuditResult cannot contain failed technical validation")
         return self
+
+    @property
+    def eligible_rows(self) -> int:
+        return self.analyzed_rows
 
 
 class Limitation(ResultModel):
