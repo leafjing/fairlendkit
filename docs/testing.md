@@ -78,6 +78,11 @@ undefined-versus-zero confusion.
 | Reference-group reversal | Differences change sign and ratios follow the documented direction; report labels identify the reference explicitly. |
 | Bootstrap edge cases | Seeded runs are reproducible; degenerate samples and insufficient valid replicates produce documented warnings. |
 | Serialization round trip | Configuration and result values, undefined states, warnings, and metadata survive JSON round trips without semantic loss. |
+| Duplicate records | All members of each duplicate set follow the configured `error`, `exclude`, or `allow` policy; record-ID and full-row definitions are tested independently. |
+| Multiple exclusion reasons | Each applicable stable reason count increments once per row, while the total excluded-row count is the cardinality of the union. |
+| Structural and group exclusions | Epic 1.2 missing/unknown masks and Epic 1.3 duplicate masks merge deterministically without one reason hiding another. |
+| Expected categories | Allowed values use type-sensitive equality; invalid configured sets and unexpected input values fail with stable semantics. |
+| Numeric structural integrity | Numeric strings, booleans, infinities, negative weights, and non-positive eligible weight totals follow the documented failure contract. |
 
 Each implemented metric must map its applicable rows in this matrix to named
 tests. A test may cover multiple rows, but an unchecked row requires an explicit

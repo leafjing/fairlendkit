@@ -235,3 +235,201 @@ def test_rejected_run_retains_all_reason_codes_and_evidence():
         ("missing_required_value", "score", None, 1),
         ("unknown_protected_group", "group", "C", 1),
     }
+
+
+@pytest.mark.parametrize("use_record_id", [False, True])
+@pytest.mark.parametrize("policy", ["error", "exclude", "allow"])
+def test_duplicate_policies_apply_to_all_occurrences(policy, use_record_id):
+    data = pd.DataFrame(
+        {
+            "outcome": [1, 1, 0, 1],
+            "score": [0.9, 0.9, 0.2, 0.8],
+            "group": ["A", "A", "B", "A"],
+            "id": ["same", "same", "other", "unique"],
+        }
+    )
+    config = make_config(
+        duplicate_policy=policy,
+        record_id_column="id" if use_record_id else None,
+        minimum_group_size=1,
+    )
+    if policy == "error" or (policy == "allow" and use_record_id):
+        with pytest.raises(DataValidationError, match="duplicate|unique"):
+            validate_audit_data(data, config)
+        return
+
+    summary = validate_audit_data(data, config)
+    assert summary.duplicate_rows == 2
+    assert summary.exclusion_reason_counts["duplicate_record"] == 2
+    assert summary.excluded_rows == (2 if policy == "exclude" else 0)
+
+
+def test_record_id_duplicates_are_type_sensitive():
+    data = make_data().assign(id=pd.Series([1, True, "1"], dtype=object))
+    summary = validate_audit_data(
+        data,
+        make_config(record_id_column="id", duplicate_policy="allow", minimum_group_size=1),
+    )
+
+    assert summary.duplicate_rows == 0
+
+
+def test_missing_record_ids_follow_missing_policy_and_required_columns():
+    with pytest.raises(DataValidationError, match="missing required columns: id"):
+        validate_audit_data(make_data(), make_config(record_id_column="id"))
+
+    summary = validate_audit_data(
+        make_data().assign(id=["a", None, "c"]),
+        make_config(
+            record_id_column="id",
+            missing_value_policy="exclude",
+            minimum_group_size=1,
+        ),
+    )
+    assert summary.excluded_rows == 1
+    assert summary.duplicate_rows == 0
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        ["0.9", "0.4", "0.7"],
+        [True, False, True],
+        [0.9 + 0j, 0.4 + 0j, 0.7 + 0j],
+        [complex(float("inf"), 0), 0.4 + 0j, 0.7 + 0j],
+    ],
+)
+def test_score_requires_non_boolean_numeric_dtype(values):
+    with pytest.raises(DataValidationError, match="non-boolean real numeric dtype"):
+        validate_audit_data(make_data().assign(score=values), make_config())
+
+
+@pytest.mark.parametrize(
+    "weights",
+    [
+        [1 + 0j, 1 + 0j, 1 + 0j],
+        [complex(float("inf"), 0), 1 + 0j, 1 + 0j],
+    ],
+)
+def test_sample_weights_reject_complex_dtype(weights):
+    with pytest.raises(DataValidationError, match="non-boolean real numeric dtype"):
+        validate_audit_data(
+            make_data().assign(weight=weights),
+            make_config(sample_weight_column="weight"),
+        )
+
+
+@pytest.mark.parametrize("value", [float("inf"), float("-inf")])
+def test_infinite_numbers_have_stable_reason(value):
+    data = make_data()
+    data.loc[1, "score"] = value
+    with pytest.raises(DataValidationError, match="non-finite") as caught:
+        validate_audit_data(data, make_config())
+
+    assert caught.value.reason_counts["non_finite_numeric"] == 1
+
+
+@pytest.mark.parametrize(
+    ("weights", "message"),
+    [([-1.0, 1.0, 1.0], "non-negative"), ([0.0, 0.0, 0.0], "positive sum")],
+)
+def test_weight_bounds_apply_to_final_eligible_rows(weights, message):
+    with pytest.raises(DataValidationError, match=message):
+        validate_audit_data(
+            make_data().assign(weight=weights),
+            make_config(sample_weight_column="weight"),
+        )
+
+
+def test_excluded_negative_weight_does_not_invalidate_final_eligible_rows():
+    data = make_data().assign(weight=[1.0, 1.0, -1.0], id=["a", "b", "dup"])
+    data = pd.concat([data, data.iloc[[2]]], ignore_index=True)
+
+    summary = validate_audit_data(
+        data,
+        make_config(
+            sample_weight_column="weight",
+            record_id_column="id",
+            duplicate_policy="exclude",
+            minimum_group_size=1,
+        ),
+    )
+    assert summary.eligible_rows == 2
+
+
+def test_expected_categories_reject_unexpected_typed_values():
+    data = make_data().assign(outcome=pd.Series([True, 0, True], dtype=object))
+    config = make_config(
+        favorable_label=True,
+        expected_categories={"outcome": (True, 0)},
+    )
+    validate_audit_data(data, config)
+
+    data.loc[1, "outcome"] = 1
+    with pytest.raises(DataValidationError, match="unexpected categories") as caught:
+        validate_audit_data(data, config)
+    assert caught.value.reason_counts["unexpected_category"] == 1
+
+
+def test_multiple_reasons_count_independently_but_exclusions_use_union():
+    data = pd.DataFrame(
+        {
+            "outcome": [1, 1, 0, 0, 1],
+            "score": [None, 0.9, 0.2, 0.1, 0.8],
+            "group": ["A", "A", "C", "B", "A"],
+            "id": ["duplicate", "duplicate", "c", "d", "e"],
+        }
+    )
+    summary = validate_audit_data(
+        data,
+        make_config(
+            record_id_column="id",
+            duplicate_policy="exclude",
+            missing_value_policy="exclude",
+            unknown_group_policy="exclude",
+            minimum_group_size=1,
+        ),
+    )
+
+    assert summary.reason_counts == (
+        ("duplicate_record", 2),
+        ("missing_required_value", 1),
+        ("unknown_protected_group", 1),
+    )
+    assert summary.excluded_rows == 3
+    assert sum(count for _, count in summary.reason_counts) > summary.excluded_rows
+
+
+def test_duplicate_and_unknown_exclusions_do_not_hide_each_other():
+    data = pd.DataFrame(
+        {
+            "outcome": [1, 1, 0, 0, 1],
+            "score": [0.9, 0.9, 0.2, 0.1, 0.8],
+            "group": ["A", "A", "C", "B", "A"],
+        }
+    )
+    summary = validate_audit_data(
+        data,
+        make_config(
+            duplicate_policy="exclude",
+            unknown_group_policy="exclude",
+            minimum_group_size=1,
+        ),
+    )
+    assert summary.reason_counts == (
+        ("duplicate_record", 2),
+        ("unknown_protected_group", 1),
+    )
+    assert summary.excluded_rows == 3
+
+
+def test_validation_counts_are_permutation_invariant_and_input_is_unchanged():
+    data = pd.concat([make_data(), make_data().iloc[[0]]], ignore_index=True)
+    before = data.copy(deep=True)
+    config = make_config(duplicate_policy="exclude", minimum_group_size=1)
+
+    first = validate_audit_data(data, config)
+    second = validate_audit_data(data.sample(frac=1, random_state=7), config)
+
+    assert first == second
+    pd.testing.assert_frame_equal(data, before)

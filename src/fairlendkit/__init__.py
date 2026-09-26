@@ -1,6 +1,12 @@
 """Public package interface for FairLendKit."""
 
-from fairlendkit.config import AuditConfig, ScoreDirection, ScoreType, ThresholdOperator
+from fairlendkit.config import (
+    AuditConfig,
+    DuplicatePolicy,
+    ScoreDirection,
+    ScoreType,
+    ThresholdOperator,
+)
 from fairlendkit.data import (
     DataValidationError,
     ExclusionEvidence,
@@ -14,6 +20,7 @@ __all__ = [
     "AuditConfig",
     "AuditResult",
     "DataValidationError",
+    "DuplicatePolicy",
     "ExclusionEvidence",
     "ExclusionReason",
     "ScoreDirection",
