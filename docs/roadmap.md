@@ -32,6 +32,17 @@ V1 prioritizes correctness, transparency, reproducibility, and usability before
 breadth. A metric or flag is not release-ready until its semantics, applicability,
 edge cases, tests, report representation, and limitations are documented.
 
+### Epic 1 completion sequence
+
+- Epic 1.1: base configuration and semantic validation — complete.
+- Epic 1.2: protected-group missing/unknown-value semantics — complete.
+- Epic 1.3: structural integrity — contract defined in
+  [`epic-1.3-structural-integrity.md`](epic-1.3-structural-integrity.md); implement
+  and independently review before proceeding.
+- Epic 1.4: layered validation results — follows Epic 1.3 and closes Epic 1.
+
+Epic 2 must not begin until Epic 1.4 is complete.
+
 ## V1.1 — Mitigation experiments
 
 - Reweighing

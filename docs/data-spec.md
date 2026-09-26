@@ -199,3 +199,12 @@ reason counts and evidence, plus stable identifiers for groups below
 `minimum_group_size`. Counts by reason need not sum to the excluded total because
 a row can satisfy multiple exclusion conditions. It does not imply statistical
 significance or legal compliance.
+
+## Structural integrity
+
+Duplicate handling, optional stable record IDs, expected categorical values,
+row-level reason codes, multi-reason counting, and the merge order for Epic 1.3
+are defined in the normative
+[Structural Integrity Contract](epic-1.3-structural-integrity.md). Where that
+contract extends fields or summary semantics described here, its Epic 1.3 rules
+take precedence.
