@@ -2,14 +2,27 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
 from numbers import Real
 
 import pandas as pd
 
 from fairlendkit.config import AuditConfig
-from fairlendkit.data.contracts import ExclusionEvidence, ExclusionReason
+from fairlendkit.data.contracts import (
+    AffectedGroup,
+    ExclusionEvidence,
+    ExclusionReason,
+    LAYER_ORDER,
+    LayeredValidationResult,
+    ValidationIssue,
+    ValidationIssueEvidence,
+    ValidationLayerId,
+    ValidationLayerResult,
+    ValidationSeverity,
+    ValidationStatus,
+    issue_sort_key,
+    make_issue,
+)
 
 
 class DataValidationError(ValueError):
@@ -21,24 +34,15 @@ class DataValidationError(ValueError):
         *,
         reason_counts: dict[ExclusionReason, int] | None = None,
         evidence: tuple[ExclusionEvidence, ...] = (),
+        issues: tuple[ValidationIssue, ...] = (),
     ) -> None:
         super().__init__(message)
         self.reason_counts = dict(reason_counts or {})
         self.evidence = evidence
+        self.issues = tuple(sorted(issues, key=issue_sort_key))
 
 
-@dataclass(frozen=True)
-class ValidationSummary:
-    """Counts produced by successful validation without mutating input data."""
-
-    input_rows: int
-    eligible_rows: int
-    excluded_rows: int
-    small_groups: tuple[str, ...]
-    exclusion_reason_counts: dict[ExclusionReason, int]
-    exclusion_evidence: tuple[ExclusionEvidence, ...]
-    reason_counts: tuple[tuple[str, int], ...]
-    duplicate_rows: int
+ValidationSummary = LayeredValidationResult
 
 
 def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSummary:
@@ -47,9 +51,11 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
     required = _required_columns(config)
     missing_columns = sorted(required.difference(data.columns))
     if missing_columns:
-        raise DataValidationError(f"missing required columns: {', '.join(missing_columns)}")
+        issue = make_issue("missing_required_column", affected_fields=tuple(missing_columns), evidence=ValidationIssueEvidence(count=len(missing_columns)))
+        raise DataValidationError(f"missing required columns: {', '.join(missing_columns)}", issues=(issue,))
     if data.empty:
-        raise DataValidationError("audit data must contain at least one row")
+        issue = make_issue("no_eligible_rows", evidence=ValidationIssueEvidence(count=0))
+        raise DataValidationError("audit data must contain at least one row", issues=(issue,))
 
     relevant = data[list(sorted(required))]
     missing_rows = relevant.isna().any(axis=1)
@@ -85,6 +91,14 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
             unknown_rows |= attribute_unknown
     for column, expected in config.expected_categories.items():
         unexpected_rows |= _outside_typed_set(data[column], expected)
+    evidence.sort(
+        key=lambda item: (
+            item.reason.value,
+            item.attribute or "",
+            type(item.observed_value).__name__,
+            repr(item.observed_value),
+        )
+    )
 
     masks = {
         ExclusionReason.MISSING_REQUIRED_VALUE: missing_rows,
@@ -95,19 +109,25 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
     }
     counts = {reason: int(mask.sum()) for reason, mask in masks.items() if mask.any()}
     rejected: list[str] = []
+    failure_issues: list[ValidationIssue] = []
     if missing_rows.any() and config.missing_value_policy == "error":
         rejected.append(f"{int(missing_rows.sum())} rows contain missing required values")
+        failure_issues.append(make_issue("missing_required_value", affected_fields=tuple(sorted(column for column in required if relevant[column].isna().any())), evidence=ValidationIssueEvidence(count=int(missing_rows.sum()))))
     if unknown_rows.any() and config.unknown_group_policy == "error":
         rejected.append(f"{int(unknown_rows.sum())} rows contain unknown protected groups")
+        failure_issues.append(make_issue("unknown_protected_group", affected_fields=tuple(sorted(attribute for attribute in config.protected_attributes if _outside_typed_set(data[attribute], config.allowed_groups[attribute]).any())), evidence=ValidationIssueEvidence(count=int(unknown_rows.sum()))))
     if duplicate_rows.any() and config.duplicate_policy == "error":
         rejected.append(f"{int(duplicate_rows.sum())} rows are duplicate records")
+        failure_issues.append(make_issue("duplicate_record", affected_fields=((config.record_id_column,) if config.record_id_column else ()), evidence=ValidationIssueEvidence(count=int(duplicate_rows.sum()))))
     if non_finite_rows.any():
         rejected.append(f"{int(non_finite_rows.sum())} rows contain non-finite numeric values")
+        failure_issues.append(make_issue("non_finite_numeric", affected_fields=tuple(sorted(column for column in _numeric_columns(config) if data[column].map(_is_infinite_number).any())), evidence=ValidationIssueEvidence(count=int(non_finite_rows.sum()))))
     if unexpected_rows.any():
         rejected.append(f"{int(unexpected_rows.sum())} rows contain unexpected categories")
+        failure_issues.append(make_issue("unexpected_category", affected_fields=tuple(sorted(column for column, expected in config.expected_categories.items() if _outside_typed_set(data[column], expected).any())), evidence=ValidationIssueEvidence(count=int(unexpected_rows.sum()))))
     if rejected:
         raise DataValidationError(
-            "; ".join(rejected), reason_counts=counts, evidence=tuple(evidence)
+            "; ".join(rejected), reason_counts=counts, evidence=tuple(evidence), issues=tuple(failure_issues)
         )
 
     excluded = pd.Series(False, index=data.index)
@@ -119,42 +139,83 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
         excluded |= duplicate_rows
     eligible = data.loc[~excluded]
     if eligible.empty:
-        raise DataValidationError("no eligible rows remain after exclusion handling")
+        issue = make_issue("no_eligible_rows", evidence=ValidationIssueEvidence(count=0, reason_counts={reason.value: count for reason, count in counts.items()}))
+        raise DataValidationError("no eligible rows remain after exclusion handling", reason_counts=counts, evidence=tuple(evidence), issues=(issue,))
 
-    _validate_numeric_columns(eligible, config)
+    try:
+        _validate_numeric_columns(eligible, config)
+    except DataValidationError as error:
+        error.reason_counts = dict(counts)
+        error.evidence = tuple(evidence)
+        raise
     if config.record_id_column is not None and _duplicate_mask(eligible, config).any():
-        raise DataValidationError("record_id_column must be unique in eligible data")
+        count = int(_duplicate_mask(eligible, config).sum())
+        issue = make_issue("non_unique_record_id", affected_fields=(config.record_id_column,), evidence=ValidationIssueEvidence(count=count))
+        raise DataValidationError("record_id_column must be unique in eligible data", reason_counts=counts, evidence=tuple(evidence), issues=(issue,))
     if not _contains_typed_value(eligible[config.outcome_column], config.favorable_label):
-        raise DataValidationError("favorable_label is not present in outcome_column")
+        issue = make_issue("favorable_label_absent", affected_fields=(config.outcome_column,), evidence=ValidationIssueEvidence(expected=config.favorable_label))
+        raise DataValidationError("favorable_label is not present in outcome_column", reason_counts=counts, evidence=tuple(evidence), issues=(issue,))
     if config.decision_column is not None and not _contains_typed_value(
         eligible[config.decision_column], config.favorable_decision_label
     ):
-        raise DataValidationError("favorable_decision_label is not present in decision_column")
+        issue = make_issue("favorable_decision_label_absent", affected_fields=(config.decision_column,), evidence=ValidationIssueEvidence(expected=config.favorable_decision_label))
+        raise DataValidationError("favorable_decision_label is not present in decision_column", reason_counts=counts, evidence=tuple(evidence), issues=(issue,))
 
     small_groups: list[str] = []
+    reliability_issues: list[ValidationIssue] = []
     for attribute in config.protected_attributes:
         reference = config.reference_groups[attribute]
         if not _contains_typed_value(eligible[attribute], reference):
-            raise DataValidationError(
-                f"reference group {reference!r} is not present in {attribute!r}"
-            )
-        small_groups.extend(
-            f"{attribute}={value!r}"
-            for value, count in _typed_value_counts(eligible[attribute])
-            if count < config.minimum_group_size
-        )
+            issue = make_issue("reference_group_absent", affected_fields=(attribute,), affected_groups=(AffectedGroup(attributes={attribute: reference}),), evidence=ValidationIssueEvidence(expected=reference))
+            raise DataValidationError(f"reference group {reference!r} is not present in {attribute!r}", reason_counts=counts, evidence=tuple(evidence), issues=(issue,))
+        for value, count in _typed_value_counts(eligible[attribute]):
+            if count < config.minimum_group_size:
+                small_groups.append(f"{attribute}={value!r}")
+                reliability_issues.append(make_issue("small_group", affected_fields=(attribute,), affected_groups=(AffectedGroup(attributes={attribute: value}),), evidence=ValidationIssueEvidence(count=count, minimum=config.minimum_group_size)))
 
     ordered_counts = tuple(sorted((reason.value, count) for reason, count in counts.items()))
-    return ValidationSummary(
+    structural_issues: list[ValidationIssue] = []
+    for code, mask, fields, policy_excludes in (
+        ("missing_required_value", missing_rows, tuple(sorted(column for column in required if relevant[column].isna().any())), config.missing_value_policy == "exclude"),
+        ("unknown_protected_group", unknown_rows, tuple(sorted(config.protected_attributes)), config.unknown_group_policy == "exclude"),
+        ("duplicate_record", duplicate_rows, ((config.record_id_column,) if config.record_id_column else ()), config.duplicate_policy == "exclude"),
+    ):
+        if mask.any() and policy_excludes:
+            structural_issues.append(make_issue(code, affected_fields=fields, evidence=ValidationIssueEvidence(count=int(mask.sum())), severity=ValidationSeverity.WARNING, blocking=False))
+    data_quality_issue = make_issue("comparison_baseline_unavailable")
+    layers = (
+        _make_layer(ValidationLayerId.STRUCTURAL, structural_issues),
+        _make_layer(ValidationLayerId.SEMANTIC, []),
+        _make_layer(ValidationLayerId.ANALYTICAL_RELIABILITY, reliability_issues),
+        _make_layer(ValidationLayerId.DATA_QUALITY, [data_quality_issue]),
+    )
+    statuses = tuple(layer.status for layer in layers)
+    overall = ValidationStatus.WARNING if ValidationStatus.WARNING in statuses else ValidationStatus.PASSED
+    return LayeredValidationResult(
+        status=overall,
+        technical_validation=ValidationStatus.WARNING if layers[0].status == ValidationStatus.WARNING else ValidationStatus.PASSED,
         input_rows=len(data),
         eligible_rows=len(eligible),
         excluded_rows=int(excluded.sum()),
         small_groups=tuple(sorted(small_groups)),
-        exclusion_reason_counts=counts,
         exclusion_evidence=tuple(evidence),
         reason_counts=ordered_counts,
         duplicate_rows=int(duplicate_rows.sum()),
+        layers=layers,
     )
+
+
+def _make_layer(layer: ValidationLayerId, issues: list[ValidationIssue]) -> ValidationLayerResult:
+    ordered = tuple(sorted(issues, key=issue_sort_key))
+    if any(issue.severity == ValidationSeverity.ERROR for issue in ordered):
+        status = ValidationStatus.FAILED
+    elif any(issue.severity == ValidationSeverity.WARNING for issue in ordered):
+        status = ValidationStatus.WARNING
+    elif ordered:
+        status = ValidationStatus.NOT_EVALUATED
+    else:
+        status = ValidationStatus.PASSED
+    return ValidationLayerResult(layer=layer, status=status, issues=ordered)
 
 
 def _required_columns(config: AuditConfig) -> set[str]:
@@ -187,7 +248,8 @@ def _validate_numeric_columns(data: pd.DataFrame, config: AuditConfig) -> None:
         or pd.api.types.is_complex_dtype(scores.dtype)
         or not pd.api.types.is_numeric_dtype(scores)
     ):
-        raise DataValidationError("score_column must have a non-boolean real numeric dtype")
+        issue = make_issue("non_numeric_score", affected_fields=(config.score_column,))
+        raise DataValidationError("score_column must have a non-boolean real numeric dtype", issues=(issue,))
     if config.sample_weight_column is not None:
         weights = data[config.sample_weight_column]
         if (
@@ -195,11 +257,14 @@ def _validate_numeric_columns(data: pd.DataFrame, config: AuditConfig) -> None:
             or pd.api.types.is_complex_dtype(weights.dtype)
             or not pd.api.types.is_numeric_dtype(weights)
         ):
-            raise DataValidationError(
-                "sample weights must have a non-boolean real numeric dtype"
-            )
-        if (weights < 0).any() or float(weights.sum()) <= 0:
-            raise DataValidationError("sample weights must be non-negative with a positive sum")
+            issue = make_issue("non_numeric_weight", affected_fields=(config.sample_weight_column,))
+            raise DataValidationError("sample weights must have a non-boolean real numeric dtype", issues=(issue,))
+        if (weights < 0).any():
+            issue = make_issue("negative_weight", affected_fields=(config.sample_weight_column,), evidence=ValidationIssueEvidence(count=int((weights < 0).sum())))
+            raise DataValidationError("sample weights must be non-negative with a positive sum", issues=(issue,))
+        if float(weights.sum()) <= 0:
+            issue = make_issue("non_positive_weight_total", affected_fields=(config.sample_weight_column,), evidence=ValidationIssueEvidence(total=float(weights.sum())))
+            raise DataValidationError("sample weights must be non-negative with a positive sum", issues=(issue,))
 
 
 def _duplicate_mask(data: pd.DataFrame, config: AuditConfig) -> pd.Series:

@@ -1,6 +1,18 @@
 """Input-data validation API."""
 
-from fairlendkit.data.contracts import ExclusionEvidence, ExclusionReason
+from fairlendkit.data.contracts import (
+    APPLICABILITY_STATEMENT,
+    AffectedGroup,
+    ExclusionEvidence,
+    ExclusionReason,
+    LayeredValidationResult,
+    ValidationIssue,
+    ValidationIssueEvidence,
+    ValidationLayerId,
+    ValidationLayerResult,
+    ValidationSeverity,
+    ValidationStatus,
+)
 from fairlendkit.data.validation import (
     DataValidationError,
     ValidationSummary,
@@ -9,8 +21,17 @@ from fairlendkit.data.validation import (
 
 __all__ = [
     "DataValidationError",
+    "APPLICABILITY_STATEMENT",
+    "AffectedGroup",
     "ExclusionEvidence",
     "ExclusionReason",
+    "LayeredValidationResult",
+    "ValidationIssue",
+    "ValidationIssueEvidence",
+    "ValidationLayerId",
+    "ValidationLayerResult",
+    "ValidationSeverity",
+    "ValidationStatus",
     "ValidationSummary",
     "validate_audit_data",
 ]
