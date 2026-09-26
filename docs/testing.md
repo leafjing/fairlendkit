@@ -83,6 +83,10 @@ undefined-versus-zero confusion.
 | Structural and group exclusions | Epic 1.2 missing/unknown masks and Epic 1.3 duplicate masks merge deterministically without one reason hiding another. |
 | Expected categories | Allowed values use type-sensitive equality; invalid configured sets and unexpected input values fail with stable semantics. |
 | Numeric structural integrity | Numeric strings, booleans, infinities, negative weights, and non-positive eligible weight totals follow the documented failure contract. |
+| Layered validation result | Exactly four layers appear in canonical order; statuses derive from typed issues and unavailable checks remain `not_evaluated`. |
+| Technical pass versus applicability | Technical passage retains `applicability=not_assessed` and the practitioner-review statement; approval/compliance conclusions are rejected. |
+| Validation issue serialization | Stable codes, canonical messages, severity, affected fields/groups, bounded evidence, and deterministic ordering survive JSON round trips. |
+| Validation backward compatibility | Epic 1.3 summary properties, reason-code values, and error evidence remain available while layered fields are additive. |
 
 Each implemented metric must map its applicable rows in this matrix to named
 tests. A test may cover multiple rows, but an unchecked row requires an explicit
