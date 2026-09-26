@@ -182,12 +182,22 @@ def _numeric_columns(config: AuditConfig) -> tuple[str, ...]:
 
 def _validate_numeric_columns(data: pd.DataFrame, config: AuditConfig) -> None:
     scores = data[config.score_column]
-    if pd.api.types.is_bool_dtype(scores.dtype) or not pd.api.types.is_numeric_dtype(scores):
-        raise DataValidationError("score_column must have a non-boolean numeric dtype")
+    if (
+        pd.api.types.is_bool_dtype(scores.dtype)
+        or pd.api.types.is_complex_dtype(scores.dtype)
+        or not pd.api.types.is_numeric_dtype(scores)
+    ):
+        raise DataValidationError("score_column must have a non-boolean real numeric dtype")
     if config.sample_weight_column is not None:
         weights = data[config.sample_weight_column]
-        if pd.api.types.is_bool_dtype(weights.dtype) or not pd.api.types.is_numeric_dtype(weights):
-            raise DataValidationError("sample weights must have a non-boolean numeric dtype")
+        if (
+            pd.api.types.is_bool_dtype(weights.dtype)
+            or pd.api.types.is_complex_dtype(weights.dtype)
+            or not pd.api.types.is_numeric_dtype(weights)
+        ):
+            raise DataValidationError(
+                "sample weights must have a non-boolean real numeric dtype"
+            )
         if (weights < 0).any() or float(weights.sum()) <= 0:
             raise DataValidationError("sample weights must be non-negative with a positive sum")
 

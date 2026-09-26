@@ -290,10 +290,33 @@ def test_missing_record_ids_follow_missing_policy_and_required_columns():
     assert summary.duplicate_rows == 0
 
 
-@pytest.mark.parametrize("values", [["0.9", "0.4", "0.7"], [True, False, True]])
+@pytest.mark.parametrize(
+    "values",
+    [
+        ["0.9", "0.4", "0.7"],
+        [True, False, True],
+        [0.9 + 0j, 0.4 + 0j, 0.7 + 0j],
+        [complex(float("inf"), 0), 0.4 + 0j, 0.7 + 0j],
+    ],
+)
 def test_score_requires_non_boolean_numeric_dtype(values):
-    with pytest.raises(DataValidationError, match="non-boolean numeric dtype"):
+    with pytest.raises(DataValidationError, match="non-boolean real numeric dtype"):
         validate_audit_data(make_data().assign(score=values), make_config())
+
+
+@pytest.mark.parametrize(
+    "weights",
+    [
+        [1 + 0j, 1 + 0j, 1 + 0j],
+        [complex(float("inf"), 0), 1 + 0j, 1 + 0j],
+    ],
+)
+def test_sample_weights_reject_complex_dtype(weights):
+    with pytest.raises(DataValidationError, match="non-boolean real numeric dtype"):
+        validate_audit_data(
+            make_data().assign(weight=weights),
+            make_config(sample_weight_column="weight"),
+        )
 
 
 @pytest.mark.parametrize("value", [float("inf"), float("-inf")])
@@ -352,9 +375,9 @@ def test_multiple_reasons_count_independently_but_exclusions_use_union():
     data = pd.DataFrame(
         {
             "outcome": [1, 1, 0, 0, 1],
-            "score": [0.9, 0.9, 0.2, 0.1, 0.8],
+            "score": [None, 0.9, 0.2, 0.1, 0.8],
             "group": ["A", "A", "C", "B", "A"],
-            "id": [None, None, "c", "d", "e"],
+            "id": ["duplicate", "duplicate", "c", "d", "e"],
         }
     )
     summary = validate_audit_data(
@@ -369,10 +392,12 @@ def test_multiple_reasons_count_independently_but_exclusions_use_union():
     )
 
     assert summary.reason_counts == (
-        ("missing_required_value", 2),
+        ("duplicate_record", 2),
+        ("missing_required_value", 1),
         ("unknown_protected_group", 1),
     )
     assert summary.excluded_rows == 3
+    assert sum(count for _, count in summary.reason_counts) > summary.excluded_rows
 
 
 def test_duplicate_and_unknown_exclusions_do_not_hide_each_other():
