@@ -78,6 +78,18 @@ def test_epic_2_1_ac3_configured_zero_count_groups_and_reference_flags():
     ]
 
 
+def test_epic_2_1_ac3_integer_groups_use_numeric_canonical_order():
+    data = frame().assign(group=[10, 2, 10, 2])
+    profile = validate_audit_data(
+        data,
+        config(
+            allowed_groups={"group": (10, 2)},
+            reference_groups={"group": 2},
+        ),
+    ).profile
+    assert [item.group.attributes["group"] for item in profile.groups] == [2, 2, 10, 10]
+
+
 def test_epic_2_1_ac4_all_anomalies_reconcile_without_duplicate_issues():
     data = pd.DataFrame(
         {
@@ -204,6 +216,9 @@ def test_epic_2_1_ac10_mapping_index_and_timezone_spelling_are_invariant():
         (("missingness", 0, "missing_rate"), 2.0),
         (("score_distribution", "mean"), float("inf")),
         (("outliers", "outlier_count"), 99),
+        (("anomalies", 0, "total_count"), 3),
+        (("freshness", "age_seconds"), 42),
+        (("outliers", "field"), "other_score"),
     ],
 )
 def test_epic_2_1_ac11_strict_models_reject_invalid_values(path, value):
@@ -222,6 +237,20 @@ def test_epic_2_1_ac11_unknown_and_raw_identifier_fields_rejected():
     with pytest.raises(ValidationError, match="Extra inputs"):
         SingleRunProfile.model_validate(payload)
     assert "id" not in json.dumps(payload["outliers"])
+
+
+def test_epic_2_1_ac11_freshness_rejects_inconsistent_time_order():
+    payload = validate_audit_data(frame(), config()).profile.model_dump()
+    payload["freshness"]["data_as_of"] = "2026-07-03T00:00:00Z"
+    with pytest.raises(ValidationError, match="available freshness"):
+        SingleRunProfile.model_validate(payload)
+
+    payload = validate_audit_data(
+        frame(), config(data_as_of="2026-07-03T00:00:00Z")
+    ).profile.model_dump()
+    payload["freshness"]["data_as_of"] = "2026-07-01T00:00:00Z"
+    with pytest.raises(ValidationError, match="future_dated freshness"):
+        SingleRunProfile.model_validate(payload)
 
 
 def test_epic_2_1_ac12_public_compatibility_and_report_schema_are_additive():

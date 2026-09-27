@@ -350,10 +350,24 @@ class FreshnessProfile(ValidationContractModel):
             raise ValueError("freshness timestamps must use canonical UTC Z form")
         try:
             datetime_values = (self.execution_timestamp,) if self.data_as_of is None else (self.execution_timestamp, self.data_as_of)
-            for value in datetime_values:
+            parsed = tuple(
                 datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+                for value in datetime_values
+            )
         except ValueError as error:
             raise ValueError("freshness timestamps must be valid ISO 8601 values") from error
+        execution = parsed[0]
+        if self.status == "unavailable":
+            return self
+        data_as_of = parsed[1]
+        if self.status == "future_dated" and data_as_of <= execution:
+            raise ValueError("future_dated freshness requires data_as_of after execution_timestamp")
+        if self.status == "available":
+            if data_as_of > execution:
+                raise ValueError("available freshness requires data_as_of at or before execution_timestamp")
+            expected_age = math.floor((execution - data_as_of).total_seconds())
+            if self.age_seconds != expected_age:
+                raise ValueError("age_seconds must derive from freshness timestamps")
         return self
 
 
@@ -377,6 +391,8 @@ class SingleRunProfile(ValidationContractModel):
             raise ValueError("profile row counts must reconcile")
         if self.score_distribution.count != self.eligible_rows:
             raise ValueError("score distribution count must equal eligible_rows")
+        if self.score_distribution.field != self.outliers.field:
+            raise ValueError("score distribution and outlier fields must match")
         if self.outliers.total_count != self.eligible_rows:
             raise ValueError("outlier total_count must equal eligible_rows")
         q1 = next(item.value for item in self.score_distribution.quantiles if float(item.probability) == 0.25)
@@ -393,6 +409,8 @@ class SingleRunProfile(ValidationContractModel):
         expected_codes = tuple(reason.value for reason in ExclusionReason)
         if tuple(item.code.value for item in self.anomalies) != tuple(sorted(expected_codes)):
             raise ValueError("all anomaly categories must appear in code order")
+        if any(item.total_count != self.input_rows for item in self.anomalies):
+            raise ValueError("anomaly total_count must equal input_rows")
         if self.issues != tuple(sorted(self.issues, key=issue_sort_key)):
             raise ValueError("profile issues must use canonical order")
         if any(issue.layer != ValidationLayerId.DATA_QUALITY for issue in self.issues):
@@ -500,7 +518,7 @@ def issue_sort_key(issue: ValidationIssue) -> tuple[Any, ...]:
 
 
 def _group_sort_key(group: AffectedGroup) -> tuple[Any, ...]:
-    return tuple((key, type(value).__name__, repr(value)) for key, value in group.attributes.items())
+    return tuple((key, *_typed_label_key(value)) for key, value in group.attributes.items())
 
 
 def _typed_label_key(value: Label) -> tuple[int, object]:
