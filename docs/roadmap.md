@@ -32,16 +32,20 @@ V1 prioritizes correctness, transparency, reproducibility, and usability before
 breadth. A metric or flag is not release-ready until its semantics, applicability,
 edge cases, tests, report representation, and limitations are documented.
 
-### Epic 1 completion sequence
+### Epic delivery sequence
 
 - Epic 1.1: base configuration and semantic validation — complete.
 - Epic 1.2: protected-group missing/unknown-value semantics — complete.
 - Epic 1.3: structural integrity — complete.
-- Epic 1.4: layered validation results — implementation contract defined in
-  [`epic-1.4-layered-validation-results.md`](epic-1.4-layered-validation-results.md);
-  implement and independently review to close Epic 1.
+- Epic 1.4: layered validation results — complete; Epic 1 is closed.
+- Epic 2.1: single-run data-quality profile — contract defined in
+  [`epic-2.1-single-run-profile.md`](epic-2.1-single-run-profile.md); implement
+  and independently review before starting Epic 2.2.
+- Epic 2.2: baseline comparison — blocked until Epic 2.1 is merged and `main`
+  CI is green.
 
-Epic 2 must not begin until Epic 1.4 is complete.
+Epic 2.1 is descriptive and must not silently establish the comparison API or
+drift semantics owned by Epic 2.2.
 
 ## V1.1 — Mitigation experiments
 

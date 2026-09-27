@@ -173,6 +173,12 @@ are defined in the
 Technical passage never means approved or fit for use, and unavailable
 comparison evidence is `not_evaluated`, not `passed`.
 
+The normative single-run observation fields, population scopes, formulas,
+ordering, privacy constraints, reason codes, and edge behavior are defined in
+the [Epic 2.1 Single-run Profile Contract](epic-2.1-single-run-profile.md).
+Single-run profiling does not imply that a baseline comparison was requested;
+distribution and group-size change remain reserved for Epic 2.2.
+
 ## Public API
 
 ```python

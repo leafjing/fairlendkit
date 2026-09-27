@@ -58,6 +58,19 @@ is required for favorable-label inversion, score-direction inversion,
 reference-group reversal, missing-value handling, group-order instability, and
 undefined-versus-zero confusion.
 
+### Epic 2.1 profile tests
+
+Single-run profile approval requires hand-calculated missingness, group-size,
+anomaly, distribution, outlier, and freshness fixtures. Tests must exercise
+input-versus-eligible population scope, typed category identity, configured
+zero-count groups, multi-reason anomaly counts, type-7 quantiles, population
+standard deviation, Tukey fence equality, zero IQR, timezone normalization, and
+unavailable/future-dated freshness. Property tests must show row-permutation and
+mapping-order invariance. Strict-model tests must reject inconsistent derived
+values, boolean numerics, non-finite values, raw identifiers, and unknown fields.
+The complete normative matrix is in
+[`epic-2.1-single-run-profile.md`](epic-2.1-single-run-profile.md).
+
 ## Verification matrix
 
 | Case | Expected evidence |
