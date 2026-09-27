@@ -140,10 +140,28 @@ The eligible score distribution contains:
 - `quantiles` at exactly `0`, `0.25`, `0.5`, `0.75`, and `1`; and
 - `method="linear_type7"`.
 
-Calculations use finite numeric eligible scores converted to binary64. Mean and
-population standard deviation use a documented stable two-pass calculation;
-standard deviation divides by `count`, not `count - 1`. Quantiles use Hyndman
-and Fan type 7 linear interpolation: for sorted zero-based values, position is
+Calculations first convert eligible scores to binary64, normalize both signed
+zeros to positive `0.0`, reject non-finite conversions, and sort the resulting
+values in ascending numeric order. Because all values are finite and zeros are
+normalized, this is a canonical total order independent of input row order.
+
+Mean and population standard deviation use this exact deterministic two-pass
+algorithm:
+
+1. `mean = math.fsum(sorted_values) / count`;
+2. in the same canonical value order, calculate each `(value - mean) ** 2`;
+3. `variance = math.fsum(squared_deviations) / count`; and
+4. `standard_deviation = math.sqrt(variance)`.
+
+Standard deviation therefore divides by `count`, not `count - 1`. An overflow,
+`math.fsum` exception, negative derived variance, or non-finite mean, squared
+deviation, variance, standard deviation, interpolated quantile, IQR, or fence is
+an invariant failure: profile construction fails closed and no partial success
+result is returned. Implementations must not fall back to insertion-order
+summation, silently clamp a value, or serialize a non-finite number.
+
+Quantiles use the same canonical sorted values and Hyndman and Fan type 7 linear
+interpolation: for sorted zero-based values, position is
 `(n - 1) * p`, with linear interpolation between the surrounding values.
 For one eligible row, minimum, maximum, mean, and all quantiles equal that score
 and standard deviation is `0.0`.
@@ -228,12 +246,17 @@ reserved for a requested comparison whose baseline is unavailable. Until Epic
 2.2 is invoked, absence of a baseline is not an attempted check and must not
 make the Epic 2.1 data-quality layer `not_evaluated`.
 
-The profile is evaluated when produced. Its data-quality layer is `warning` if
-either warning is present, otherwise `not_evaluated` only when freshness is
-unavailable and no other profile issue exists, otherwise `passed`. The
-`data_freshness_unavailable` info issue is the required explanation for that
-`not_evaluated` state. Missing freshness does not erase successfully calculated
-profile observations.
+The profile's missingness, group-size, anomaly, distribution, and outlier checks
+are all evaluated whenever a profile is produced. Therefore its data-quality
+layer is `warning` if a warning issue is present and otherwise `passed`, including
+when `data_freshness_unavailable` is present. That info issue marks only the
+freshness check as unavailable; it does not erase the other completed checks or
+make the whole layer `not_evaluated`.
+
+Under the Epic 1.4 aggregate rule, a layer is `not_evaluated` only when every
+applicable check owned by that layer is unrunnable. An informational issue alone
+does not determine layer status: it may explain either a wholly unevaluated
+layer or one unavailable sub-check in an otherwise evaluated layer.
 
 ## Determinism, privacy, and serialization
 
@@ -288,17 +311,20 @@ Implementation is acceptable only when named automated tests demonstrate:
    eligible counts, proportions, and correct reference designation.
 4. All five anomaly categories are present, reconcile with Epic 1 reason counts,
    preserve multi-reason semantics, and create no duplicate layer issues.
-5. Score minimum, maximum, mean, population standard deviation, fixed type-7
-   quantiles, singleton behavior, and negative-zero normalization match
-   hand-calculated fixtures.
+5. Score minimum, maximum, canonical sorting, `math.fsum` mean, deterministic
+   two-pass population standard deviation, fixed type-7 quantiles, singleton
+   behavior, and negative-zero normalization match hand-calculated fixtures;
+   a non-associative float fixture is byte-identical under row permutations and
+   derived non-finite values fail closed.
 6. Outcome counts preserve typed labels, sum to eligible rows, retain rare
    values, and use canonical typed ordering.
 7. Tukey fences, strict boundary behavior, zero-IQR behavior, lower/upper/total
    counts, and `score_outliers_observed` evidence match hand calculations.
 8. Freshness covers UTC normalization, whole-second age, unavailable
    `data_as_of`, and future-dated metadata with the exact stable issues.
-9. The data-quality layer contains exactly profile issues, uses derived Epic 1.4
-   status, and never emits `comparison_baseline_unavailable` without a requested
+9. The data-quality layer contains exactly profile issues, is `passed` when
+   freshness alone is unavailable, uses `warning` when a warning is present,
+   and never emits `comparison_baseline_unavailable` without a requested
    comparison.
 10. Row permutation, mapping insertion order, pandas index, and equivalent
     timezone offsets produce byte-equivalent canonical JSON.
