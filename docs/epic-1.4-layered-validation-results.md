@@ -76,8 +76,10 @@ strict `LayeredValidationResult` with:
 
 Each layer contains its identifier, derived status, and ordered issue tuple.
 `warning` and `failed` require a corresponding issue. Empty issue tuples are
-valid for `passed`; `not_evaluated` requires an informational issue identifying
-the unavailable input or unimplemented later-epic check.
+valid for `passed`; a `passed` layer may also contain an informational issue for
+an unavailable sub-check when at least one other applicable check in that layer
+ran. `not_evaluated` requires an informational issue identifying why every
+applicable check owned by the layer was unavailable or unimplemented.
 
 ## Issue contract
 
@@ -132,8 +134,10 @@ success result.
 ## Status and applicability rules
 
 Layer status is derived: any error means `failed`; otherwise any warning means
-`warning`; otherwise an evaluated layer is `passed`; a layer with no runnable
-applicable check is `not_evaluated`.
+`warning`; otherwise a layer with at least one completed applicable check is
+`passed`, even if an informational issue records another unavailable sub-check;
+a layer is `not_evaluated` only when every applicable check it owns is
+unrunnable. Informational severity alone does not determine layer status.
 
 `technical_validation` is `failed` if structural or semantic validity fails,
 `warning` if neither fails and either warns, otherwise `passed`. Successful
