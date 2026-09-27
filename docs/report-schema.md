@@ -59,6 +59,13 @@ always require practitioner review; no `compliance_status`, automated verdict,
 or pass/fail field exists in the contract. Human review notes remain visibly
 separate and attributable.
 
+Epic 1.4 replaces the flat validation presentation with the
+[layered validation contract](epic-1.4-layered-validation-results.md). During
+V1, `analyzed_rows` aliases `eligible_rows`; exclusion records reconcile the
+de-duplicated excluded total, while overlapping per-reason hit counts remain
+separate. The embedded result exposes all four layers, technical status, and
+`applicability="not_assessed"` without implying fitness for use.
+
 ## Versioning and serialization
 
 `schema_version` is required and fixed to `"1.0"`. Pydantic's generated JSON

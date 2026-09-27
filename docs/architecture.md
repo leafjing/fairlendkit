@@ -56,6 +56,12 @@ fitness for use:
    group, anomalous values, and model/dataset-version changes when comparison
    metadata is supplied.
 
+All four entries are mandatory in canonical order and use derived `passed`,
+`warning`, `failed`, or `not_evaluated` statuses. Overall status does not encode
+applicability: Epic 1.4 records it as `not_assessed` and requires practitioner
+review. See the normative
+[`epic-1.4-layered-validation-results.md`](epic-1.4-layered-validation-results.md).
+
 The domain-owned validation contract represents group-category declarations,
 eligibility decisions, stable issue/reason codes, per-reason counts, and the
 de-duplicated excluded total using framework-neutral types. Missing means null/NA;

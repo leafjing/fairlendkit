@@ -166,6 +166,13 @@ by group, unexpected categories, anomalous values, and dataset/model-version
 change. These are observations with supporting counts or statistics, not silent
 row transformations or automated causal conclusions.
 
+The normative boundaries, issue fields, stable codes, status aggregation,
+serialization rules, applicability disclaimer, and compatibility requirements
+are defined in the
+[Layered Validation Results Contract](epic-1.4-layered-validation-results.md).
+Technical passage never means approved or fit for use, and unavailable
+comparison evidence is `not_evaluated`, not `passed`.
+
 ## Public API
 
 ```python
