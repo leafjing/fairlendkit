@@ -33,7 +33,42 @@
     "input_rows": 4,
     "analyzed_rows": 4,
     "exclusions": [],
-    "warnings": []
+    "warnings": [],
+    "status": "passed",
+    "technical_validation": "passed",
+    "applicability": "not_assessed",
+    "applicability_statement": "Technical validation does not determine fitness for use; applicability requires practitioner review.",
+    "reason_counts": [],
+    "duplicate_rows": 0,
+    "small_groups": [],
+    "layers": [
+      {"layer": "structural", "status": "passed", "issues": []},
+      {"layer": "semantic", "status": "passed", "issues": []},
+      {"layer": "analytical_reliability", "status": "passed", "issues": []},
+      {
+        "layer": "data_quality",
+        "status": "not_evaluated",
+        "issues": [
+          {
+            "code": "comparison_baseline_unavailable",
+            "severity": "info",
+            "affected_fields": [],
+            "affected_groups": [],
+            "evidence": {
+              "count": null,
+              "total": null,
+              "observed": null,
+              "expected": null,
+              "minimum": null,
+              "maximum": null,
+              "reason_counts": null
+            },
+            "message": "Comparison baseline evidence is unavailable.",
+            "blocking": false
+          }
+        ]
+      }
+    ]
   },
   "observed_metrics": [
     {
