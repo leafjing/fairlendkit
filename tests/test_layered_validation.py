@@ -52,13 +52,14 @@ def frame():
 def test_ac1_exactly_four_layers_in_canonical_order_and_derived_statuses():
     result = validate_audit_data(frame(), config())
     assert [layer.layer.value for layer in result.layers] == ["structural", "semantic", "analytical_reliability", "data_quality"]
-    assert [layer.status.value for layer in result.layers] == ["passed", "passed", "passed", "not_evaluated"]
+    assert [layer.status.value for layer in result.layers] == ["passed", "passed", "passed", "passed"]
     with pytest.raises(ValidationError, match="derived"):
         ValidationLayerResult(layer="structural", status="warning", issues=())
 
 
 def test_ac2_all_statuses_and_unavailable_baseline_evidence_are_representable():
-    assert validate_audit_data(frame(), config()).layers[-1].issues[0].code == "comparison_baseline_unavailable"
+    assert validate_audit_data(frame(), config()).layers[-1].issues == ()
+    assert all(issue.code != "comparison_baseline_unavailable" for issue in validate_audit_data(frame(), config()).profile.issues)
     assert {status for status in ("passed", "warning", "failed", "not_evaluated")} == {"passed", "warning", "failed", "not_evaluated"}
     assert make_issue("comparison_baseline_unavailable").severity.value == "info"
 

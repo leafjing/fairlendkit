@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import UTC, datetime
 from numbers import Real
 
 import pandas as pd
@@ -10,16 +11,26 @@ import pandas as pd
 from fairlendkit.config import AuditConfig
 from fairlendkit.data.contracts import (
     AffectedGroup,
+    AnomalyProfile,
+    CategoryCount,
     ExclusionEvidence,
     ExclusionReason,
     LAYER_ORDER,
     LayeredValidationResult,
+    FreshnessProfile,
+    GroupSizeProfile,
+    MissingnessProfile,
+    NumericDistributionProfile,
+    OutlierProfile,
+    QuantileValue,
+    SingleRunProfile,
     ValidationIssue,
     ValidationIssueEvidence,
     ValidationLayerId,
     ValidationLayerResult,
     ValidationSeverity,
     ValidationStatus,
+    aggregate_validation_status,
     issue_sort_key,
     make_issue,
 )
@@ -182,15 +193,21 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
     ):
         if mask.any() and policy_excludes:
             structural_issues.append(make_issue(code, affected_fields=fields, evidence=ValidationIssueEvidence(count=int(mask.sum())), severity=ValidationSeverity.WARNING, blocking=False))
-    data_quality_issue = make_issue("comparison_baseline_unavailable")
+    profile = _build_single_run_profile(
+        data=data,
+        eligible=eligible,
+        config=config,
+        reason_counts=counts,
+        excluded_rows=int(excluded.sum()),
+    )
     layers = (
         _make_layer(ValidationLayerId.STRUCTURAL, structural_issues),
         _make_layer(ValidationLayerId.SEMANTIC, []),
         _make_layer(ValidationLayerId.ANALYTICAL_RELIABILITY, reliability_issues),
-        _make_layer(ValidationLayerId.DATA_QUALITY, [data_quality_issue]),
+        _make_layer(ValidationLayerId.DATA_QUALITY, list(profile.issues)),
     )
     statuses = tuple(layer.status for layer in layers)
-    overall = ValidationStatus.WARNING if ValidationStatus.WARNING in statuses else ValidationStatus.PASSED
+    overall = aggregate_validation_status(statuses)
     return LayeredValidationResult(
         status=overall,
         technical_validation=ValidationStatus.WARNING if layers[0].status == ValidationStatus.WARNING else ValidationStatus.PASSED,
@@ -202,6 +219,7 @@ def validate_audit_data(data: pd.DataFrame, config: AuditConfig) -> ValidationSu
         reason_counts=ordered_counts,
         duplicate_rows=int(duplicate_rows.sum()),
         layers=layers,
+        profile=profile,
     )
 
 
@@ -211,6 +229,8 @@ def _make_layer(layer: ValidationLayerId, issues: list[ValidationIssue]) -> Vali
         status = ValidationStatus.FAILED
     elif any(issue.severity == ValidationSeverity.WARNING for issue in ordered):
         status = ValidationStatus.WARNING
+    elif ordered and all(issue.code == "data_freshness_unavailable" for issue in ordered):
+        status = ValidationStatus.PASSED
     elif ordered:
         status = ValidationStatus.NOT_EVALUATED
     else:
@@ -322,3 +342,276 @@ def _typed_value_counts(series: pd.Series) -> list[tuple[object, int]]:
         else:
             counts.append([value, 1])
     return [(entry[0], int(entry[1])) for entry in counts]
+
+
+def _build_single_run_profile(
+    *,
+    data: pd.DataFrame,
+    eligible: pd.DataFrame,
+    config: AuditConfig,
+    reason_counts: dict[ExclusionReason, int],
+    excluded_rows: int,
+) -> SingleRunProfile:
+    input_rows = len(data)
+    eligible_rows = len(eligible)
+    required = tuple(sorted(_required_columns(config)))
+
+    missingness: list[MissingnessProfile] = []
+    for field in required:
+        missing_count = int(data[field].isna().sum())
+        missingness.append(
+            MissingnessProfile(
+                field=field,
+                group=None,
+                missing_count=missing_count,
+                total_count=input_rows,
+                missing_rate=missing_count / input_rows,
+            )
+        )
+        grouped: list[tuple[tuple[object, ...], AffectedGroup, pd.Series]] = []
+        for attribute in sorted(config.protected_attributes):
+            observed = [
+                value
+                for value, _ in _typed_value_counts(data[attribute].dropna())
+                if any(_typed_values_equal(value, allowed) for allowed in config.allowed_groups[attribute])
+            ]
+            for value in sorted(observed, key=_typed_value_sort_key):
+                mask = data[attribute].map(lambda actual: _typed_values_equal(actual, value))
+                group = AffectedGroup(attributes={attribute: _python_label(value)})
+                grouped.append(((attribute, *_typed_value_sort_key(value)), group, mask))
+        for _, group, mask in sorted(grouped, key=lambda item: item[0]):
+            total = int(mask.sum())
+            missing = int(data.loc[mask, field].isna().sum())
+            missingness.append(
+                MissingnessProfile(
+                    field=field,
+                    group=group,
+                    missing_count=missing,
+                    total_count=total,
+                    missing_rate=missing / total,
+                )
+            )
+
+    groups: list[GroupSizeProfile] = []
+    for attribute in sorted(config.protected_attributes):
+        reference = config.reference_groups[attribute]
+        for value in sorted(config.allowed_groups[attribute], key=_typed_value_sort_key):
+            label = _python_label(value)
+            group = AffectedGroup(attributes={attribute: label})
+            for population, frame in (("input", data), ("eligible", eligible)):
+                count = int(frame[attribute].map(lambda actual: _typed_values_equal(actual, value)).sum())
+                total = len(frame)
+                groups.append(
+                    GroupSizeProfile(
+                        group=group,
+                        population=population,
+                        count=count,
+                        total_count=total,
+                        proportion=count / total,
+                        is_reference=_typed_values_equal(value, reference),
+                    )
+                )
+
+    anomalies = tuple(
+        AnomalyProfile(
+            code=reason,
+            count=reason_counts.get(reason, 0),
+            total_count=input_rows,
+            rate=reason_counts.get(reason, 0) / input_rows,
+        )
+        for reason in sorted(ExclusionReason, key=lambda item: item.value)
+    )
+
+    values = sorted(_canonical_binary64(value) for value in eligible[config.score_column].tolist())
+    score_distribution = _numeric_distribution(config.score_column, values)
+    quantiles = {float(item.probability): float(item.value) for item in score_distribution.quantiles}
+    outliers = _outlier_profile(config.score_column, values, quantiles[0.25], quantiles[0.75])
+
+    outcome_distribution = tuple(
+        CategoryCount(
+            value=_python_label(value),
+            count=count,
+            total_count=eligible_rows,
+            proportion=count / eligible_rows,
+        )
+        for value, count in sorted(
+            _typed_value_counts(eligible[config.outcome_column]),
+            key=lambda item: _typed_value_sort_key(item[0]),
+        )
+    )
+
+    freshness, freshness_issue = _freshness_profile(config)
+    issues: list[ValidationIssue] = []
+    if outliers.outlier_count:
+        issues.append(
+            make_issue(
+                "score_outliers_observed",
+                affected_fields=(config.score_column,),
+                evidence=ValidationIssueEvidence(
+                    count=outliers.outlier_count,
+                    total=outliers.total_count,
+                    minimum=outliers.lower_fence,
+                    maximum=outliers.upper_fence,
+                ),
+            )
+        )
+    if freshness_issue is not None:
+        issues.append(freshness_issue)
+
+    return SingleRunProfile(
+        input_rows=input_rows,
+        eligible_rows=eligible_rows,
+        excluded_rows=excluded_rows,
+        missingness=tuple(missingness),
+        groups=tuple(groups),
+        anomalies=anomalies,
+        score_distribution=score_distribution,
+        outcome_distribution=outcome_distribution,
+        outliers=outliers,
+        freshness=freshness,
+        issues=tuple(sorted(issues, key=issue_sort_key)),
+    )
+
+
+def _canonical_binary64(value: object) -> float:
+    converted = float(value)
+    if not math.isfinite(converted):
+        raise ValueError("profile scores must convert to finite binary64 values")
+    return 0.0 if converted == 0.0 else converted
+
+
+def _finite_derived(value: float, name: str) -> float:
+    if not math.isfinite(value):
+        raise ValueError(f"derived profile {name} must be finite")
+    return 0.0 if value == 0.0 else value
+
+
+def _type7_quantile(values: list[float], probability: float) -> float:
+    position = (len(values) - 1) * probability
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return values[lower]
+    fraction = position - lower
+    return _finite_derived(
+        values[lower] + fraction * (values[upper] - values[lower]),
+        "quantile",
+    )
+
+
+def _numeric_distribution(field: str, values: list[float]) -> NumericDistributionProfile:
+    try:
+        mean = _finite_derived(math.fsum(values) / len(values), "mean")
+        squared_deviations = []
+        for value in values:
+            deviation = value - mean
+            squared_deviations.append(_finite_derived(deviation**2, "squared deviation"))
+        variance = _finite_derived(math.fsum(squared_deviations) / len(values), "variance")
+        if variance < 0:
+            raise ValueError("derived profile variance must not be negative")
+        standard_deviation = _finite_derived(math.sqrt(variance), "standard deviation")
+        quantiles = tuple(
+            QuantileValue(probability=probability, value=_type7_quantile(values, probability))
+            for probability in (0.0, 0.25, 0.5, 0.75, 1.0)
+        )
+    except (ArithmeticError, OverflowError, ValueError) as error:
+        raise ValueError("score distribution invariant failure") from error
+    return NumericDistributionProfile(
+        field=field,
+        count=len(values),
+        minimum=values[0],
+        maximum=values[-1],
+        mean=mean,
+        standard_deviation=standard_deviation,
+        quantiles=quantiles,
+    )
+
+
+def _outlier_profile(field: str, values: list[float], q1: float, q3: float) -> OutlierProfile:
+    try:
+        iqr = _finite_derived(q3 - q1, "IQR")
+        lower_fence = _finite_derived(q1 - 1.5 * iqr, "lower fence")
+        upper_fence = _finite_derived(q3 + 1.5 * iqr, "upper fence")
+    except (ArithmeticError, OverflowError, ValueError) as error:
+        raise ValueError("score outlier invariant failure") from error
+    lower_count = sum(value < lower_fence for value in values)
+    upper_count = sum(value > upper_fence for value in values)
+    outlier_count = lower_count + upper_count
+    return OutlierProfile(
+        field=field,
+        q1=q1,
+        q3=q3,
+        iqr=iqr,
+        lower_fence=lower_fence,
+        upper_fence=upper_fence,
+        lower_count=lower_count,
+        upper_count=upper_count,
+        total_count=len(values),
+        outlier_count=outlier_count,
+        outlier_rate=outlier_count / len(values),
+    )
+
+
+def _utc_z(value: datetime) -> str:
+    normalized = value.astimezone(UTC)
+    return normalized.isoformat().replace("+00:00", "Z")
+
+
+def _freshness_profile(config: AuditConfig) -> tuple[FreshnessProfile, ValidationIssue | None]:
+    execution = _utc_z(config.execution_timestamp)
+    if config.data_as_of is None:
+        return (
+            FreshnessProfile(
+                status="unavailable",
+                data_as_of=None,
+                execution_timestamp=execution,
+                age_seconds=None,
+                reason_code="data_freshness_unavailable",
+            ),
+            make_issue("data_freshness_unavailable"),
+        )
+    data_as_of = _utc_z(config.data_as_of)
+    if config.data_as_of > config.execution_timestamp:
+        return (
+            FreshnessProfile(
+                status="future_dated",
+                data_as_of=data_as_of,
+                execution_timestamp=execution,
+                age_seconds=None,
+                reason_code="data_as_of_after_execution",
+            ),
+            make_issue(
+                "data_as_of_after_execution",
+                evidence=ValidationIssueEvidence(observed=data_as_of, expected=execution),
+            ),
+        )
+    age_seconds = math.floor((config.execution_timestamp - config.data_as_of).total_seconds())
+    return (
+        FreshnessProfile(
+            status="available",
+            data_as_of=data_as_of,
+            execution_timestamp=execution,
+            age_seconds=age_seconds,
+            reason_code=None,
+        ),
+        None,
+    )
+
+
+def _typed_value_sort_key(value: object) -> tuple[int, object]:
+    if pd.api.types.is_bool(value):
+        return (0, bool(value))
+    if pd.api.types.is_integer(value):
+        return (1, int(value))
+    if isinstance(value, str):
+        return (2, value)
+    raise TypeError(f"unsupported typed label {value!r}")
+
+
+def _python_label(value: object) -> bool | int | str:
+    rank, canonical = _typed_value_sort_key(value)
+    if rank == 0:
+        return bool(canonical)
+    if rank == 1:
+        return int(canonical)
+    return str(canonical)
