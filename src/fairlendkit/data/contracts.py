@@ -443,12 +443,24 @@ class SingleRunProfile(ValidationContractModel):
             raise ValueError("profile issues must exactly match outlier and freshness observations")
         outlier_issue = next((issue for issue in self.issues if issue.code == "score_outliers_observed"), None)
         if outlier_issue is not None and (
-            outlier_issue.evidence.count != self.outliers.outlier_count
+            outlier_issue.affected_fields != (self.outliers.field,)
+            or outlier_issue.evidence.count != self.outliers.outlier_count
             or float(outlier_issue.evidence.total) != self.outliers.total_count
             or float(outlier_issue.evidence.minimum) != float(self.outliers.lower_fence)
             or float(outlier_issue.evidence.maximum) != float(self.outliers.upper_fence)
         ):
             raise ValueError("outlier issue evidence must match the outlier profile")
+        freshness_issue = next(
+            (issue for issue in self.issues if issue.code == self.freshness.reason_code),
+            None,
+        )
+        if self.freshness.status == "future_dated" and (
+            freshness_issue is None
+            or freshness_issue.affected_fields
+            or freshness_issue.evidence.observed != self.freshness.data_as_of
+            or freshness_issue.evidence.expected != self.freshness.execution_timestamp
+        ):
+            raise ValueError("future-dated issue evidence must match freshness timestamps")
         return self
 
 

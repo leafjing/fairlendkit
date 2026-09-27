@@ -253,6 +253,36 @@ def test_epic_2_1_ac11_freshness_rejects_inconsistent_time_order():
         SingleRunProfile.model_validate(payload)
 
 
+def test_epic_2_1_ac11_rejects_issue_evidence_inconsistent_with_profile():
+    payload = validate_audit_data(frame(), config()).profile.model_dump()
+    outlier_issue = next(
+        issue for issue in payload["issues"] if issue["code"] == "score_outliers_observed"
+    )
+    outlier_issue["affected_fields"] = ("wrong_score",)
+    with pytest.raises(ValidationError, match="outlier issue evidence"):
+        SingleRunProfile.model_validate(payload)
+
+    payload = validate_audit_data(
+        frame(), config(data_as_of="2026-07-03T00:00:00Z")
+    ).profile.model_dump()
+    freshness_issue = next(
+        issue for issue in payload["issues"] if issue["code"] == "data_as_of_after_execution"
+    )
+    freshness_issue["evidence"]["observed"] = "2026-07-04T00:00:00Z"
+    with pytest.raises(ValidationError, match="future-dated issue evidence"):
+        SingleRunProfile.model_validate(payload)
+
+    payload = validate_audit_data(
+        frame(), config(data_as_of="2026-07-03T00:00:00Z")
+    ).profile.model_dump()
+    freshness_issue = next(
+        issue for issue in payload["issues"] if issue["code"] == "data_as_of_after_execution"
+    )
+    freshness_issue["evidence"]["expected"] = "2026-07-05T00:00:00Z"
+    with pytest.raises(ValidationError, match="future-dated issue evidence"):
+        SingleRunProfile.model_validate(payload)
+
+
 def test_epic_2_1_ac12_public_compatibility_and_report_schema_are_additive():
     result = validate_audit_data(frame(), config())
     assert result.analyzed_rows == result.eligible_rows
