@@ -76,12 +76,24 @@ def test_ac4_registry_enforces_canonical_issue_fields():
         ValidationIssue.model_validate(payload)
 
 
-@pytest.mark.parametrize("bad", [{"count": -1}, {"total": float("inf")}, {"raw_identifier": "app-1"}])
+@pytest.mark.parametrize("bad", [{"count": -1}, {"count": True}, {"total": float("inf")}, {"raw_identifier": "app-1"}])
 def test_ac5_evidence_rejects_negative_nonfinite_raw_or_unknown_members(bad):
     with pytest.raises(ValidationError):
         ValidationIssueEvidence.model_validate(bad)
     typed = ValidationIssueEvidence(observed=(True, 1, "1"))
     assert [type(value) for value in typed.observed] == [bool, int, str]
+
+
+def test_ac5_registry_rejects_unauthorized_observed_identifier_evidence():
+    canonical = make_issue(
+        "missing_required_column",
+        affected_fields=("score",),
+        evidence=ValidationIssueEvidence(count=1),
+    )
+    payload = canonical.model_dump()
+    payload["evidence"]["observed"] = "applicant-123"
+    with pytest.raises(ValidationError, match="does not allow evidence: observed"):
+        ValidationIssue.model_validate(payload)
 
 
 def test_ac6_multi_reason_counts_can_exceed_excluded_union():
@@ -138,6 +150,26 @@ def test_ac11_audit_result_migrates_flat_v1_and_round_trips_layered_schema():
     assert result.validation.eligible_rows == result.validation.analyzed_rows
     assert AuditResult.model_validate_json(result.model_dump_json()) == result
     assert "layers" in AuditResult.model_json_schema()["$defs"]["ValidationEvidence"]["required"]
+
+
+def test_ac11_audit_result_rejects_status_inconsistent_with_layers():
+    payload = json.loads((Path(__file__).parents[1] / "examples/synthetic/audit-result.json").read_text())
+    payload["validation"]["status"] = "failed"
+    with pytest.raises(ValidationError, match="status must derive"):
+        AuditResult.model_validate(payload)
+
+
+def test_ac11_flat_v1_warning_migration_produces_consistent_warning_layer():
+    payload = json.loads((Path(__file__).parents[1] / "examples/synthetic/audit-result.json").read_text())
+    for field in ("status", "technical_validation", "applicability", "applicability_statement", "reason_counts", "duplicate_rows", "small_groups", "layers"):
+        payload["validation"].pop(field)
+    payload["validation"]["warnings"] = [
+        {"code": "legacy-data-note", "message": "A factual legacy warning."}
+    ]
+    result = AuditResult.model_validate(payload)
+    assert result.validation.status == "warning"
+    assert result.validation.layers[-1].status == "warning"
+    assert result.validation.layers[-1].issues[0].code == "legacy_validation_warning"
 
 
 def test_ac12_epic_11_through_13_public_reason_strings_are_unchanged():

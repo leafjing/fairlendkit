@@ -15,7 +15,10 @@ from fairlendkit.data.contracts import (
     APPLICABILITY_STATEMENT,
     ValidationLayerId,
     ValidationLayerResult,
+    ValidationIssueEvidence,
     ValidationStatus,
+    aggregate_validation_status,
+    issue_sort_key,
     make_issue,
 )
 AUDIT_RESULT_SCHEMA_VERSION = "1.0"
@@ -263,15 +266,26 @@ class ValidationEvidence(ResultModel):
             return value
         migrated = dict(value)
         warnings = migrated.get("warnings", ())
-        reliability_issues = ()
         # Released flat fixtures had no typed mapping from arbitrary warning codes.
-        # They remain in ``warnings``; the additive layered view does not invent one.
-        data_quality_issue = make_issue("comparison_baseline_unavailable")
+        # Preserve their aggregate state under one bounded compatibility issue.
+        data_quality_issues = [make_issue("comparison_baseline_unavailable")]
+        if warnings:
+            data_quality_issues.append(
+                make_issue(
+                    "legacy_validation_warning",
+                    evidence=ValidationIssueEvidence(count=len(warnings)),
+                )
+            )
+        data_quality_issues.sort(key=issue_sort_key)
         layers = (
             ValidationLayerResult(layer="structural", status="passed", issues=()),
             ValidationLayerResult(layer="semantic", status="passed", issues=()),
-            ValidationLayerResult(layer="analytical_reliability", status="passed", issues=reliability_issues),
-            ValidationLayerResult(layer="data_quality", status="not_evaluated", issues=(data_quality_issue,)),
+            ValidationLayerResult(layer="analytical_reliability", status="passed", issues=()),
+            ValidationLayerResult(
+                layer="data_quality",
+                status="warning" if warnings else "not_evaluated",
+                issues=tuple(data_quality_issues),
+            ),
         )
         migrated.update(
             status="passed" if not warnings else "warning",
@@ -295,17 +309,21 @@ class ValidationEvidence(ResultModel):
         if tuple(layer.layer for layer in self.layers) != tuple(ValidationLayerId):
             raise ValueError("validation layers must use canonical order")
         layer_status = {layer.layer: layer.status for layer in self.layers}
-        expected_technical = (
-            ValidationStatus.FAILED
-            if ValidationStatus.FAILED in (layer_status[ValidationLayerId.STRUCTURAL], layer_status[ValidationLayerId.SEMANTIC])
-            else ValidationStatus.WARNING
-            if ValidationStatus.WARNING in (layer_status[ValidationLayerId.STRUCTURAL], layer_status[ValidationLayerId.SEMANTIC])
-            else ValidationStatus.PASSED
+        expected_technical = aggregate_validation_status(
+            (
+                layer_status[ValidationLayerId.STRUCTURAL],
+                layer_status[ValidationLayerId.SEMANTIC],
+            )
         )
         if self.technical_validation != expected_technical:
             raise ValueError("technical_validation must derive from structural and semantic layers")
         if self.technical_validation == ValidationStatus.FAILED:
             raise ValueError("AuditResult cannot contain failed technical validation")
+        expected_status = aggregate_validation_status(
+            tuple(layer.status for layer in self.layers)
+        )
+        if self.status != expected_status:
+            raise ValueError("validation status must derive from all four layers")
         return self
 
     @property

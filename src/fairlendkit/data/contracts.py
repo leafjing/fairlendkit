@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, model_validator
 
 from fairlendkit.config.models import Label
 
@@ -69,29 +69,31 @@ class IssueDefinition:
     severity: ValidationSeverity
     blocking: bool
     required_evidence: frozenset[str] = frozenset()
+    allowed_evidence: frozenset[str] = frozenset()
 
 
 ISSUE_REGISTRY: dict[str, IssueDefinition] = {
-    "missing_required_column": IssueDefinition(ValidationLayerId.STRUCTURAL, "One or more required columns are missing.", ValidationSeverity.ERROR, True, frozenset({"count"})),
-    "missing_required_value": IssueDefinition(ValidationLayerId.STRUCTURAL, "Required analysis values are missing.", ValidationSeverity.ERROR, True, frozenset({"count"})),
+    "missing_required_column": IssueDefinition(ValidationLayerId.STRUCTURAL, "One or more required columns are missing.", ValidationSeverity.ERROR, True, frozenset({"count"}), frozenset({"count"})),
+    "missing_required_value": IssueDefinition(ValidationLayerId.STRUCTURAL, "Required analysis values are missing.", ValidationSeverity.ERROR, True, frozenset({"count"}), frozenset({"count"})),
     "non_numeric_score": IssueDefinition(ValidationLayerId.STRUCTURAL, "The score column is not a non-boolean real numeric type.", ValidationSeverity.ERROR, True),
     "non_numeric_weight": IssueDefinition(ValidationLayerId.STRUCTURAL, "The sample-weight column is not a non-boolean real numeric type.", ValidationSeverity.ERROR, True),
-    "negative_weight": IssueDefinition(ValidationLayerId.STRUCTURAL, "Sample weights contain negative values.", ValidationSeverity.ERROR, True, frozenset({"count"})),
-    "non_positive_weight_total": IssueDefinition(ValidationLayerId.STRUCTURAL, "Eligible sample weights do not have a positive total.", ValidationSeverity.ERROR, True, frozenset({"total"})),
-    "non_finite_numeric": IssueDefinition(ValidationLayerId.STRUCTURAL, "Numeric analysis values must be finite.", ValidationSeverity.ERROR, True, frozenset({"count"})),
-    "duplicate_record": IssueDefinition(ValidationLayerId.STRUCTURAL, "Duplicate records were detected.", ValidationSeverity.ERROR, True, frozenset({"count"})),
-    "non_unique_record_id": IssueDefinition(ValidationLayerId.STRUCTURAL, "Record identifiers are not unique in eligible data.", ValidationSeverity.ERROR, True, frozenset({"count"})),
-    "unknown_protected_group": IssueDefinition(ValidationLayerId.STRUCTURAL, "Protected-group values outside the declared allowed set were observed.", ValidationSeverity.ERROR, True, frozenset({"count"})),
-    "unexpected_category": IssueDefinition(ValidationLayerId.STRUCTURAL, "Values outside the declared expected categories were observed.", ValidationSeverity.ERROR, True, frozenset({"count"})),
-    "no_eligible_rows": IssueDefinition(ValidationLayerId.STRUCTURAL, "No eligible rows remain after configured exclusions.", ValidationSeverity.ERROR, True, frozenset({"count"})),
-    "favorable_label_absent": IssueDefinition(ValidationLayerId.SEMANTIC, "The configured favorable outcome label is absent from eligible data.", ValidationSeverity.ERROR, True),
-    "favorable_decision_label_absent": IssueDefinition(ValidationLayerId.SEMANTIC, "The configured favorable decision label is absent from eligible data.", ValidationSeverity.ERROR, True),
-    "reference_group_absent": IssueDefinition(ValidationLayerId.SEMANTIC, "A configured reference group is absent from eligible data.", ValidationSeverity.ERROR, True),
+    "negative_weight": IssueDefinition(ValidationLayerId.STRUCTURAL, "Sample weights contain negative values.", ValidationSeverity.ERROR, True, frozenset({"count"}), frozenset({"count"})),
+    "non_positive_weight_total": IssueDefinition(ValidationLayerId.STRUCTURAL, "Eligible sample weights do not have a positive total.", ValidationSeverity.ERROR, True, frozenset({"total"}), frozenset({"total"})),
+    "non_finite_numeric": IssueDefinition(ValidationLayerId.STRUCTURAL, "Numeric analysis values must be finite.", ValidationSeverity.ERROR, True, frozenset({"count"}), frozenset({"count"})),
+    "duplicate_record": IssueDefinition(ValidationLayerId.STRUCTURAL, "Duplicate records were detected.", ValidationSeverity.ERROR, True, frozenset({"count"}), frozenset({"count"})),
+    "non_unique_record_id": IssueDefinition(ValidationLayerId.STRUCTURAL, "Record identifiers are not unique in eligible data.", ValidationSeverity.ERROR, True, frozenset({"count"}), frozenset({"count"})),
+    "unknown_protected_group": IssueDefinition(ValidationLayerId.STRUCTURAL, "Protected-group values outside the declared allowed set were observed.", ValidationSeverity.ERROR, True, frozenset({"count"}), frozenset({"count"})),
+    "unexpected_category": IssueDefinition(ValidationLayerId.STRUCTURAL, "Values outside the declared expected categories were observed.", ValidationSeverity.ERROR, True, frozenset({"count"}), frozenset({"count"})),
+    "no_eligible_rows": IssueDefinition(ValidationLayerId.STRUCTURAL, "No eligible rows remain after configured exclusions.", ValidationSeverity.ERROR, True, frozenset({"count"}), frozenset({"count", "reason_counts"})),
+    "favorable_label_absent": IssueDefinition(ValidationLayerId.SEMANTIC, "The configured favorable outcome label is absent from eligible data.", ValidationSeverity.ERROR, True, allowed_evidence=frozenset({"expected"})),
+    "favorable_decision_label_absent": IssueDefinition(ValidationLayerId.SEMANTIC, "The configured favorable decision label is absent from eligible data.", ValidationSeverity.ERROR, True, allowed_evidence=frozenset({"expected"})),
+    "reference_group_absent": IssueDefinition(ValidationLayerId.SEMANTIC, "A configured reference group is absent from eligible data.", ValidationSeverity.ERROR, True, allowed_evidence=frozenset({"expected"})),
     "ambiguous_column_role": IssueDefinition(ValidationLayerId.SEMANTIC, "A column has more than one declared semantic role.", ValidationSeverity.ERROR, True),
     "inconsistent_threshold_direction": IssueDefinition(ValidationLayerId.SEMANTIC, "The threshold operator is inconsistent with score direction.", ValidationSeverity.ERROR, True),
     "invalid_category_declaration": IssueDefinition(ValidationLayerId.SEMANTIC, "A category declaration is invalid.", ValidationSeverity.ERROR, True),
-    "small_group": IssueDefinition(ValidationLayerId.ANALYTICAL_RELIABILITY, "An eligible protected group is below the configured minimum size.", ValidationSeverity.WARNING, False, frozenset({"count", "minimum"})),
+    "small_group": IssueDefinition(ValidationLayerId.ANALYTICAL_RELIABILITY, "An eligible protected group is below the configured minimum size.", ValidationSeverity.WARNING, False, frozenset({"count", "minimum"}), frozenset({"count", "minimum"})),
     "comparison_baseline_unavailable": IssueDefinition(ValidationLayerId.DATA_QUALITY, "Comparison baseline evidence is unavailable.", ValidationSeverity.INFO, False),
+    "legacy_validation_warning": IssueDefinition(ValidationLayerId.DATA_QUALITY, "Legacy validation warnings are present.", ValidationSeverity.WARNING, False, frozenset({"count"}), frozenset({"count"})),
 }
 
 
@@ -99,14 +101,18 @@ class ValidationContractModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+StrictCount = Annotated[StrictInt, Field(ge=0)]
+FiniteNumber = StrictFloat | StrictInt
+
+
 class ValidationIssueEvidence(ValidationContractModel):
-    count: int | None = Field(default=None, ge=0)
-    total: float | int | None = None
+    count: StrictCount | None = None
+    total: FiniteNumber | None = None
     observed: Label | tuple[Label, ...] | None = None
     expected: Label | tuple[Label, ...] | None = None
-    minimum: float | int | None = None
-    maximum: float | int | None = None
-    reason_counts: dict[str, int] | None = None
+    minimum: FiniteNumber | None = None
+    maximum: FiniteNumber | None = None
+    reason_counts: dict[str, StrictCount] | None = None
 
     @model_validator(mode="after")
     def validate_bounded_json_evidence(self) -> "ValidationIssueEvidence":
@@ -159,6 +165,9 @@ class ValidationIssue(ValidationContractModel):
         missing = definition.required_evidence - present
         if missing:
             raise ValueError(f"issue {self.code!r} requires evidence: {', '.join(sorted(missing))}")
+        unauthorized = present - definition.allowed_evidence
+        if unauthorized:
+            raise ValueError(f"issue {self.code!r} does not allow evidence: {', '.join(sorted(unauthorized))}")
         return self
 
     @property
@@ -207,8 +216,8 @@ class LayeredValidationResult(ValidationContractModel):
         if self.reason_counts != tuple(sorted((code, count) for code, count in self.reason_counts if count > 0)):
             raise ValueError("reason_counts must be sorted with zero counts omitted")
         statuses = {layer.layer: layer.status for layer in self.layers}
-        technical = _aggregate_status((statuses[ValidationLayerId.STRUCTURAL], statuses[ValidationLayerId.SEMANTIC]))
-        overall = _aggregate_status(tuple(statuses.values()))
+        technical = aggregate_validation_status((statuses[ValidationLayerId.STRUCTURAL], statuses[ValidationLayerId.SEMANTIC]))
+        overall = aggregate_validation_status(tuple(statuses.values()))
         if self.technical_validation != technical or self.status != overall:
             raise ValueError("aggregate statuses must be derived from layer statuses")
         if technical == ValidationStatus.FAILED:
@@ -252,7 +261,7 @@ def _layer_status(issues: tuple[ValidationIssue, ...]) -> ValidationStatus:
     return ValidationStatus.PASSED
 
 
-def _aggregate_status(statuses: tuple[ValidationStatus, ...]) -> ValidationStatus:
+def aggregate_validation_status(statuses: tuple[ValidationStatus, ...]) -> ValidationStatus:
     evaluated = [status for status in statuses if status != ValidationStatus.NOT_EVALUATED]
     if not evaluated:
         return ValidationStatus.NOT_EVALUATED
