@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -93,6 +94,9 @@ ISSUE_REGISTRY: dict[str, IssueDefinition] = {
     "invalid_category_declaration": IssueDefinition(ValidationLayerId.SEMANTIC, "A category declaration is invalid.", ValidationSeverity.ERROR, True),
     "small_group": IssueDefinition(ValidationLayerId.ANALYTICAL_RELIABILITY, "An eligible protected group is below the configured minimum size.", ValidationSeverity.WARNING, False, frozenset({"count", "minimum"}), frozenset({"count", "minimum"})),
     "comparison_baseline_unavailable": IssueDefinition(ValidationLayerId.DATA_QUALITY, "Comparison baseline evidence is unavailable.", ValidationSeverity.INFO, False),
+    "score_outliers_observed": IssueDefinition(ValidationLayerId.DATA_QUALITY, "Eligible scores include values outside the declared Tukey fences.", ValidationSeverity.WARNING, False, frozenset({"count", "total", "minimum", "maximum"}), frozenset({"count", "total", "minimum", "maximum"})),
+    "data_freshness_unavailable": IssueDefinition(ValidationLayerId.DATA_QUALITY, "Data freshness was not evaluated because data_as_of is unavailable.", ValidationSeverity.INFO, False),
+    "data_as_of_after_execution": IssueDefinition(ValidationLayerId.DATA_QUALITY, "data_as_of is later than execution_timestamp.", ValidationSeverity.WARNING, False, frozenset({"observed", "expected"}), frozenset({"observed", "expected"})),
     "legacy_validation_warning": IssueDefinition(ValidationLayerId.DATA_QUALITY, "Legacy validation warnings are present.", ValidationSeverity.WARNING, False, frozenset({"count"}), frozenset({"count"})),
 }
 
@@ -102,7 +106,7 @@ class ValidationContractModel(BaseModel):
 
 
 StrictCount = Annotated[StrictInt, Field(ge=0)]
-FiniteNumber = StrictFloat | StrictInt
+FiniteNumber = Annotated[StrictFloat | StrictInt, Field(allow_inf_nan=False)]
 
 
 class ValidationIssueEvidence(ValidationContractModel):
@@ -192,6 +196,274 @@ class ValidationLayerResult(ValidationContractModel):
         return self
 
 
+ProfilePopulation = Literal["input", "eligible"]
+
+
+class MissingnessProfile(ValidationContractModel):
+    field: Annotated[str, Field(min_length=1)]
+    population: Literal["input"] = "input"
+    group: AffectedGroup | None = None
+    missing_count: StrictCount
+    total_count: Annotated[StrictInt, Field(gt=0)]
+    missing_rate: FiniteNumber = Field(ge=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_counts(self) -> "MissingnessProfile":
+        if self.missing_count > self.total_count:
+            raise ValueError("missing_count cannot exceed total_count")
+        if float(self.missing_rate) != self.missing_count / self.total_count:
+            raise ValueError("missing_rate must derive from counts")
+        return self
+
+
+class GroupSizeProfile(ValidationContractModel):
+    group: AffectedGroup
+    population: ProfilePopulation
+    count: StrictCount
+    total_count: Annotated[StrictInt, Field(gt=0)]
+    proportion: FiniteNumber = Field(ge=0, le=1)
+    is_reference: bool
+
+    @model_validator(mode="after")
+    def validate_counts(self) -> "GroupSizeProfile":
+        if self.count > self.total_count:
+            raise ValueError("count cannot exceed total_count")
+        if float(self.proportion) != self.count / self.total_count:
+            raise ValueError("proportion must derive from counts")
+        return self
+
+
+class AnomalyProfile(ValidationContractModel):
+    code: ExclusionReason
+    population: Literal["input"] = "input"
+    count: StrictCount
+    total_count: Annotated[StrictInt, Field(gt=0)]
+    rate: FiniteNumber = Field(ge=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_counts(self) -> "AnomalyProfile":
+        if self.count > self.total_count:
+            raise ValueError("count cannot exceed total_count")
+        if float(self.rate) != self.count / self.total_count:
+            raise ValueError("rate must derive from counts")
+        return self
+
+
+class QuantileValue(ValidationContractModel):
+    probability: FiniteNumber = Field(ge=0, le=1)
+    value: FiniteNumber
+
+
+class NumericDistributionProfile(ValidationContractModel):
+    field: Annotated[str, Field(min_length=1)]
+    population: Literal["eligible"] = "eligible"
+    count: Annotated[StrictInt, Field(gt=0)]
+    minimum: FiniteNumber
+    maximum: FiniteNumber
+    mean: FiniteNumber
+    standard_deviation: FiniteNumber = Field(ge=0)
+    quantiles: tuple[QuantileValue, ...]
+    method: Literal["linear_type7"] = "linear_type7"
+
+    @model_validator(mode="after")
+    def validate_distribution(self) -> "NumericDistributionProfile":
+        expected = (0.0, 0.25, 0.5, 0.75, 1.0)
+        if tuple(float(item.probability) for item in self.quantiles) != expected:
+            raise ValueError("quantiles must contain the fixed type-7 probabilities")
+        values = tuple(float(item.value) for item in self.quantiles)
+        if self.minimum > self.maximum or values != tuple(sorted(values)):
+            raise ValueError("distribution values must be ordered")
+        if float(self.minimum) != values[0] or float(self.maximum) != values[-1]:
+            raise ValueError("minimum and maximum must match endpoint quantiles")
+        if not self.minimum <= self.mean <= self.maximum:
+            raise ValueError("mean must be within minimum and maximum")
+        return self
+
+
+class CategoryCount(ValidationContractModel):
+    value: Label
+    count: Annotated[StrictInt, Field(gt=0)]
+    total_count: Annotated[StrictInt, Field(gt=0)]
+    proportion: FiniteNumber = Field(gt=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_counts(self) -> "CategoryCount":
+        if self.count > self.total_count:
+            raise ValueError("count cannot exceed total_count")
+        if float(self.proportion) != self.count / self.total_count:
+            raise ValueError("proportion must derive from counts")
+        return self
+
+
+class OutlierProfile(ValidationContractModel):
+    field: Annotated[str, Field(min_length=1)]
+    population: Literal["eligible"] = "eligible"
+    method: Literal["tukey_1_5_iqr"] = "tukey_1_5_iqr"
+    q1: FiniteNumber
+    q3: FiniteNumber
+    iqr: FiniteNumber = Field(ge=0)
+    lower_fence: FiniteNumber
+    upper_fence: FiniteNumber
+    lower_count: StrictCount
+    upper_count: StrictCount
+    total_count: Annotated[StrictInt, Field(gt=0)]
+    outlier_count: StrictCount
+    outlier_rate: FiniteNumber = Field(ge=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_outliers(self) -> "OutlierProfile":
+        if float(self.iqr) != float(self.q3) - float(self.q1):
+            raise ValueError("iqr must derive from quartiles")
+        if float(self.lower_fence) != float(self.q1) - 1.5 * float(self.iqr):
+            raise ValueError("lower_fence must derive from quartiles")
+        if float(self.upper_fence) != float(self.q3) + 1.5 * float(self.iqr):
+            raise ValueError("upper_fence must derive from quartiles")
+        if self.outlier_count != self.lower_count + self.upper_count:
+            raise ValueError("outlier_count must equal lower_count plus upper_count")
+        if self.outlier_count > self.total_count:
+            raise ValueError("outlier_count cannot exceed total_count")
+        if float(self.outlier_rate) != self.outlier_count / self.total_count:
+            raise ValueError("outlier_rate must derive from counts")
+        return self
+
+
+class FreshnessProfile(ValidationContractModel):
+    status: Literal["available", "unavailable", "future_dated"]
+    data_as_of: str | None
+    execution_timestamp: Annotated[str, Field(min_length=1)]
+    age_seconds: StrictCount | None
+    reason_code: Literal["data_freshness_unavailable", "data_as_of_after_execution"] | None
+
+    @model_validator(mode="after")
+    def validate_state(self) -> "FreshnessProfile":
+        expected = {
+            "available": (False, False, None),
+            "unavailable": (True, True, "data_freshness_unavailable"),
+            "future_dated": (False, True, "data_as_of_after_execution"),
+        }[self.status]
+        actual = (self.data_as_of is None, self.age_seconds is None, self.reason_code)
+        if actual != expected:
+            raise ValueError("freshness fields are inconsistent with status")
+        if not self.execution_timestamp.endswith("Z") or (
+            self.data_as_of is not None and not self.data_as_of.endswith("Z")
+        ):
+            raise ValueError("freshness timestamps must use canonical UTC Z form")
+        try:
+            datetime_values = (self.execution_timestamp,) if self.data_as_of is None else (self.execution_timestamp, self.data_as_of)
+            parsed = tuple(
+                datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+                for value in datetime_values
+            )
+        except ValueError as error:
+            raise ValueError("freshness timestamps must be valid ISO 8601 values") from error
+        execution = parsed[0]
+        if self.status == "unavailable":
+            return self
+        data_as_of = parsed[1]
+        if self.status == "future_dated" and data_as_of <= execution:
+            raise ValueError("future_dated freshness requires data_as_of after execution_timestamp")
+        if self.status == "available":
+            if data_as_of > execution:
+                raise ValueError("available freshness requires data_as_of at or before execution_timestamp")
+            expected_age = math.floor((execution - data_as_of).total_seconds())
+            if self.age_seconds != expected_age:
+                raise ValueError("age_seconds must derive from freshness timestamps")
+        return self
+
+
+class SingleRunProfile(ValidationContractModel):
+    schema_version: Literal["1.0"] = "1.0"
+    input_rows: Annotated[StrictInt, Field(gt=0)]
+    eligible_rows: Annotated[StrictInt, Field(gt=0)]
+    excluded_rows: StrictCount
+    missingness: tuple[MissingnessProfile, ...]
+    groups: tuple[GroupSizeProfile, ...]
+    anomalies: tuple[AnomalyProfile, ...]
+    score_distribution: NumericDistributionProfile
+    outcome_distribution: tuple[CategoryCount, ...]
+    outliers: OutlierProfile
+    freshness: FreshnessProfile
+    issues: tuple[ValidationIssue, ...]
+
+    @model_validator(mode="after")
+    def validate_profile(self) -> "SingleRunProfile":
+        if self.input_rows != self.eligible_rows + self.excluded_rows:
+            raise ValueError("profile row counts must reconcile")
+        if self.score_distribution.count != self.eligible_rows:
+            raise ValueError("score distribution count must equal eligible_rows")
+        if self.score_distribution.field != self.outliers.field:
+            raise ValueError("score distribution and outlier fields must match")
+        if self.outliers.total_count != self.eligible_rows:
+            raise ValueError("outlier total_count must equal eligible_rows")
+        q1 = next(item.value for item in self.score_distribution.quantiles if float(item.probability) == 0.25)
+        q3 = next(item.value for item in self.score_distribution.quantiles if float(item.probability) == 0.75)
+        if float(self.outliers.q1) != float(q1) or float(self.outliers.q3) != float(q3):
+            raise ValueError("outlier quartiles must match score distribution")
+        if sum(item.count for item in self.outcome_distribution) != self.eligible_rows:
+            raise ValueError("outcome counts must sum to eligible_rows")
+        if any(item.total_count != self.eligible_rows for item in self.outcome_distribution):
+            raise ValueError("outcome total_count must equal eligible_rows")
+        outcome_keys = tuple(_typed_label_key(item.value) for item in self.outcome_distribution)
+        if outcome_keys != tuple(sorted(set(outcome_keys))):
+            raise ValueError("outcome categories must be sorted and unique")
+        expected_codes = tuple(reason.value for reason in ExclusionReason)
+        if tuple(item.code.value for item in self.anomalies) != tuple(sorted(expected_codes)):
+            raise ValueError("all anomaly categories must appear in code order")
+        if any(item.total_count != self.input_rows for item in self.anomalies):
+            raise ValueError("anomaly total_count must equal input_rows")
+        if self.issues != tuple(sorted(self.issues, key=issue_sort_key)):
+            raise ValueError("profile issues must use canonical order")
+        if any(issue.layer != ValidationLayerId.DATA_QUALITY for issue in self.issues):
+            raise ValueError("profile issues must belong to data_quality")
+        group_keys = tuple((_group_sort_key(item.group), 0 if item.population == "input" else 1) for item in self.groups)
+        if group_keys != tuple(sorted(set(group_keys))):
+            raise ValueError("groups must use canonical order and be unique")
+        for item in self.groups:
+            expected_total = self.input_rows if item.population == "input" else self.eligible_rows
+            if item.total_count != expected_total:
+                raise ValueError("group total_count must match its population")
+        missingness_keys = tuple(
+            (item.field, 0 if item.group is None else 1, () if item.group is None else _group_sort_key(item.group))
+            for item in self.missingness
+        )
+        if missingness_keys != tuple(sorted(set(missingness_keys))):
+            raise ValueError("missingness must use canonical order and be unique")
+        input_group_counts = {_group_sort_key(item.group): item.count for item in self.groups if item.population == "input"}
+        for item in self.missingness:
+            expected_total = self.input_rows if item.group is None else input_group_counts.get(_group_sort_key(item.group))
+            if item.total_count != expected_total:
+                raise ValueError("missingness total_count must match its input population")
+        issue_codes = {issue.code for issue in self.issues}
+        expected_issue_codes = set()
+        if self.outliers.outlier_count > 0:
+            expected_issue_codes.add("score_outliers_observed")
+        if self.freshness.reason_code is not None:
+            expected_issue_codes.add(self.freshness.reason_code)
+        if issue_codes != expected_issue_codes:
+            raise ValueError("profile issues must exactly match outlier and freshness observations")
+        outlier_issue = next((issue for issue in self.issues if issue.code == "score_outliers_observed"), None)
+        if outlier_issue is not None and (
+            outlier_issue.affected_fields != (self.outliers.field,)
+            or outlier_issue.evidence.count != self.outliers.outlier_count
+            or float(outlier_issue.evidence.total) != self.outliers.total_count
+            or float(outlier_issue.evidence.minimum) != float(self.outliers.lower_fence)
+            or float(outlier_issue.evidence.maximum) != float(self.outliers.upper_fence)
+        ):
+            raise ValueError("outlier issue evidence must match the outlier profile")
+        freshness_issue = next(
+            (issue for issue in self.issues if issue.code == self.freshness.reason_code),
+            None,
+        )
+        if self.freshness.status == "future_dated" and (
+            freshness_issue is None
+            or freshness_issue.affected_fields
+            or freshness_issue.evidence.observed != self.freshness.data_as_of
+            or freshness_issue.evidence.expected != self.freshness.execution_timestamp
+        ):
+            raise ValueError("future-dated issue evidence must match freshness timestamps")
+        return self
+
+
 class LayeredValidationResult(ValidationContractModel):
     schema_version: Literal["1.0"] = VALIDATION_SCHEMA_VERSION
     status: ValidationStatus
@@ -206,6 +478,7 @@ class LayeredValidationResult(ValidationContractModel):
     duplicate_rows: int = Field(ge=0)
     small_groups: tuple[str, ...]
     layers: tuple[ValidationLayerResult, ...]
+    profile: SingleRunProfile | None = None
 
     @model_validator(mode="after")
     def validate_derived_contract(self) -> "LayeredValidationResult":
@@ -222,6 +495,15 @@ class LayeredValidationResult(ValidationContractModel):
             raise ValueError("aggregate statuses must be derived from layer statuses")
         if technical == ValidationStatus.FAILED:
             raise ValueError("a successful result cannot contain failed technical validation")
+        if self.profile is not None:
+            if (self.profile.input_rows, self.profile.eligible_rows, self.profile.excluded_rows) != (self.input_rows, self.eligible_rows, self.excluded_rows):
+                raise ValueError("profile row counts must match validation result")
+            data_quality = next(layer for layer in self.layers if layer.layer == ValidationLayerId.DATA_QUALITY)
+            if data_quality.issues != self.profile.issues:
+                raise ValueError("data-quality layer must contain exactly profile issues")
+            reason_counts = dict(self.reason_counts)
+            if any(item.count != reason_counts.get(item.code.value, 0) for item in self.profile.anomalies):
+                raise ValueError("profile anomalies must match validation reason_counts")
         return self
 
     @property
@@ -248,7 +530,15 @@ def issue_sort_key(issue: ValidationIssue) -> tuple[Any, ...]:
 
 
 def _group_sort_key(group: AffectedGroup) -> tuple[Any, ...]:
-    return tuple((key, type(value).__name__, repr(value)) for key, value in group.attributes.items())
+    return tuple((key, *_typed_label_key(value)) for key, value in group.attributes.items())
+
+
+def _typed_label_key(value: Label) -> tuple[int, object]:
+    if isinstance(value, bool):
+        return (0, value)
+    if isinstance(value, int):
+        return (1, value)
+    return (2, value)
 
 
 def _layer_status(issues: tuple[ValidationIssue, ...]) -> ValidationStatus:
@@ -256,6 +546,8 @@ def _layer_status(issues: tuple[ValidationIssue, ...]) -> ValidationStatus:
         return ValidationStatus.FAILED
     if any(issue.severity == ValidationSeverity.WARNING for issue in issues):
         return ValidationStatus.WARNING
+    if issues and all(issue.code == "data_freshness_unavailable" for issue in issues):
+        return ValidationStatus.PASSED
     if issues:
         return ValidationStatus.NOT_EVALUATED
     return ValidationStatus.PASSED

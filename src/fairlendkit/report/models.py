@@ -13,6 +13,7 @@ from fairlendkit.config import AuditConfig
 from fairlendkit.config.models import Label
 from fairlendkit.data.contracts import (
     APPLICABILITY_STATEMENT,
+    SingleRunProfile,
     ValidationLayerId,
     ValidationLayerResult,
     ValidationIssueEvidence,
@@ -258,6 +259,7 @@ class ValidationEvidence(ResultModel):
     duplicate_rows: int = Field(ge=0)
     small_groups: tuple[str, ...]
     layers: tuple[ValidationLayerResult, ...]
+    profile: SingleRunProfile | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -296,6 +298,7 @@ class ValidationEvidence(ResultModel):
             duplicate_rows=0,
             small_groups=(),
             layers=layers,
+            profile=None,
         )
         return migrated
 
@@ -324,6 +327,13 @@ class ValidationEvidence(ResultModel):
         )
         if self.status != expected_status:
             raise ValueError("validation status must derive from all four layers")
+        if self.profile is not None:
+            excluded_rows = self.input_rows - self.analyzed_rows
+            if (self.profile.input_rows, self.profile.eligible_rows, self.profile.excluded_rows) != (self.input_rows, self.analyzed_rows, excluded_rows):
+                raise ValueError("profile row counts must match validation evidence")
+            data_quality = next(layer for layer in self.layers if layer.layer == ValidationLayerId.DATA_QUALITY)
+            if data_quality.issues != self.profile.issues:
+                raise ValueError("data-quality layer must contain exactly profile issues")
         return self
 
     @property
