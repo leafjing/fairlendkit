@@ -22,6 +22,7 @@ from fairlendkit.data.contracts import (
     issue_sort_key,
     make_issue,
 )
+
 AUDIT_RESULT_SCHEMA_VERSION = "1.0"
 Identifier = Annotated[str, Field(min_length=1, pattern=r"^[a-z][a-z0-9_.-]*$")]
 
@@ -165,10 +166,13 @@ class ObservedMetric(ResultModel):
                 )
             if self.group is not None:
                 raise ValueError("disparity metrics cannot also set group")
-        elif self.comparison_group is not None or self.reference_group is not None:
-            raise ValueError(
-                "non-disparity metrics use group, not comparison/reference groups"
-            )
+        else:
+            if self.group is None:
+                raise ValueError("non-disparity metrics require group")
+            if self.comparison_group is not None or self.reference_group is not None:
+                raise ValueError(
+                    "non-disparity metrics use group, not comparison/reference groups"
+                )
         if self.sample_count == 0 and self.value.is_defined:
             raise ValueError("a metric with sample_count zero must be undefined")
         if self.value.value is not None:
