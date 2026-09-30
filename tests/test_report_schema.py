@@ -118,6 +118,13 @@ def test_defined_metric_requires_positive_sample_count(example_payload):
         AuditResult.model_validate(example_payload)
 
 
+def test_non_disparity_metric_requires_group(example_payload):
+    example_payload["observed_metrics"][0]["group"] = None
+
+    with pytest.raises(ValidationError, match="non-disparity metrics require group"):
+        AuditResult.model_validate(example_payload)
+
+
 def test_undefined_reason_is_typed_and_round_trips(example_payload):
     result = AuditResult.model_validate(example_payload)
     reason = result.observed_metrics[1].value.undefined_reason
