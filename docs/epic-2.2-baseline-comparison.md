@@ -120,7 +120,7 @@ payloads, or an automated verdict. Checks retain non-flagged evidence so an
 empty `flags` tuple means “no configured threshold was crossed among evaluated
 checks”, not merely “no evidence was saved”.
 
-## Composition with validation and AuditResult
+## Domain ownership and report mapping
 
 `compare_profiles()` returns only an independent `BaselineComparisonResult` and
 does not mutate either frozen input. Epic 2.2 also adds the pure composition
@@ -133,23 +133,88 @@ attach_baseline_comparison(
 ) -> LayeredValidationResult
 ```
 
-`LayeredValidationResult` gains an additive optional `comparison` field. A
-single-run result has `comparison=null`, which means comparison was not
-requested. The composition function requires `current.profile` to be the exact
-current profile used by the comparison, verified by a `current_profile_digest`
-stored in `BaselineComparisonResult`. It returns a newly constructed frozen
-validation result with `comparison` set, the data-quality layer rebuilt under
-the integration rules below, aggregate status re-derived, and all other source
+`LayeredValidationResult` is the sole domain owner of the canonical comparison
+result and gains a required nullable `comparison` field. A single-run result has
+`comparison=null`, which means comparison was not requested. The composition
+function requires `current.profile` to be the exact current profile used by the
+comparison, verified by a `current_profile_digest` stored in
+`BaselineComparisonResult`. It returns a newly constructed frozen validation
+result with `comparison` set, the data-quality layer rebuilt under the
+integration rules below, aggregate status re-derived, and all other source
 evidence fields unchanged. It rejects a different current profile, a result
 that already contains a comparison, or any inconsistent derived layer/aggregate
 status. It never edits `current` in place.
 
-`AuditResult.validation` receives that newly composed validation result through
-the existing AuditResult construction path; there is no second comparison field
-on `AuditResult`. Aggregation is therefore part of Epic 2.2, not deferred to a
-renderer or a later epic. Legacy and single-run AuditResult fixtures migrate to
-the explicit `comparison=null` value and must not fabricate an unavailable
-comparison.
+The actual report contract uses `ValidationEvidence`, not
+`LayeredValidationResult`. Epic 2.2 therefore adds exactly one public mapper:
+
+```python
+to_validation_evidence(
+    validation: LayeredValidationResult,
+    *,
+    exclusions: tuple[ExclusionRecord, ...],
+    warnings: tuple[WarningRecord, ...],
+) -> ValidationEvidence
+```
+
+This mapper is the only supported construction path from domain validation to
+report validation. `ValidationEvidence` also gains a required nullable
+`comparison` field, but it is a report projection, not a second owner: the
+mapper copies the complete immutable `BaselineComparisonResult` from
+`validation.comparison` without recomputing, filtering, or independently
+constructing it. Callers must not pass a separate comparison argument to the
+mapper or directly assemble report comparison evidence.
+
+The mapper transfers row counts, reason counts, duplicate/group evidence,
+layers, profile, status, technical status, and applicability from the domain
+result under the existing report aliases (`eligible_rows` becomes
+`analyzed_rows`). `ExclusionRecord` and `WarningRecord` are existing report
+compatibility projections that are not losslessly derivable from
+`LayeredValidationResult`: reason counts may overlap while report exclusions
+must reconcile by union, and legacy warnings may be externally authored. They
+are therefore the mapper's only keyword inputs. They cannot contain comparison
+evidence, alter layers/status, or provide a comparison object. Exclusions must
+reconcile exactly to `excluded_rows`, each exclusion code/count must be
+supported by the domain reason counts without exceeding them, and warnings must
+retain their existing neutral-message validation. The returned
+`ValidationEvidence` must satisfy all of these invariants:
+
+- its `profile`, `comparison`, `layers`, statuses, counts, reason counts,
+  duplicate rows, and small groups equal their domain sources exactly, apart
+  from the documented `eligible_rows`/`analyzed_rows` name;
+- if comparison is non-null, its `current_profile_digest` equals the canonical
+  digest of both the domain and report `profile` fields;
+- the report and domain comparison objects are value-identical after canonical
+  serialization;
+- the data-quality layer contains exactly the canonical merge of profile issues
+  and comparison issues defined below; and
+- no report validator or renderer recomputes checks, flags, issues, or status.
+
+`AuditResult.validation` remains typed as `ValidationEvidence` and receives only
+the mapper's output. `AuditResult` has no second `comparison` field. Any helper
+that constructs an `AuditResult` from domain objects must call
+`to_validation_evidence()`; accepting both a domain validation result and an
+independently supplied report validation object is forbidden.
+
+### Nullable field, round-trip, schema, and legacy migration
+
+Both validation models serialize `comparison` explicitly. Newly produced
+domain results and AuditResult JSON therefore contain either the complete
+comparison object or `"comparison": null`; omission is not valid new output.
+Their generated JSON Schemas list `comparison` as required and nullable, with
+the non-null branch referencing the same `BaselineComparisonResult` schema.
+
+For backward compatibility, each model's deterministic V1 pre-validation
+migration inserts `comparison=null` only when the field is absent. It must not
+interpret an absent legacy field as an unavailable comparison, create
+`comparison_baseline_unavailable`, alter layers/statuses, or synthesize checks.
+An explicit non-null comparison is then validated against profile digest,
+layers, issues, and status; malformed or inconsistent evidence is rejected
+rather than replaced. Parsing and serializing a legacy AuditResult consequently
+emits the explicit null field, and the next parse is byte-semantically
+equivalent. `AuditResult.schema_version` and both embedded validation/profile
+schema versions remain `"1.0"` because this is an additive nullable field during
+the unreleased V1 contract; later removal or reinterpretation is breaking.
 
 ## Threshold policy
 
@@ -362,6 +427,15 @@ threshold, values, baseline identity, fields, and groups. Version changes are
 factual information; distribution, group, missingness, and category changes are
 warnings requesting review. None are blocking.
 
+The canonical merged data-quality issue tuple is formed from all Epic 2.1
+`profile.issues` followed by all issues derived from the attached comparison,
+then sorted once with the Epic 1.4 issue ordering. Exact duplicate issues are
+rejected; they are not silently collapsed. With `comparison=null`, the tuple is
+exactly `profile.issues`, preserving the Epic 2.1 invariant. Both
+`LayeredValidationResult` and `ValidationEvidence` validate this same formula;
+the report mapper copies the already merged layer and verifies it rather than
+merging again.
+
 When comparison is requested, the data-quality layer is `warning` if any
 comparison warning exists, otherwise `passed` if at least one comparison or
 single-run check ran. It is `not_evaluated` only when every applicable
@@ -403,9 +477,9 @@ silently redact an unsafe value.
 - Calling single-run validation alone still performs no baseline comparison and
   emits no comparison issue merely because no baseline was supplied.
 - Comparison is additive to `LayeredValidationResult` during V1 and reaches
-  `AuditResult` only through its existing validation field; a legacy result
-  parses with validation comparison `null`, meaning not requested, not
-  unavailable.
+  `AuditResult` only through the explicit domain-to-report mapper and its
+  existing validation field; a legacy result parses with validation comparison
+  `null`, meaning not requested, not unavailable.
 - Missing, unavailable, incompatible, and not-computable are distinct states and
   never become a fabricated zero, equality, empty version, or passed check.
 - Invalid selection or policy models raise configuration validation errors.
@@ -451,14 +525,24 @@ Implementation is acceptable only when named automated tests demonstrate:
     object, verifies the current-profile digest, attaches comparison once, and
     preserves already completed Epic 2.1 checks while deriving layer and
     aggregate statuses.
-12. Row permutation, mapping order, typed-label edge cases, and equivalent
+12. The sole domain-to-report mapper produces `ValidationEvidence` with exact
+    profile, comparison, layer, status, count, and digest consistency; attempts
+    to construct divergent domain/report comparison evidence are rejected.
+13. New domain and AuditResult JSON require an explicit nullable comparison;
+    generated JSON Schema marks it required with null and typed-result branches,
+    and non-null values round-trip without loss.
+14. Legacy LayeredValidationResult and AuditResult payloads lacking comparison
+    migrate only to explicit null, retain their existing issues/statuses, emit
+    no baseline-unavailable issue, and round-trip deterministically.
+15. Row permutation, mapping order, typed-label edge cases, and equivalent
     profile objects produce byte-identical canonical JSON and digest values.
-13. Strict models reject unknown fields, booleans as numbers, invalid ratios,
+16. Strict models reject unknown fields, booleans as numbers, invalid ratios,
     non-finite values, unsafe artifact URIs, inconsistent totals, duplicate
-    checks, and flags without a matching evaluated check.
-14. Privacy tests prove that comparison output includes no raw rows, record IDs,
+    checks, flags without a matching evaluated check, and data-quality layers
+    that do not equal the canonical profile/comparison issue merge.
+17. Privacy tests prove that comparison output includes no raw rows, record IDs,
     samples, credentials, query strings, or fragments.
-15. All Epic 1 and Epic 2.1 tests plus AuditResult schema and round-trip fixtures
+18. All Epic 1 and Epic 2.1 tests plus AuditResult schema and round-trip fixtures
     pass on Python 3.11/3.12, and `git diff --check` passes.
 
 The implementation PR must map every criterion to at least one named automated
