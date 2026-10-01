@@ -26,6 +26,13 @@ Baseline comparison is opt-in. The caller supplies a `BaselineSelection` with:
 - `profile_digest`: lowercase SHA-256 of the baseline profile's canonical JSON,
   or `null` only when the selected baseline artifact is unavailable.
 
+When `selection_method="content_digest"`, `selected_value` must equal
+`profile_digest` exactly. Both must be present lowercase 64-character SHA-256
+hex strings. A selection model with unequal values is invalid and comparison
+does not start. For the other selection methods, `selected_value` identifies
+the external run or artifact while `profile_digest` independently binds its
+resolved profile content.
+
 `baseline_id` is the stable identity exposed by every check and flag.
 `selected_value` records how the caller resolved that identity; it is not
 derived from recency, dataset version, model version, filename order, or the
@@ -66,6 +73,7 @@ both absent. `BaselineComparisonResult` is frozen and strict and contains:
 
 - `schema_version`: literal `"1.0"`;
 - `baseline`: the complete selection record;
+- `current_profile_digest`: lowercase SHA-256 of the exact current profile used;
 - `status`: `completed`, `partially_completed`, `unavailable`, or
   `incompatible`;
 - `policy`: the complete threshold policy used;
@@ -74,18 +82,32 @@ both absent. `BaselineComparisonResult` is frozen and strict and contains:
 - `issues`: comparison-level data-quality issues.
 
 Every required comparison domain has one or more checks. A `ComparisonCheck`
-contains `code`, `status`, `statistic`, `threshold`, `current_value`,
-`baseline_value`, `baseline_id`, `affected_fields`, `affected_groups`, and
-optional `reason_code`. Check status is `evaluated`, `not_computable`,
-`unavailable`, or `incompatible`. Values are typed JSON scalars or `null` and
-all numeric values are finite. A non-evaluated check has null statistic and
-values except for safe identity evidence needed to explain incompatibility.
+contains `check_id`, `code`, `status`, `statistic`, `threshold`,
+`current_value`, `baseline_value`, `baseline_id`, `affected_fields`,
+`affected_groups`, and optional `reason_code`. Check status is `evaluated`,
+`not_computable`, `unavailable`, or `incompatible`. Values are typed JSON
+scalars or `null` and all numeric values are finite. A non-evaluated check has
+null statistic and values except for safe identity evidence needed to explain
+incompatibility.
 
-A `ChangeFlag` contains the same required evidence fields except status and
-reason, plus a stable change `code`. It is created only from an evaluated check
-whose declared comparison condition is met. Thus every flag always contains:
+`check_id` is unique within a result and stable across equivalent inputs. It is
+`<code>:<scope_digest>`, where `scope_digest` is the lowercase SHA-256 of the
+canonical JSON object containing only that check's identity dimensions: field,
+typed group, quantile probability, or typed category as applicable. Canonical
+JSON uses the digest rules below; an empty identity object is used for a
+singleton check. Human-readable labels are not interpolated into IDs.
+
+A `ChangeFlag` contains `source_check_id` plus the same required evidence fields
+except check status and reason, and has its own stable change `code`. The source
+ID must resolve to exactly one evaluated check in the same result, and every
+flag's statistic, threshold, values, baseline ID, fields, and groups must equal
+that source check's evidence. Zero, one, or multiple flags may reference one
+check; code matching alone is never an association mechanism. A flag is created
+only when the source check's declared comparison condition is met. Thus every
+flag always contains:
 
 - a stable code;
+- an exact `source_check_id`;
 - the named statistic and its comparison condition;
 - the exact threshold used (finite numeric or the literal `"equal"`);
 - the typed current and baseline values that produced the statistic, with
@@ -97,6 +119,37 @@ No flag may contain row indices, record identifiers, raw samples, free-form
 payloads, or an automated verdict. Checks retain non-flagged evidence so an
 empty `flags` tuple means “no configured threshold was crossed among evaluated
 checks”, not merely “no evidence was saved”.
+
+## Composition with validation and AuditResult
+
+`compare_profiles()` returns only an independent `BaselineComparisonResult` and
+does not mutate either frozen input. Epic 2.2 also adds the pure composition
+function:
+
+```python
+attach_baseline_comparison(
+    current: LayeredValidationResult,
+    comparison: BaselineComparisonResult,
+) -> LayeredValidationResult
+```
+
+`LayeredValidationResult` gains an additive optional `comparison` field. A
+single-run result has `comparison=null`, which means comparison was not
+requested. The composition function requires `current.profile` to be the exact
+current profile used by the comparison, verified by a `current_profile_digest`
+stored in `BaselineComparisonResult`. It returns a newly constructed frozen
+validation result with `comparison` set, the data-quality layer rebuilt under
+the integration rules below, aggregate status re-derived, and all other source
+evidence fields unchanged. It rejects a different current profile, a result
+that already contains a comparison, or any inconsistent derived layer/aggregate
+status. It never edits `current` in place.
+
+`AuditResult.validation` receives that newly composed validation result through
+the existing AuditResult construction path; there is no second comparison field
+on `AuditResult`. Aggregation is therefore part of Epic 2.2, not deferred to a
+renderer or a later epic. Legacy and single-run AuditResult fixtures migrate to
+the explicit `comparison=null` value and must not fabricate an unavailable
+comparison.
 
 ## Threshold policy
 
@@ -111,8 +164,8 @@ strict `BaselineComparisonPolicy` containing all of:
 All numeric change conditions are inclusive: flag when
 `absolute(current_value - baseline_value) >= threshold`. Equality therefore
 flags. Values below a threshold remain recorded as evaluated checks. Version
-and category-set checks use exact typed equality and have the literal threshold
-`"equal"`; a mismatch flags.
+and category-presence checks use exact typed equality and have the literal
+threshold `"equal"`; a mismatch flags.
 
 Policy fields cannot be omitted, inferred from the data, or changed by an
 adapter. Policy serialization is part of the result. A future relative,
@@ -214,15 +267,24 @@ permitted: those cannot be reconstructed faithfully from the Epic 2.1 profile.
 
 ### Outcome distribution and category changes
 
-First compare the typed sets of observed eligible outcome categories. Typed
-values remain distinct (`true`, `1`, and `"1"` are different). Emit
-`outcome_category_set_equal` with `statistic="typed_set_equality"` and literal
-threshold `"equal"`. For each category present only in the current run emit an
-`outcome_category_added` flag; for each present only in the baseline emit
-`outcome_category_removed`. Each flag records the category itself as both the
-current or baseline value and uses `null` on the absent side; these two category
-flags are the sole exception to the finite-two-value requirement because
-absence is the fact being reported.
+Compare category membership separately for every typed category in the
+canonical union of the current and baseline eligible outcome categories. Typed
+values remain distinct (`true`, `1`, and `"1"` are different). For each category
+emit one `outcome_category_presence_equal` check with:
+
+- a category-specific `check_id` whose identity scope contains the typed
+  category;
+- `statistic="exact_equality"` and threshold `"equal"`;
+- boolean `current_value` and `baseline_value` indicating membership; and
+- the outcome column as affected field and the typed `category` member.
+
+The scalar booleans satisfy the common check schema; a category set is never
+placed in `current_value` or `baseline_value`. When current is `true` and
+baseline is `false`, emit `outcome_category_added`; for the inverse emit
+`outcome_category_removed`. The flag's `source_check_id` links it to that exact
+evaluated membership check. Its values remain the same two booleans; absence is
+not represented by null. This permits deterministic validation without relying
+on a shared code or searching a collection value.
 
 Then compare category proportions over the canonical union of typed categories.
 An absent category has count and proportion `0.0`; this is a defined zero, not
@@ -275,8 +337,10 @@ result is returned.
 
 ## Data-quality layer integration and stable codes
 
-The current run's data-quality layer is augmented with comparison issues and
-issues implied by flags, without duplicating Epic 2.1 issues. Stable codes are:
+`attach_baseline_comparison()` augments the newly constructed current run's
+data-quality layer with comparison issues and issues implied by flags, without
+duplicating Epic 2.1 issues. `compare_profiles()` alone does not alter a layer.
+Stable codes are:
 
 - `comparison_baseline_unavailable`: info, non-blocking;
 - `comparison_baseline_incompatible`: info, non-blocking;
@@ -313,12 +377,13 @@ insertion order, pandas index, or source artifact location. Checks are ordered:
 1. group composition by attribute and typed group value;
 2. missingness by field, overall before grouped, then typed group key;
 3. score quantiles by ascending probability;
-4. outcome category-set check, then proportions by typed category;
+4. outcome category-presence checks, then proportions, each by typed category;
 5. dataset version, then model version.
 
-Flags follow their source-check order, with category removals before additions
-and typed category order within each. Issues retain the Epic 1.4 issue order.
-Typed values use the Epic 2.1 canonical type rank and value ordering.
+Flags follow their source-check order. Category-presence checks and their flags
+use typed category order; when otherwise tied, removals precede additions.
+Issues retain the Epic 1.4 issue order. Typed values use the Epic 2.1 canonical
+type rank and value ordering.
 
 Canonical profile digests use UTF-8 JSON with sorted object keys, compact
 separators, no ASCII escaping requirement, JSON-safe shortest round-trip finite
@@ -337,8 +402,10 @@ silently redact an unsafe value.
   meanings remain compatible.
 - Calling single-run validation alone still performs no baseline comparison and
   emits no comparison issue merely because no baseline was supplied.
-- Comparison results are additive to `AuditResult` during V1; a legacy result
-  parses with comparison `null`, meaning not requested, not unavailable.
+- Comparison is additive to `LayeredValidationResult` during V1 and reaches
+  `AuditResult` only through its existing validation field; a legacy result
+  parses with validation comparison `null`, meaning not requested, not
+  unavailable.
 - Missing, unavailable, incompatible, and not-computable are distinct states and
   never become a fabricated zero, equality, empty version, or passed check.
 - Invalid selection or policy models raise configuration validation errors.
@@ -352,10 +419,13 @@ silently redact an unsafe value.
 Implementation is acceptable only when named automated tests demonstrate:
 
 1. Baseline selection is explicit, fully serialized, digest-verified, and never
-   inferred from recency, versions, filenames, or observed values.
-2. Every flag contains its stable code, statistic, threshold, current value,
-   baseline value, baseline ID, and sorted affected fields/groups; category
-   absence uses only the documented null exception.
+   inferred from recency, versions, filenames, or observed values;
+   `content_digest` selections require exact selected-value/profile-digest
+   equality.
+2. Every flag contains its stable code, source check ID, statistic, threshold,
+   current value, baseline value, baseline ID, and sorted affected fields/groups;
+   every source ID resolves to exactly one evaluated check with identical
+   evidence.
 3. Required numeric policy thresholds are strict, finite, serialized, and
    applied with inclusive absolute-delta semantics, including equality at the
    boundary; equality checks serialize the literal threshold `"equal"`.
@@ -365,8 +435,9 @@ Implementation is acceptable only when named automated tests demonstrate:
    group denominator yields `zero_group_sample`, never a zero rate or flag.
 6. All five score quantiles compare in score units, preserve probability
    identity, and reject undocumented normalization or inferred methods.
-7. Outcome categories preserve types; additions, removals, union-based zero
-   proportions, rare categories, and proportion thresholds match fixtures.
+7. Outcome categories preserve types; scalar per-category presence checks,
+   additions, removals, union-based zero proportions, rare categories, and
+   proportion thresholds match fixtures.
 8. Dataset and model versions compare independently; exact changes flag, while
    either-side null produces `version_unavailable` without suppressing other
    checks.
@@ -376,8 +447,10 @@ Implementation is acceptable only when named automated tests demonstrate:
 10. Zero whole-population samples and corrupt/non-finite profiles fail closed;
     zero group samples follow the domain-specific defined/not-computable rules.
 11. Complete, partial, unavailable, and incompatible result statuses derive
-    exactly from check states, and data-quality layer aggregation preserves
-    already completed Epic 2.1 checks.
+    exactly from check states; composition returns a new frozen validation
+    object, verifies the current-profile digest, attaches comparison once, and
+    preserves already completed Epic 2.1 checks while deriving layer and
+    aggregate statuses.
 12. Row permutation, mapping order, typed-label edge cases, and equivalent
     profile objects produce byte-identical canonical JSON and digest values.
 13. Strict models reject unknown fields, booleans as numbers, invalid ratios,
