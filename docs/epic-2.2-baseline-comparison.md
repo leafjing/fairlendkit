@@ -100,15 +100,15 @@ singleton check. Human-readable labels are not interpolated into IDs.
 A `ChangeFlag` contains `flag_id`, `source_check_id`, and the same required
 evidence fields except check status and reason, and has its own stable change
 `code`. `flag_id` is
-`<code>:<sha256(canonical JSON {"source_check_id": ..., "ordinal": ...})>`;
-`ordinal` is the zero-based position among flags with that code from the same
-source check after canonical flag ordering. The source ID must resolve to
-exactly one evaluated check in the same result, and every flag's statistic,
-threshold, values, baseline ID, fields, and groups must equal that source
-check's evidence. Zero, one, or multiple flags may reference one check; code
-matching alone is never an association mechanism. Flag IDs are unique. A flag
-is created only when the source check's declared comparison condition is met.
-Thus every flag always contains:
+`<code>:<sha256(canonical JSON {"code": ..., "source_check_id": ...})>`. Each
+check can produce at most one flag for a given change code, so
+`(code, source_check_id)` must be unique within the result. The source ID must
+resolve to exactly one evaluated check in the same result, and every flag's
+statistic, threshold, values, baseline ID, fields, and groups must equal that
+source check's evidence. Different change codes may reference one check, but
+code matching alone is never an association mechanism. Flag IDs are unique. A
+flag is created only when the source check's declared comparison condition is
+met. Thus every flag always contains:
 
 - a stable code;
 - a stable unique `flag_id`;
@@ -538,10 +538,11 @@ insertion order, pandas index, or source artifact location. Checks are ordered:
 4. outcome category-presence checks, then proportions, each by typed category;
 5. dataset version, then model version.
 
-Flags follow their source-check order. Category-presence checks and their flags
-use typed category order; when otherwise tied, removals precede additions.
-Issues retain the Epic 1.4 issue order. Typed values use the Epic 2.1 canonical
-type rank and value ordering.
+Flags sort first by their source check's position in the canonical check tuple,
+then by flag code in Unicode code-point order. `flag_id` never participates in
+or determines flag ordering. Category-presence checks inherit typed category
+order through their source-check positions. Issues retain the Epic 1.4 issue
+order. Typed values use the Epic 2.1 canonical type rank and value ordering.
 
 Canonical profile digests use UTF-8 JSON with sorted object keys, compact
 separators, no ASCII escaping requirement, JSON-safe shortest round-trip finite
@@ -583,7 +584,8 @@ Implementation is acceptable only when named automated tests demonstrate:
 2. Every flag contains its stable unique flag ID, code, source check ID,
    statistic, threshold, current value, baseline value, baseline ID, and sorted
    affected fields/groups; every source ID resolves to exactly one evaluated
-   check with identical evidence.
+   check with identical evidence, and a duplicate `(code, source_check_id)` pair
+   is rejected even if the supplied flag IDs differ.
 3. Required numeric policy thresholds are strict, finite, serialized, and
    applied with inclusive absolute-delta semantics, including equality at the
    boundary; equality checks serialize the literal threshold `"equal"`.
@@ -630,8 +632,10 @@ Implementation is acceptable only when named automated tests demonstrate:
 16. Legacy LayeredValidationResult and AuditResult payloads lacking comparison
     migrate only to explicit null, retain their existing issues/statuses, emit
     no baseline-unavailable issue, and round-trip deterministically.
-17. Row permutation, mapping order, typed-label edge cases, and equivalent
-    profile objects produce byte-identical canonical JSON and digest values.
+17. Row permutation, mapping order, input check/flag order perturbation,
+    typed-label edge cases, and equivalent profile objects produce identical
+    check IDs, flag IDs, canonical check/flag ordering, and byte-identical
+    canonical JSON and digest values.
 18. Strict models reject unknown fields, booleans as numbers, invalid ratios,
     non-finite values, unsafe artifact URIs, inconsistent totals, duplicate
     checks, flags without a matching evaluated check, and data-quality layers
