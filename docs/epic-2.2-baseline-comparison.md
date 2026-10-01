@@ -97,16 +97,21 @@ typed group, quantile probability, or typed category as applicable. Canonical
 JSON uses the digest rules below; an empty identity object is used for a
 singleton check. Human-readable labels are not interpolated into IDs.
 
-A `ChangeFlag` contains `source_check_id` plus the same required evidence fields
-except check status and reason, and has its own stable change `code`. The source
-ID must resolve to exactly one evaluated check in the same result, and every
-flag's statistic, threshold, values, baseline ID, fields, and groups must equal
-that source check's evidence. Zero, one, or multiple flags may reference one
-check; code matching alone is never an association mechanism. A flag is created
-only when the source check's declared comparison condition is met. Thus every
-flag always contains:
+A `ChangeFlag` contains `flag_id`, `source_check_id`, and the same required
+evidence fields except check status and reason, and has its own stable change
+`code`. `flag_id` is
+`<code>:<sha256(canonical JSON {"source_check_id": ..., "ordinal": ...})>`;
+`ordinal` is the zero-based position among flags with that code from the same
+source check after canonical flag ordering. The source ID must resolve to
+exactly one evaluated check in the same result, and every flag's statistic,
+threshold, values, baseline ID, fields, and groups must equal that source
+check's evidence. Zero, one, or multiple flags may reference one check; code
+matching alone is never an association mechanism. Flag IDs are unique. A flag
+is created only when the source check's declared comparison condition is met.
+Thus every flag always contains:
 
 - a stable code;
+- a stable unique `flag_id`;
 - an exact `source_check_id`;
 - the named statistic and its comparison condition;
 - the exact threshold used (finite numeric or the literal `"equal"`);
@@ -237,6 +242,47 @@ adapter. Policy serialization is part of the result. A future relative,
 weighted, statistical-significance, or domain-specific rule requires a new
 named statistic and an additive contract; it must not reinterpret these codes.
 
+## Deterministic check manifest
+
+Before resolving or trusting baseline content, the implementation constructs a
+current-owned check manifest from the validated current config and current
+profile. This manifest is the complete required-check skeleton for unavailable
+and incompatible results and contains, in canonical check order:
+
+1. one eligible group-proportion check for every typed allowed group of every
+   current protected attribute;
+2. one overall missingness check for every required analysis field represented
+   by the current profile, plus one grouped check for each such field and every
+   typed allowed group of every current protected attribute;
+3. exactly five score-quantile checks for probabilities `0`, `0.25`, `0.5`,
+   `0.75`, and `1` on the current score field;
+4. one category-presence check and one outcome-proportion check for every typed
+   category observed in the current eligible outcome profile; and
+5. exactly one dataset-version and one model-version check.
+
+The manifest fixes each check's code, `check_id`, threshold, affected fields,
+affected groups, quantile probability, and typed category. Those identity
+members are populated even when the check cannot run; statistic, current value,
+and baseline value remain null for `unavailable` or `incompatible` checks. A
+current profile/config invariant failure fails construction rather than
+producing a manifest.
+
+If the baseline is available and passes the compatibility gate, extend only the
+outcome portion with category-presence and outcome-proportion checks for typed
+categories observed only in the baseline, then restore canonical order. This
+current-plus-baseline typed union is the complete manifest for compatible
+results. No other domain gains baseline-only scope because compatible configs
+have identical required fields and group definitions.
+
+If the baseline is unavailable, no baseline-only category can be known and none
+is invented. If it is incompatible for any reason, its fields, groups,
+categories, and methods are untrusted for check planning; the skeleton remains
+the current-owned manifest, even when some baseline declarations can be parsed.
+Baseline-only categories and incompatible baseline-only field/group scopes are
+therefore intentionally absent. The incompatibility issue, not synthetic
+checks, records the safe mismatched declarations. These rules make check count,
+IDs, ordering, and affected scopes independent of partial baseline readability.
+
 ## Compatibility gate
 
 Comparison first applies one all-or-nothing compatibility gate. Profiles are
@@ -259,9 +305,10 @@ not compatibility requirements; they are either comparison subjects or run
 context. Sample-weight configuration does not affect compatibility because all
 Epic 2.1 profile comparisons are explicitly unweighted.
 
-Any compatibility failure makes the result `incompatible`; all required checks
-are `incompatible`, no numeric or version flags are emitted, and exactly one
-`comparison_baseline_incompatible` issue records a stable reason code. The
+Any compatibility failure makes the result `incompatible`; every check in the
+current-owned manifest is emitted with status `incompatible`, no numeric or
+version flags are emitted, and exactly one `comparison_baseline_incompatible`
+issue records a stable reason code and references that complete manifest. The
 implementation must not compare the compatible-looking subset of mismatched
 profiles. Supported reason codes are:
 
@@ -375,9 +422,11 @@ checks may still run, producing a `partially_completed` result.
 ## Unavailable, zero-sample, and non-computable states
 
 If the selected baseline cannot be resolved, pass both baseline arguments as
-`null`. The result is `unavailable`; every required check is `unavailable` with
-reason `baseline_unavailable`, flags are empty, and the sole issue is the
-existing `comparison_baseline_unavailable`. The selection and unavailable
+`null`. The result is `unavailable`; every check in the current-owned manifest
+is emitted with status `unavailable` and reason `baseline_unavailable`, flags
+are empty, and the sole issue is the existing
+`comparison_baseline_unavailable`, referencing that complete manifest. No
+baseline-only category scope is generated. The selection and unavailable
 profile digest remain recorded. Baseline absence is never reported as “no
 change”.
 
@@ -420,12 +469,45 @@ Stable codes are:
 - `model_version_changed`: info, non-blocking.
 
 Each issue points to the typed comparison evidence rather than squeezing the
-new contract into legacy `ValidationEvidence`. One issue may summarize flags
-with the same code, but it must preserve links to every underlying flag; the
-flags themselves remain the normative evidence records containing statistic,
-threshold, values, baseline identity, fields, and groups. Version changes are
-factual information; distribution, group, missingness, and category changes are
-warnings requesting review. None are blocking.
+new contract into legacy scalar evidence. Epic 2.2 additively extends the strict
+`ValidationIssueEvidence` model with two optional fields:
+
+- `source_check_ids`: tuple of stable `ComparisonCheck.check_id` strings; and
+- `source_flag_ids`: tuple of stable `ChangeFlag.flag_id` strings.
+
+Both default to `null` for pre-Epic 2.2 issues. When present they are non-empty,
+contain unique strings matching `<stable_code>:<64 lowercase hex characters>`,
+and follow the referenced checks' or flags' canonical result order, not lexical
+order or insertion order. The issue registry permits these fields only for the
+comparison codes listed above; every other issue rejects them. They are bounded
+references into the enclosing `BaselineComparisonResult`, never embedded copies
+of checks or flags.
+
+Exactly one comparison issue exists for each applicable comparison issue code.
+The enclosing result validator enforces the complete reference closure:
+
+- a flag-driven issue has `source_flag_ids` equal to all and only flag IDs with
+  the same code, and `source_check_ids` equal to their unique source check IDs
+  in first-source occurrence order;
+- `comparison_check_not_computable` references all and only checks with status
+  `not_computable` and has no flag IDs;
+- `comparison_baseline_unavailable` references every check in the current-owned
+  unavailable manifest, all of which have status `unavailable`, and has no flag
+  IDs;
+- `comparison_baseline_incompatible` references every check in the current-owned
+  incompatible manifest, all of which have status `incompatible`, and has no
+  flag IDs; and
+- every referenced ID resolves exactly once in the same comparison result; no
+  issue may reference a check or flag from another result or omit an applicable
+  reference.
+
+Comparison issues with references cannot be constructed as valid standalone
+layer evidence without their enclosing comparison result; cross-reference
+validation occurs in `BaselineComparisonResult`, `LayeredValidationResult`, and
+the report mapper. The flags remain the normative evidence records containing
+statistic, threshold, values, baseline identity, fields, and groups. Version
+changes are factual information; distribution, group, missingness, and category
+changes are warnings requesting review. None are blocking.
 
 The canonical merged data-quality issue tuple is formed from all Epic 2.1
 `profile.issues` followed by all issues derived from the attached comparison,
@@ -496,10 +578,10 @@ Implementation is acceptable only when named automated tests demonstrate:
    inferred from recency, versions, filenames, or observed values;
    `content_digest` selections require exact selected-value/profile-digest
    equality.
-2. Every flag contains its stable code, source check ID, statistic, threshold,
-   current value, baseline value, baseline ID, and sorted affected fields/groups;
-   every source ID resolves to exactly one evaluated check with identical
-   evidence.
+2. Every flag contains its stable unique flag ID, code, source check ID,
+   statistic, threshold, current value, baseline value, baseline ID, and sorted
+   affected fields/groups; every source ID resolves to exactly one evaluated
+   check with identical evidence.
 3. Required numeric policy thresholds are strict, finite, serialized, and
    applied with inclusive absolute-delta semantics, including equality at the
    boundary; equality checks serialize the literal threshold `"equal"`.
@@ -515,34 +597,44 @@ Implementation is acceptable only when named automated tests demonstrate:
 8. Dataset and model versions compare independently; exact changes flag, while
    either-side null produces `version_unavailable` without suppressing other
    checks.
-9. A missing baseline returns `unavailable` with the existing stable issue and
-   no flags; a digest or semantic mismatch returns `incompatible` with the
-   deterministic reason and no partial comparisons.
-10. Zero whole-population samples and corrupt/non-finite profiles fail closed;
-    zero group samples follow the domain-specific defined/not-computable rules.
-11. Complete, partial, unavailable, and incompatible result statuses derive
+9. A missing-baseline fixture emits exactly the current-owned manifest as
+   unavailable, with stable IDs/order, no flags or baseline-only categories,
+   and one issue referencing every emitted check.
+10. Separate fixtures for schema, invariant, digest, analysis-semantics,
+    group-definition, and profile-method incompatibility emit exactly the same
+    current-owned manifest shape as incompatible, ignore all incompatible
+    baseline-only scopes, select the deterministic reason, and perform no
+    partial comparison.
+11. Zero whole-population samples and corrupt/non-finite current profiles fail
+    closed; zero group samples follow the domain-specific
+    defined/not-computable rules.
+12. Complete, partial, unavailable, and incompatible result statuses derive
     exactly from check states; composition returns a new frozen validation
     object, verifies the current-profile digest, attaches comparison once, and
     preserves already completed Epic 2.1 checks while deriving layer and
     aggregate statuses.
-12. The sole domain-to-report mapper produces `ValidationEvidence` with exact
+13. Comparison issue evidence accepts ordered unique check/flag IDs only for
+    registered comparison codes; result-level validation rejects dangling,
+    cross-result, duplicated, misordered, omitted, extra, or wrong-code
+    references and proves complete reference closure with fixtures.
+14. The sole domain-to-report mapper produces `ValidationEvidence` with exact
     profile, comparison, layer, status, count, and digest consistency; attempts
     to construct divergent domain/report comparison evidence are rejected.
-13. New domain and AuditResult JSON require an explicit nullable comparison;
+15. New domain and AuditResult JSON require an explicit nullable comparison;
     generated JSON Schema marks it required with null and typed-result branches,
     and non-null values round-trip without loss.
-14. Legacy LayeredValidationResult and AuditResult payloads lacking comparison
+16. Legacy LayeredValidationResult and AuditResult payloads lacking comparison
     migrate only to explicit null, retain their existing issues/statuses, emit
     no baseline-unavailable issue, and round-trip deterministically.
-15. Row permutation, mapping order, typed-label edge cases, and equivalent
+17. Row permutation, mapping order, typed-label edge cases, and equivalent
     profile objects produce byte-identical canonical JSON and digest values.
-16. Strict models reject unknown fields, booleans as numbers, invalid ratios,
+18. Strict models reject unknown fields, booleans as numbers, invalid ratios,
     non-finite values, unsafe artifact URIs, inconsistent totals, duplicate
     checks, flags without a matching evaluated check, and data-quality layers
     that do not equal the canonical profile/comparison issue merge.
-17. Privacy tests prove that comparison output includes no raw rows, record IDs,
+19. Privacy tests prove that comparison output includes no raw rows, record IDs,
     samples, credentials, query strings, or fragments.
-18. All Epic 1 and Epic 2.1 tests plus AuditResult schema and round-trip fixtures
+20. All Epic 1 and Epic 2.1 tests plus AuditResult schema and round-trip fixtures
     pass on Python 3.11/3.12, and `git diff --check` passes.
 
 The implementation PR must map every criterion to at least one named automated
