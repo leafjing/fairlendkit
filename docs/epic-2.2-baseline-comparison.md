@@ -475,28 +475,30 @@ new contract into legacy scalar evidence. Epic 2.2 additively extends the strict
 - `source_check_ids`: tuple of stable `ComparisonCheck.check_id` strings; and
 - `source_flag_ids`: tuple of stable `ChangeFlag.flag_id` strings.
 
-Both default to `null` for pre-Epic 2.2 issues. When present they are non-empty,
-contain unique strings matching `<stable_code>:<64 lowercase hex characters>`,
-and follow the referenced checks' or flags' canonical result order, not lexical
-order or insertion order. The issue registry permits these fields only for the
-comparison codes listed above; every other issue rejects them. They are bounded
-references into the enclosing `BaselineComparisonResult`, never embedded copies
-of checks or flags.
+Both default to empty tuples, including when parsing pre-Epic 2.2 issues. Each
+non-empty tuple contains unique strings matching
+`<stable_code>:<64 lowercase hex characters>` and follows the referenced
+checks' or flags' canonical result order, not lexical order or insertion order.
+Every comparison issue must have at least one non-empty reference tuple. Every
+non-comparison issue requires both tuples to be empty, preserving its existing
+meaning and preventing unrelated issues from pointing into a comparison. These
+are bounded references into the enclosing `BaselineComparisonResult`, never
+embedded copies of checks or flags.
 
 Exactly one comparison issue exists for each applicable comparison issue code.
 The enclosing result validator enforces the complete reference closure:
 
-- a flag-driven issue has `source_flag_ids` equal to all and only flag IDs with
-  the same code, and `source_check_ids` equal to their unique source check IDs
-  in first-source occurrence order;
+- a warning/change issue has `source_flag_ids` equal to all and only flag IDs
+  with the same code and has an empty `source_check_ids`; its source checks are
+  reached indirectly through each referenced flag's `source_check_id`;
 - `comparison_check_not_computable` references all and only checks with status
-  `not_computable` and has no flag IDs;
+  `not_computable` in `source_check_ids` and has an empty `source_flag_ids`;
 - `comparison_baseline_unavailable` references every check in the current-owned
-  unavailable manifest, all of which have status `unavailable`, and has no flag
-  IDs;
+  unavailable manifest in `source_check_ids`, all of which have status
+  `unavailable`, and has an empty `source_flag_ids`;
 - `comparison_baseline_incompatible` references every check in the current-owned
-  incompatible manifest, all of which have status `incompatible`, and has no
-  flag IDs; and
+  incompatible manifest in `source_check_ids`, all of which have status
+  `incompatible`, and has an empty `source_flag_ids`; and
 - every referenced ID resolves exactly once in the same comparison result; no
   issue may reference a check or flag from another result or omit an applicable
   reference.
@@ -614,9 +616,11 @@ Implementation is acceptable only when named automated tests demonstrate:
     preserves already completed Epic 2.1 checks while deriving layer and
     aggregate statuses.
 13. Comparison issue evidence accepts ordered unique check/flag IDs only for
-    registered comparison codes; result-level validation rejects dangling,
-    cross-result, duplicated, misordered, omitted, extra, or wrong-code
-    references and proves complete reference closure with fixtures.
+    comparison issues, requires at least one reference, and leaves both tuples
+    empty for every non-comparison issue; result-level validation rejects
+    dangling, cross-result, duplicated, misordered, omitted, extra, wrong-code,
+    or wrong-directness references and proves direct-check and indirect-through-
+    flag closure with fixtures.
 14. The sole domain-to-report mapper produces `ValidationEvidence` with exact
     profile, comparison, layer, status, count, and digest consistency; attempts
     to construct divergent domain/report comparison evidence are rejected.
