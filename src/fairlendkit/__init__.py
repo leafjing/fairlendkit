@@ -10,6 +10,11 @@ from fairlendkit.config import (
 from fairlendkit.data import (
     APPLICABILITY_STATEMENT,
     AffectedGroup,
+    BaselineComparisonPolicy,
+    BaselineComparisonResult,
+    BaselineSelection,
+    ChangeFlag,
+    ComparisonCheck,
     AnomalyProfile,
     CategoryCount,
     DataValidationError,
@@ -31,12 +36,19 @@ from fairlendkit.data import (
     ValidationStatus,
     ValidationSummary,
     validate_audit_data,
+    attach_baseline_comparison,
+    compare_profiles,
 )
-from fairlendkit.report import AuditResult
+from fairlendkit.report import AuditResult, to_validation_evidence
 
 __all__ = [
     "APPLICABILITY_STATEMENT",
     "AffectedGroup",
+    "BaselineComparisonPolicy",
+    "BaselineComparisonResult",
+    "BaselineSelection",
+    "ChangeFlag",
+    "ComparisonCheck",
     "AnomalyProfile",
     "AuditConfig",
     "AuditResult",
@@ -64,4 +76,7 @@ __all__ = [
     "ValidationSeverity",
     "ValidationStatus",
     "validate_audit_data",
+    "attach_baseline_comparison",
+    "compare_profiles",
+    "to_validation_evidence",
 ]

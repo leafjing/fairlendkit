@@ -3,6 +3,11 @@
 from fairlendkit.data.contracts import (
     APPLICABILITY_STATEMENT,
     AffectedGroup,
+    BaselineComparisonPolicy,
+    BaselineComparisonResult,
+    BaselineSelection,
+    ChangeFlag,
+    ComparisonCheck,
     AnomalyProfile,
     CategoryCount,
     ExclusionEvidence,
@@ -22,6 +27,11 @@ from fairlendkit.data.contracts import (
     ValidationSeverity,
     ValidationStatus,
 )
+from fairlendkit.data.comparison import (
+    attach_baseline_comparison,
+    canonical_profile_digest,
+    compare_profiles,
+)
 from fairlendkit.data.validation import (
     DataValidationError,
     ValidationSummary,
@@ -32,6 +42,11 @@ __all__ = [
     "DataValidationError",
     "APPLICABILITY_STATEMENT",
     "AffectedGroup",
+    "BaselineComparisonPolicy",
+    "BaselineComparisonResult",
+    "BaselineSelection",
+    "ChangeFlag",
+    "ComparisonCheck",
     "AnomalyProfile",
     "CategoryCount",
     "ExclusionEvidence",
@@ -52,4 +67,7 @@ __all__ = [
     "ValidationStatus",
     "ValidationSummary",
     "validate_audit_data",
+    "attach_baseline_comparison",
+    "canonical_profile_digest",
+    "compare_profiles",
 ]
