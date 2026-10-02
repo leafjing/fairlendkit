@@ -13,6 +13,8 @@ from fairlendkit.config import AuditConfig
 from fairlendkit.config.models import Label
 from fairlendkit.data.contracts import (
     APPLICABILITY_STATEMENT,
+    BaselineComparisonResult,
+    LayeredValidationResult,
     SingleRunProfile,
     ValidationLayerId,
     ValidationLayerResult,
@@ -264,17 +266,32 @@ class ValidationEvidence(ResultModel):
     small_groups: tuple[str, ...]
     layers: tuple[ValidationLayerResult, ...]
     profile: SingleRunProfile | None = None
+    comparison: BaselineComparisonResult | None = None
 
     @model_validator(mode="before")
     @classmethod
     def migrate_flat_v1_validation(cls, value: object) -> object:
-        if not isinstance(value, dict) or "layers" in value:
+        if not isinstance(value, dict):
             return value
+        if "layers" in value:
+            if "comparison" in value:
+                return value
+            migrated = {**value, "comparison": None}
+            layers = [dict(layer) for layer in migrated["layers"]]
+            data_quality = layers[-1]
+            data_quality["issues"] = tuple(
+                issue for issue in data_quality.get("issues", ())
+                if issue.get("code") != "comparison_baseline_unavailable"
+            )
+            if not data_quality["issues"]:
+                data_quality["status"] = "passed"
+            migrated["layers"] = tuple(layers)
+            return migrated
         migrated = dict(value)
         warnings = migrated.get("warnings", ())
         # Released flat fixtures had no typed mapping from arbitrary warning codes.
         # Preserve their aggregate state under one bounded compatibility issue.
-        data_quality_issues = [make_issue("comparison_baseline_unavailable")]
+        data_quality_issues = []
         if warnings:
             data_quality_issues.append(
                 make_issue(
@@ -289,7 +306,7 @@ class ValidationEvidence(ResultModel):
             ValidationLayerResult(layer="analytical_reliability", status="passed", issues=()),
             ValidationLayerResult(
                 layer="data_quality",
-                status="warning" if warnings else "not_evaluated",
+                status="warning" if warnings else "passed",
                 issues=tuple(data_quality_issues),
             ),
         )
@@ -303,6 +320,7 @@ class ValidationEvidence(ResultModel):
             small_groups=(),
             layers=layers,
             profile=None,
+            comparison=None,
         )
         return migrated
 
@@ -336,13 +354,49 @@ class ValidationEvidence(ResultModel):
             if (self.profile.input_rows, self.profile.eligible_rows, self.profile.excluded_rows) != (self.input_rows, self.analyzed_rows, excluded_rows):
                 raise ValueError("profile row counts must match validation evidence")
             data_quality = next(layer for layer in self.layers if layer.layer == ValidationLayerId.DATA_QUALITY)
-            if data_quality.issues != self.profile.issues:
-                raise ValueError("data-quality layer must contain exactly profile issues")
+            comparison_issues = () if self.comparison is None else self.comparison.issues
+            expected_issues = tuple(sorted((*self.profile.issues, *comparison_issues), key=issue_sort_key))
+            if data_quality.issues != expected_issues:
+                raise ValueError("data-quality layer must contain canonical profile/comparison issues")
+            if self.comparison is not None:
+                from fairlendkit.data.comparison import canonical_profile_digest
+                if canonical_profile_digest(self.profile) != self.comparison.current_profile_digest:
+                    raise ValueError("comparison profile digest must match report profile")
         return self
 
     @property
     def eligible_rows(self) -> int:
         return self.analyzed_rows
+
+
+def to_validation_evidence(
+    validation: LayeredValidationResult,
+    *,
+    exclusions: tuple[ExclusionRecord, ...],
+    warnings: tuple[WarningRecord, ...],
+) -> ValidationEvidence:
+    """Project domain validation evidence into the report contract."""
+    if sum(record.count for record in exclusions) != validation.excluded_rows:
+        raise ValueError("report exclusions must reconcile to domain excluded_rows")
+    reason_counts = dict(validation.reason_counts)
+    if any(record.code not in reason_counts or record.count > reason_counts[record.code] for record in exclusions):
+        raise ValueError("report exclusions must be supported by domain reason counts")
+    return ValidationEvidence(
+        input_rows=validation.input_rows,
+        analyzed_rows=validation.eligible_rows,
+        exclusions=exclusions,
+        warnings=warnings,
+        status=validation.status,
+        technical_validation=validation.technical_validation,
+        applicability=validation.applicability,
+        applicability_statement=validation.applicability_statement,
+        reason_counts=validation.reason_counts,
+        duplicate_rows=validation.duplicate_rows,
+        small_groups=validation.small_groups,
+        layers=validation.layers,
+        profile=validation.profile,
+        comparison=validation.comparison,
+    )
 
 
 class Limitation(ResultModel):

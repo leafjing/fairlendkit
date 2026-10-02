@@ -18,6 +18,7 @@ from fairlendkit.report.models import (
     UndefinedReasonCode,
     ValidationEvidence,
     WarningRecord,
+    to_validation_evidence,
 )
 
 __all__ = [
@@ -38,4 +39,5 @@ __all__ = [
     "UndefinedReasonCode",
     "ValidationEvidence",
     "WarningRecord",
+    "to_validation_evidence",
 ]
