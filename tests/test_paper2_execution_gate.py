@@ -373,3 +373,13 @@ def test_smoke_benchmark_is_raw_only_and_resource_preflight_fails_closed(
         validate_resource_preflight(
             replace(sufficient, disk_free_bytes=evidence.projected_disk_bytes - 1), evidence
         )
+    with pytest.raises(IntegrityError, match="CPU-hours"):
+        validate_resource_preflight(
+            sufficient,
+            replace(evidence, projected_cpu_hours=evidence.cpu_hours_limit + 1),
+        )
+    with pytest.raises(IntegrityError, match="wall-time"):
+        validate_resource_preflight(
+            sufficient,
+            replace(evidence, projected_wall_hours=evidence.wall_hours_limit + 1),
+        )

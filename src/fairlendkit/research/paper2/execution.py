@@ -34,6 +34,9 @@ CPU_BUDGET = 4
 MEMORY_BUDGET_GIB = 16
 DISK_SAFETY_FACTOR = 2.0
 RUNTIME_SAFETY_FACTOR = 2.0
+MEMORY_SAFETY_FACTOR = 4.0
+CPU_HOURS_LIMIT = 10_000.0
+WALL_HOURS_LIMIT = 3_000.0
 PROTOCOL_A1_COMMIT = "865a2baf549d691d602334379ed03a7883989d6f"
 IMPLEMENTATION_BASE_COMMIT = "1143d0e5795eefa1abb3de4bf52fdc9eaf8f9b91"
 PARALLEL_STRATEGY = "process-per-shard; deterministic shard queue"
@@ -88,6 +91,9 @@ class SmokeBenchmarkEvidence:
     projected_disk_bytes: int
     required_memory_bytes: int
     safety_factor: float
+    memory_safety_factor: float = MEMORY_SAFETY_FACTOR
+    cpu_hours_limit: float = CPU_HOURS_LIMIT
+    wall_hours_limit: float = WALL_HOURS_LIMIT
 
     def __post_init__(self) -> None:
         if self.schema_version != "paper2-resource-benchmark-v1":
@@ -104,6 +110,9 @@ class SmokeBenchmarkEvidence:
             self.projected_disk_bytes,
             self.required_memory_bytes,
             self.safety_factor,
+            self.memory_safety_factor,
+            self.cpu_hours_limit,
+            self.wall_hours_limit,
         )
         if any(not isfinite(float(value)) or value <= 0 for value in numeric):
             raise IntegrityError("Resource benchmark values must be finite and positive.")
@@ -556,6 +565,10 @@ def validate_resource_preflight(
         raise IntegrityError("Execution host has insufficient memory capacity.")
     if capacity.disk_free_bytes < evidence.projected_disk_bytes:
         raise IntegrityError("Execution host has insufficient disk capacity.")
+    if evidence.projected_cpu_hours > evidence.cpu_hours_limit:
+        raise IntegrityError("Projected execution exceeds the frozen CPU-hours limit.")
+    if evidence.projected_wall_hours > evidence.wall_hours_limit:
+        raise IntegrityError("Projected execution exceeds the frozen wall-time limit.")
 
 
 def benchmark_smoke_resources(
