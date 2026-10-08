@@ -32,6 +32,7 @@ from fairlendkit.metrics.group import (
     calculate_group_metrics,
     canonical_metric_key,
     canonical_typed_token,
+    scope_key,
 )
 
 __all__ = [
@@ -62,4 +63,5 @@ __all__ = [
     "calculate_group_metrics",
     "canonical_metric_key",
     "canonical_typed_token",
+    "scope_key",
 ]

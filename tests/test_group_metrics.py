@@ -3,13 +3,13 @@ import pytest
 from fairlendkit import AuditConfig
 from fairlendkit.metrics import (
     AuditScope,
+    MetricNameV2,
     NormalizedAuditData,
-    ScopeKey,
     calculate_group_metrics,
     canonical_metric_key,
     canonical_typed_token,
+    scope_key,
 )
-from fairlendkit.report import MetricNameV2
 
 
 def config(**changes):
@@ -55,9 +55,9 @@ def test_canonical_typed_tokens_are_collision_free_and_match_contract_example():
 
 def test_scope_key_equality_and_hash_are_type_sensitive():
     scopes = {
-        ScopeKey.from_scope(AuditScope((("group", True),))),
-        ScopeKey.from_scope(AuditScope((("group", 1),))),
-        ScopeKey.from_scope(AuditScope((("group", "1"),))),
+        scope_key(AuditScope((("group", True),))),
+        scope_key(AuditScope((("group", 1),))),
+        scope_key(AuditScope((("group", "1"),))),
     }
 
     assert len(scopes) == 3
@@ -103,11 +103,11 @@ def test_group_orchestration_is_canonical_and_emits_configured_empty_groups():
     ]
     group_keys = [item.key for item in results[9:36:9]]
     assert ["str-224122" in group_keys[0], "str-224222" in group_keys[1], "str-224322" in group_keys[2]] == [True, True, True]
-    empty_key = ScopeKey.from_scope(AuditScope((("group", "C"),)))
+    empty_key = scope_key(AuditScope((("group", "C"),)))
     empty_group_metrics = [
         item
         for item in results
-        if item.group is not None and ScopeKey.from_scope(item.group) == empty_key
+        if item.group is not None and scope_key(item.group) == empty_key
     ]
     assert len(empty_group_metrics) == 9
     assert {item.sample_count for item in empty_group_metrics} == {0}
@@ -167,7 +167,7 @@ def test_multiple_attributes_are_independent_and_sorted_by_attribute():
     first_group = results[9].group
 
     assert first_group is not None
-    assert ScopeKey.from_scope(first_group) == ScopeKey.from_scope(
+    assert scope_key(first_group) == scope_key(
         AuditScope((("alpha", 0),))
     )
     assert len(results) == 55  # 9 overall + 4*9 groups + 2*5 comparisons
@@ -225,20 +225,29 @@ def test_boolean_and_integer_groups_do_not_overwrite_comparison_sources():
         for item in results
         if item.metric == MetricNameV2.SELECTION_RATE_DIFFERENCE
     ]
-    integer_key = ScopeKey.from_scope(AuditScope((("group", 1),)))
+    integer_key = scope_key(AuditScope((("group", 1),)))
     difference = next(
         item
         for item in differences
         if item.comparison_group is not None
-        and ScopeKey.from_scope(item.comparison_group) == integer_key
+        and scope_key(item.comparison_group) == integer_key
     )
 
     assert len(differences) == 2
     assert len({item.key for item in differences}) == 2
+    group_selection_rates = [
+        item
+        for item in results
+        if item.metric == MetricNameV2.SELECTION_RATE and item.group is not None
+        and item.group.attributes != (("__scope__", "overall"),)
+    ]
+    assert len(group_selection_rates) == 3
+    assert len({scope_key(item.group) for item in group_selection_rates}) == 3
+    assert len({item.key for item in group_selection_rates}) == 3
     assert difference.value.value == -1.0
     assert difference.comparison_group is not None
     assert difference.reference_group is not None
-    assert ScopeKey.from_scope(difference.comparison_group) == integer_key
-    assert ScopeKey.from_scope(difference.reference_group) == ScopeKey.from_scope(
+    assert scope_key(difference.comparison_group) == integer_key
+    assert scope_key(difference.reference_group) == scope_key(
         AuditScope((("group", True),))
     )

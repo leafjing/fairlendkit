@@ -72,14 +72,18 @@ class ScopeKey:
 
     attributes: tuple[tuple[str, str], ...]
 
-    @classmethod
-    def from_scope(cls, scope: AuditScope) -> "ScopeKey":
-        return cls(
-            tuple(
-                (canonical_typed_token(name), canonical_typed_token(value))
-                for name, value in scope.attributes
-            )
+
+def scope_key(scope: AuditScope) -> ScopeKey:
+    """Return the sole canonical identity for an audit scope."""
+
+    if not isinstance(scope, AuditScope):
+        raise TypeError("scope must be AuditScope")
+    return ScopeKey(
+        tuple(
+            (canonical_typed_token(name), canonical_typed_token(value))
+            for name, value in scope.attributes
         )
+    )
 
 
 @dataclass(frozen=True)
@@ -221,7 +225,7 @@ def calculate_group_metrics(
             metrics = _calculate_scope(data, config, scope, indices)
             output.extend(metrics)
             for item in metrics:
-                scope_results[(item.metric.value, ScopeKey.from_scope(scope))] = item
+                scope_results[(item.metric.value, scope_key(scope))] = item
 
         reference_value = config.reference_groups[attribute]
         reference_scope = AuditScope(((attribute, reference_value),))
@@ -280,7 +284,7 @@ def _calculate_comparison(
     reference_scope: AuditScope,
 ) -> tuple[CalculatedMetric, ...]:
     def source(metric: MetricNameV2, scope: AuditScope) -> CalculatedMetric:
-        return scope_results[(metric.value, ScopeKey.from_scope(scope))]
+        return scope_results[(metric.value, scope_key(scope))]
 
     comparison_selection = source(MetricNameV2.SELECTION_RATE, comparison_scope)
     reference_selection = source(MetricNameV2.SELECTION_RATE, reference_scope)

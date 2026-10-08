@@ -11,11 +11,6 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 from fairlendkit.config import AuditConfig
 from fairlendkit.config.models import Label
-from fairlendkit.metrics.contracts import (
-    CANONICAL_UNDEFINED_MESSAGES_V2,
-    MetricNameV2,
-    UndefinedReasonCodeV2,
-)
 from fairlendkit.data.contracts import (
     APPLICABILITY_STATEMENT,
     BaselineComparisonResult,
