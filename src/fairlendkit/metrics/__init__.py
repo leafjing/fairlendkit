@@ -1,7 +1,9 @@
 """Metric contracts for normalized favorable-outcome and decision indicators."""
 
 from fairlendkit.metrics.contracts import (
+    BootstrapInterval,
     CANONICAL_UNDEFINED_MESSAGES_V2,
+    LimitationCode,
     MetricNameV2,
     UndefinedReasonCodeV2,
 )
@@ -36,7 +38,6 @@ from fairlendkit.metrics.group import (
 )
 from fairlendkit.metrics.bootstrap import (
     RNG_NAME,
-    BootstrapInterval,
     Sha256CounterSampler,
     bootstrap_index_draws,
     bootstrap_interval,
@@ -57,6 +58,7 @@ from fairlendkit.metrics.reliability import (
 __all__ = [
     "MetricValue",
     "MetricNameV2",
+    "LimitationCode",
     "UndefinedReasonCodeV2",
     "CANONICAL_UNDEFINED_MESSAGES_V2",
     "accuracy",

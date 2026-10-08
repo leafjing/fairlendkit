@@ -1,5 +1,6 @@
 """Stable inner contracts shared by metric calculation and outer reporting."""
 
+from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -83,3 +84,21 @@ CANONICAL_UNDEFINED_MESSAGES_V2 = {
         "A required component metric is undefined."
     ),
 }
+
+
+class LimitationCode(StrEnum):
+    SMALL_GROUP = "small_group"
+    SEVERE_OUTCOME_IMBALANCE = "severe_outcome_imbalance"
+    SPARSE_DECISION_SUPPORT = "sparse_decision_support"
+    INSUFFICIENT_VALID_RESAMPLES = "insufficient_valid_resamples"
+
+
+@dataclass(frozen=True)
+class BootstrapInterval:
+    """Implementation-neutral percentile interval evidence."""
+
+    metric_key: str
+    confidence_level: float
+    lower: float
+    upper: float
+    valid_resamples: int

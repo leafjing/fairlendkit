@@ -77,3 +77,14 @@ def test_metrics_package_does_not_depend_on_report_package():
             or module.startswith("fairlendkit.report.")
             for module in imported_modules
         ), f"{source_path} imports the outer report package"
+
+
+def test_reliability_policy_does_not_depend_on_bootstrap_implementation():
+    tree = ast.parse(Path("src/fairlendkit/metrics/reliability.py").read_text())
+    imported_modules = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module
+    }
+
+    assert "fairlendkit.metrics.bootstrap" not in imported_modules

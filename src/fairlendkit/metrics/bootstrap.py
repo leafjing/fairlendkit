@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import math
-from dataclasses import dataclass
 from typing import Callable
+
+from fairlendkit.metrics.contracts import BootstrapInterval
 
 
 RNG_NAME = "fairlendkit-sha256-counter-v1"
@@ -84,15 +85,6 @@ def type7_quantile(values: tuple[float, ...], probability: float) -> float:
     lower = math.floor(h)
     upper = math.ceil(h)
     return ordered[lower] + (h - lower) * (ordered[upper] - ordered[lower])
-
-
-@dataclass(frozen=True)
-class BootstrapInterval:
-    metric_key: str
-    confidence_level: float
-    lower: float
-    upper: float
-    valid_resamples: int
 
 
 def bootstrap_interval(

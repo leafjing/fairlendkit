@@ -6,8 +6,11 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from fairlendkit.config import AuditConfig
-from fairlendkit.metrics.contracts import MetricNameV2
-from fairlendkit.metrics.bootstrap import BootstrapInterval
+from fairlendkit.metrics.contracts import (
+    BootstrapInterval,
+    LimitationCode,
+    MetricNameV2,
+)
 from fairlendkit.metrics.group import (
     AuditScope,
     CalculatedMetric,
@@ -17,10 +20,10 @@ from fairlendkit.metrics.group import (
 )
 
 GATE_ORDER = (
-    "small_group",
-    "severe_outcome_imbalance",
-    "sparse_decision_support",
-    "insufficient_valid_resamples",
+    LimitationCode.SMALL_GROUP,
+    LimitationCode.SEVERE_OUTCOME_IMBALANCE,
+    LimitationCode.SPARSE_DECISION_SUPPORT,
+    LimitationCode.INSUFFICIENT_VALID_RESAMPLES,
 )
 
 
@@ -35,12 +38,12 @@ class ReliabilityState(StrEnum):
 class AssessedMetric:
     calculated: CalculatedMetric
     reliability: ReliabilityState
-    limitation_codes: tuple[str, ...]
+    limitation_codes: tuple[LimitationCode, ...]
 
 
 @dataclass(frozen=True)
 class MetricLimitation:
-    code: str
+    code: LimitationCode
     scope_id: str
     affected_metric_keys: tuple[str, ...]
 
@@ -95,7 +98,7 @@ def assess_reliability(
         output.append(item)
 
     limitations: list[MetricLimitation] = []
-    buckets: dict[tuple[str, str], list[str]] = {}
+    buckets: dict[tuple[str, LimitationCode], list[str]] = {}
     for item in output:
         scope_id = _scope_id(item.calculated)
         for code in item.limitation_codes:
@@ -153,7 +156,7 @@ def collect_uncertainty(
             intervals.append(interval)
     limitations = tuple(
         MetricLimitation(
-            code="insufficient_valid_resamples",
+            code=LimitationCode.INSUFFICIENT_VALID_RESAMPLES,
             scope_id=scope_id,
             affected_metric_keys=tuple(keys),
         )
@@ -164,27 +167,27 @@ def collect_uncertainty(
 
 def _scope_gate_codes(
     metric: CalculatedMetric, data: NormalizedAuditData, config: AuditConfig
-) -> tuple[str, ...]:
+) -> tuple[LimitationCode, ...]:
     assert metric.group is not None
     indices = _scope_indices(metric.group, data)
-    codes: list[str] = []
+    codes: list[LimitationCode] = []
     if len(indices) < config.minimum_group_size:
-        codes.append("small_group")
+        codes.append(LimitationCode.SMALL_GROUP)
     if metric.metric in _OUTCOME_GATED:
         favorable = sum(data.favorable_outcome[index] for index in indices)
         unfavorable = len(indices) - favorable
         if min(favorable, unfavorable) < config.minimum_group_size:
-            codes.append("severe_outcome_imbalance")
+            codes.append(LimitationCode.SEVERE_OUTCOME_IMBALANCE)
     if metric.metric == MetricNameV2.PRECISION:
         decisions = sum(data.favorable_decision[index] for index in indices)
         if decisions < config.minimum_group_size:
-            codes.append("sparse_decision_support")
+            codes.append(LimitationCode.SPARSE_DECISION_SUPPORT)
     return tuple(code for code in GATE_ORDER if code in codes)
 
 
 def _comparison_gate_codes(
     metric: CalculatedMetric, assessed: dict[str, AssessedMetric]
-) -> tuple[str, ...]:
+) -> tuple[LimitationCode, ...]:
     assert metric.comparison_group is not None and metric.reference_group is not None
     if metric.metric in {
         MetricNameV2.SELECTION_RATE_DIFFERENCE,
