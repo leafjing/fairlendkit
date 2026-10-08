@@ -39,6 +39,12 @@ audit result. Projection uses the slowest measured scenario, not their mean.
 CPU-hours, wall time, and disk are extrapolated to 29 × 50,000 replicates with
 a frozen 2× safety factor.
 Required memory is the greater of 16 GiB and 4× measured peak RSS.
+Artifact bytes come from each complete `run_audit` result mapped into the
+strict raw-record schema, including all metric states, uncertainty references,
+flags, and limitations; no fixed dummy payload is used for disk projection.
+The 2× runtime/disk factors, 4× RSS factor, 10,000 CPU-hour ceiling, and 3,000
+wall-hour ceiling are constructor-enforced constants and cannot be overridden
+through benchmark evidence.
 
 Generate reproducible host-specific evidence on a clean locked environment:
 

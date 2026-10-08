@@ -420,3 +420,12 @@ def test_smoke_benchmark_is_raw_only_and_resource_preflight_fails_closed(
             sufficient,
             replace(evidence, projected_wall_hours=evidence.wall_hours_limit + 1),
         )
+    for change in (
+        {"cpu_hours_limit": evidence.cpu_hours_limit + 1},
+        {"wall_hours_limit": evidence.wall_hours_limit + 1},
+        {"safety_factor": evidence.safety_factor + 1},
+        {"memory_safety_factor": evidence.memory_safety_factor + 1},
+        {"required_memory_bytes": evidence.required_memory_bytes + 1},
+    ):
+        with pytest.raises(IntegrityError, match="frozen|canonical"):
+            replace(evidence, **change)

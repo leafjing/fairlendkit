@@ -116,6 +116,19 @@ class SmokeBenchmarkEvidence:
         )
         if any(not isfinite(float(value)) or value <= 0 for value in numeric):
             raise IntegrityError("Resource benchmark values must be finite and positive.")
+        if (
+            self.safety_factor != RUNTIME_SAFETY_FACTOR
+            or self.memory_safety_factor != MEMORY_SAFETY_FACTOR
+            or self.cpu_hours_limit != CPU_HOURS_LIMIT
+            or self.wall_hours_limit != WALL_HOURS_LIMIT
+        ):
+            raise IntegrityError("Resource benchmark policy values are frozen.")
+        minimum_memory = max(
+            MEMORY_BUDGET_GIB * 1024**3,
+            int(self.peak_rss_bytes * MEMORY_SAFETY_FACTOR),
+        )
+        if self.required_memory_bytes != minimum_memory:
+            raise IntegrityError("Resource benchmark memory requirement is not canonical.")
 
 
 @dataclass(frozen=True)
