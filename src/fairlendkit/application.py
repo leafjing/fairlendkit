@@ -16,6 +16,10 @@ from fairlendkit.metrics.contracts import (
     UncertaintyRequest,
     UndefinedReasonCodeV2,
 )
+from fairlendkit.metrics.batch import (
+    UnweightedComparisonBatchEvaluator,
+    UnweightedScopeBatchEvaluator,
+)
 from fairlendkit.metrics.group import (
     AuditScope,
     CalculatedMetric,
@@ -193,17 +197,153 @@ def _uncertainty_requests(assessed: tuple[AssessedMetric, ...], data: Normalized
 
 def _scope_evaluator(metric: CalculatedMetric, data: NormalizedAuditData, config: AuditConfig, source: tuple[int, ...]):
     def evaluate(draw: tuple[int, ...]) -> float | None:
+        if data.weights is None:
+            return _unweighted_scope_metric_value(
+                metric.metric, data, config, tuple(source[index] for index in draw)
+            )
         sampled = _take(data, tuple(source[index] for index in draw))
         return _scope_metric_value(metric.metric, sampled, config)
+    if data.weights is None:
+        return UnweightedScopeBatchEvaluator(
+            metric.metric,
+            data.favorable_outcome,
+            data.favorable_decision,
+            data.favorable_score,
+            source,
+            evaluate,
+        )
     return evaluate
 
 
 def _comparison_evaluator(metric: CalculatedMetric, data: NormalizedAuditData, config: AuditConfig, left: tuple[int, ...], right: tuple[int, ...]):
     def evaluate(left_draw: tuple[int, ...], right_draw: tuple[int, ...]) -> float | None:
+        if data.weights is None:
+            return _unweighted_comparison_metric_value(
+                metric.metric,
+                data,
+                tuple(left[index] for index in left_draw),
+                tuple(right[index] for index in right_draw),
+            )
         comparison = _take(data, tuple(left[index] for index in left_draw))
         reference = _take(data, tuple(right[index] for index in right_draw))
         return _comparison_metric_value(metric.metric, comparison, reference)
+    if data.weights is None:
+        return UnweightedComparisonBatchEvaluator(
+            metric.metric,
+            data.favorable_outcome,
+            data.favorable_decision,
+            left,
+            right,
+            evaluate,
+        )
     return evaluate
+
+
+def _unweighted_scope_metric_value(
+    metric: MetricNameV2,
+    data: NormalizedAuditData,
+    config: AuditConfig,
+    indices: tuple[int, ...],
+) -> float | None:
+    """Evaluate validated, unweighted bootstrap samples without revalidation."""
+    size = len(indices)
+    decisions = data.favorable_decision
+    outcomes = data.favorable_outcome
+    if metric is MetricNameV2.SELECTION_RATE:
+        return sum(decisions[index] for index in indices) / size
+    if metric is MetricNameV2.DENIAL_RATE:
+        return sum(not decisions[index] for index in indices) / size
+    if metric is MetricNameV2.ACCURACY:
+        return sum(outcomes[index] == decisions[index] for index in indices) / size
+    if metric is MetricNameV2.PRECISION:
+        support = sum(decisions[index] for index in indices)
+        if support == 0:
+            return None
+        return sum(
+            outcomes[index] and decisions[index] for index in indices
+        ) / support
+    if metric in (
+        MetricNameV2.TRUE_POSITIVE_RATE,
+        MetricNameV2.FALSE_NEGATIVE_RATE,
+    ):
+        support = sum(outcomes[index] for index in indices)
+        if support == 0:
+            return None
+        favorable = sum(
+            outcomes[index] and decisions[index] for index in indices
+        )
+        numerator = favorable if metric is MetricNameV2.TRUE_POSITIVE_RATE else support - favorable
+        return numerator / support
+    if metric is MetricNameV2.FALSE_POSITIVE_RATE:
+        support = sum(not outcomes[index] for index in indices)
+        if support == 0:
+            return None
+        return sum(
+            (not outcomes[index]) and decisions[index] for index in indices
+        ) / support
+    if metric is MetricNameV2.BRIER_SCORE:
+        if config.score_type.value != "probability":
+            return None
+        return sum(
+            (
+                data.favorable_score[index]
+                - float(data.favorable_outcome[index])
+            )
+            ** 2
+            for index in indices
+        ) / size
+    if metric is MetricNameV2.ROC_AUC:
+        sampled_outcomes = tuple(outcomes[index] for index in indices)
+        sampled_scores = tuple(data.favorable_score[index] for index in indices)
+        return roc_auc(sampled_outcomes, sampled_scores).value
+    raise ValueError(f"Unsupported scope metric: {metric.value}")
+
+
+def _unweighted_comparison_metric_value(
+    metric: MetricNameV2,
+    data: NormalizedAuditData,
+    comparison: tuple[int, ...],
+    reference: tuple[int, ...],
+) -> float | None:
+    """Evaluate validated, unweighted directed bootstrap samples directly."""
+    decisions = data.favorable_decision
+    outcomes = data.favorable_outcome
+
+    def rate(indices: tuple[int, ...]) -> float:
+        return sum(decisions[index] for index in indices) / len(indices)
+
+    comparison_selection = rate(comparison)
+    reference_selection = rate(reference)
+    if metric in (
+        MetricNameV2.SELECTION_RATE_DIFFERENCE,
+        MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE,
+    ):
+        return comparison_selection - reference_selection
+    if metric is MetricNameV2.ADVERSE_IMPACT_RATIO:
+        return None if reference_selection == 0 else comparison_selection / reference_selection
+
+    def conditional(indices: tuple[int, ...], favorable: bool) -> float | None:
+        support = sum(outcomes[index] is favorable for index in indices)
+        if support == 0:
+            return None
+        return sum(
+            (outcomes[index] is favorable) and decisions[index] for index in indices
+        ) / support
+
+    comparison_tpr = conditional(comparison, True)
+    reference_tpr = conditional(reference, True)
+    if metric is MetricNameV2.EQUAL_OPPORTUNITY_DIFFERENCE:
+        if comparison_tpr is None or reference_tpr is None:
+            return None
+        return comparison_tpr - reference_tpr
+    comparison_fpr = conditional(comparison, False)
+    reference_fpr = conditional(reference, False)
+    if None in (comparison_tpr, reference_tpr, comparison_fpr, reference_fpr):
+        return None
+    return max(
+        abs(comparison_tpr - reference_tpr),
+        abs(comparison_fpr - reference_fpr),
+    )
 
 
 def _scope_metric_value(
