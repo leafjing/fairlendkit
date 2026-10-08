@@ -78,6 +78,27 @@ class ResourceCapacity:
 
 
 @dataclass(frozen=True)
+class RepresentativeCost:
+    scenario_id: str
+    cpu_seconds: float
+    wall_seconds: float
+    peak_rss_bytes: int
+    artifact_bytes: int
+
+    def __post_init__(self) -> None:
+        if not self.scenario_id or any(
+            not isfinite(float(value)) or value <= 0
+            for value in (
+                self.cpu_seconds,
+                self.wall_seconds,
+                self.peak_rss_bytes,
+                self.artifact_bytes,
+            )
+        ):
+            raise IntegrityError("Representative cost evidence must be finite and positive.")
+
+
+@dataclass(frozen=True)
 class SmokeBenchmarkEvidence:
     schema_version: str
     smoke_records: int
@@ -91,6 +112,7 @@ class SmokeBenchmarkEvidence:
     projected_disk_bytes: int
     required_memory_bytes: int
     safety_factor: float
+    representative_costs: tuple[RepresentativeCost, ...] = ()
     memory_safety_factor: float = MEMORY_SAFETY_FACTOR
     cpu_hours_limit: float = CPU_HOURS_LIMIT
     wall_hours_limit: float = WALL_HOURS_LIMIT
@@ -129,6 +151,18 @@ class SmokeBenchmarkEvidence:
         )
         if self.required_memory_bytes != minimum_memory:
             raise IntegrityError("Resource benchmark memory requirement is not canonical.")
+        if self.representative_costs:
+            identities = tuple(item.scenario_id for item in self.representative_costs)
+            if identities != tuple(sorted(set(identities))):
+                raise IntegrityError("Representative cost identities must be unique and sorted.")
+            if self.cpu_seconds != max(item.cpu_seconds for item in self.representative_costs):
+                raise IntegrityError("Representative CPU evidence is inconsistent.")
+            if self.wall_seconds != max(item.wall_seconds for item in self.representative_costs):
+                raise IntegrityError("Representative wall evidence is inconsistent.")
+            if self.peak_rss_bytes != max(item.peak_rss_bytes for item in self.representative_costs):
+                raise IntegrityError("Representative RSS evidence is inconsistent.")
+            if self.artifact_bytes != sum(item.artifact_bytes for item in self.representative_costs):
+                raise IntegrityError("Representative artifact evidence is inconsistent.")
 
 
 @dataclass(frozen=True)

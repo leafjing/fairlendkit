@@ -50,6 +50,9 @@ scenarios and sums the mapped CPU, wall, and serialized artifact costs; disk
 cost is never derived from an average of the measured artifacts. CPU-hours,
 wall time, and disk are extrapolated to 29 × 50,000 replicates with a frozen 2×
 safety factor.
+The evidence retains each representative's CPU seconds, wall seconds, peak RSS,
+and serialized artifact bytes under its scenario ID; aggregate maxima and totals
+must reconcile exactly with those sorted, unique measurements.
 Required memory is the greater of 16 GiB and 4× measured peak RSS.
 Artifact bytes come from each complete `run_audit` result mapped into the
 strict raw-record schema, including all metric states, uncertainty references,

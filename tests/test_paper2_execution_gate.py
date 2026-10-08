@@ -24,6 +24,7 @@ from fairlendkit.research.paper2.execution import (
     RawReplicatePayload,
     RawReplicateRecord,
     ResourceCapacity,
+    RepresentativeCost,
     ShardSpec,
     build_manifest,
     benchmark_smoke_resources,
@@ -539,3 +540,33 @@ def test_each_cost_representative_requires_full_metric_set_and_frozen_artifact_s
             replace(payload, metric_values=(("overall.accuracy", 1.0),)),
             {"selection_rate"},
         )
+
+
+def test_representative_cost_evidence_is_unique_sorted_and_matches_aggregates():
+    costs = (
+        RepresentativeCost("a", 1.0, 2.0, 100, 10),
+        RepresentativeCost("b", 3.0, 4.0, 200, 20),
+    )
+    evidence = execution.SmokeBenchmarkEvidence(
+        schema_version="paper2-resource-benchmark-v1",
+        smoke_records=2,
+        wall_seconds=4.0,
+        cpu_seconds=3.0,
+        peak_rss_bytes=200,
+        artifact_bytes=30,
+        projected_records=29 * 50_000,
+        projected_cpu_hours=1.0,
+        projected_wall_hours=1.0,
+        projected_disk_bytes=1,
+        required_memory_bytes=16 * 1024**3,
+        safety_factor=2.0,
+        representative_costs=costs,
+    )
+    assert evidence.representative_costs == costs
+
+    with pytest.raises(IntegrityError, match="unique and sorted"):
+        replace(evidence, representative_costs=tuple(reversed(costs)))
+    with pytest.raises(IntegrityError, match="RSS"):
+        replace(evidence, peak_rss_bytes=201)
+    with pytest.raises(IntegrityError, match="artifact evidence"):
+        replace(evidence, artifact_bytes=31)

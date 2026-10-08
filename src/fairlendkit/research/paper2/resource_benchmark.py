@@ -23,6 +23,7 @@ from fairlendkit.research.paper2.execution import (
     IntegrityError,
     RawReplicatePayload,
     RawReplicateRecord,
+    RepresentativeCost,
     SmokeBenchmarkEvidence,
     frozen_execution_scenario_ids,
     smoke_shards,
@@ -63,6 +64,7 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
     wall_measurements: dict[str, float] = {}
     cpu_measurements: dict[str, float] = {}
     artifact_measurements: dict[str, int] = {}
+    rss_measurements: dict[str, int] = {}
     expected_metric_names = {item.value for item in MetricNameV2}
     with tempfile.TemporaryDirectory(prefix="paper2-full-smoke-") as directory:
         workspace = ExecutionWorkspace(Path(directory).resolve(), "smoke")
@@ -99,11 +101,14 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
                 path.stat().st_size
                 for path in workspace.output_dir.glob(f"{scenario_id}--00000*")
             )
+            observed_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            rss_measurements[scenario_id] = (
+                observed_rss if sys.platform == "darwin" else observed_rss * 1024
+            )
         artifact_bytes = sum(path.stat().st_size for path in workspace.output_dir.iterdir())
     wall_seconds = max(wall_measurements.values())
     cpu_seconds = max(cpu_measurements.values())
-    peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    peak_rss_bytes = peak_rss if sys.platform == "darwin" else peak_rss * 1024
+    peak_rss_bytes = max(rss_measurements.values())
     projected_records = len(frozen_execution_scenario_ids()) * CONFIRMATORY_REPLICATES
     projected_cpu_hours, projected_wall_hours, projected_disk_bytes = (
         _project_benchmark_costs(
@@ -129,6 +134,16 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
             int(peak_rss_bytes * MEMORY_SAFETY_FACTOR),
         ),
         safety_factor=RUNTIME_SAFETY_FACTOR,
+        representative_costs=tuple(
+            RepresentativeCost(
+                scenario_id=scenario_id,
+                cpu_seconds=cpu_measurements[scenario_id],
+                wall_seconds=wall_measurements[scenario_id],
+                peak_rss_bytes=rss_measurements[scenario_id],
+                artifact_bytes=artifact_measurements[scenario_id],
+            )
+            for scenario_id in sorted(scenario_ids)
+        ),
     )
 
 
