@@ -317,9 +317,8 @@ digest or used as counters are big-endian:
 - split each 32-byte digest in byte order into four consecutive unsigned
   64-bit big-endian candidates: bytes `0:8`, `8:16`, `16:24`, and `24:32`;
 - consume candidates in counter order and then digest-chunk order. For
-  population size `n`, let `limit = floor(2**64 / n) * n`; accept candidate `x`
-  only when `x < limit`, select source row position `x % n`, and otherwise
-  discard it and consume the next candidate;
+  population size `n`, let `limit = 2**64 - (2**64 % n)`; discard candidate
+  `x` when `x >= limit`; otherwise select source row position `x % n`;
 - reject `n == 0` before sampling. Fill sampled positions in draw-major order:
   all positions of draw zero, then all positions of draw one, without resetting
   the counter or discarding unused candidates at a draw boundary;
