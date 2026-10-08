@@ -11,12 +11,16 @@ Run from a clean checkout:
 ./scripts/verify_milestone3_release.sh
 ```
 
-The script creates a temporary isolated dependency directory, installs every
-direct and transitive dependency at the exact version in
-`requirements-release.txt`, installs the project without resolving additional
-dependencies, generates the synthetic result, byte-compares it with the
-checked-in oracle, verifies SHA-256, runs all tests and architecture tests, and
-runs `git diff --check`. Any mismatch exits non-zero.
+The script bootstraps the exactly pinned `virtualenv` tool into a temporary
+directory, creates a real temporary virtual environment, and installs the
+exact build and application/test dependency versions in the three
+`requirements-release*.txt` files. It installs the project without dependency
+resolution or build isolation, records `python --version`, and strictly
+compares the normalized final `pip freeze --all` with
+`docs/milestone-3-release-pip-freeze.txt`. It then generates the synthetic
+result, byte-compares it with the checked-in oracle, verifies SHA-256, runs all
+tests and architecture tests, and runs `git diff --check`. Any mismatch exits
+non-zero.
 
 ## Frozen artifact
 
@@ -30,12 +34,14 @@ runs `git diff --check`. Any mismatch exits non-zero.
 ## Verified environment and results
 
 Local clean-environment verification on 2026-10-08 used Python 3.12.3 and the
-exact dependency versions in `requirements-release.txt`:
+complete final environment recorded in
+`docs/milestone-3-release-pip-freeze.txt`:
 
 - full suite: `239 passed`;
 - architecture suite: `4 passed`;
 - canonical JSON byte comparison: passed;
 - fixed SHA-256 comparison: passed; and
+- final `pip freeze --all` comparison: passed; and
 - `git diff --check`: passed.
 
 GitHub Actions independently runs the full suite on the supported Python 3.11

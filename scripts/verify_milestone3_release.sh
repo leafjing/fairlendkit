@@ -6,13 +6,28 @@ release_tmp="$(mktemp -d)"
 trap 'rm -rf -- "$release_tmp"' EXIT
 
 python_bin="${PYTHON:-python3}"
-release_site="$release_tmp/site-packages"
-"$python_bin" -m pip install --disable-pip-version-check --target "$release_site" \
+bootstrap_site="$release_tmp/bootstrap"
+"$python_bin" -m pip install --disable-pip-version-check --break-system-packages \
+  --no-deps --target "$bootstrap_site" \
+  -r "$repo_root/requirements-release-bootstrap.txt"
+PYTHONPATH="$bootstrap_site" "$python_bin" -m virtualenv --no-download \
+  "$release_tmp/venv"
+venv_python="$release_tmp/venv/bin/python"
+"$venv_python" -m pip install --disable-pip-version-check \
+  -r "$repo_root/requirements-release-build.txt"
+"$venv_python" -m pip install --disable-pip-version-check --no-deps \
   -r "$repo_root/requirements-release.txt"
-"$python_bin" -m pip install --disable-pip-version-check --target "$release_site" \
-  --no-deps "$repo_root"
+"$venv_python" -m pip install --disable-pip-version-check --no-deps \
+  --no-build-isolation "$repo_root"
 
-PYTHONPATH="$release_site" "$python_bin" "$repo_root/examples/synthetic/run_audit.py" \
+"$venv_python" --version
+"$venv_python" -m pip freeze --all \
+  | sed -E 's#^fairlendkit @ .*#fairlendkit==0.1.0.dev0#' \
+  | tee "$release_tmp/pip-freeze.txt"
+cmp "$repo_root/docs/milestone-3-release-pip-freeze.txt" \
+  "$release_tmp/pip-freeze.txt"
+
+"$venv_python" "$repo_root/examples/synthetic/run_audit.py" \
   > "$release_tmp/audit-result-v2.json"
 cmp "$repo_root/examples/synthetic/audit-result-v2.json" \
   "$release_tmp/audit-result-v2.json"
@@ -21,6 +36,6 @@ expected_hash="$(tr -d '\n' < "$repo_root/examples/synthetic/audit-result-v2.sha
 test "$actual_hash" = "$expected_hash"
 
 cd "$repo_root"
-PYTHONPATH="$release_site" "$python_bin" -m pytest -q
-PYTHONPATH="$release_site" "$python_bin" -m pytest -q tests/test_architecture.py
+"$venv_python" -m pytest -q
+"$venv_python" -m pytest -q tests/test_architecture.py
 git diff --check

@@ -50,7 +50,8 @@ newline, is:
 
 From a clean checkout, the single release-verification entry point creates an
 isolated temporary dependency directory, installs the exact versions in
-`requirements-release.txt`, generates and byte-compares canonical JSON, checks
+the pinned release requirement files, creates a real temporary virtual
+environment, verifies the final `pip freeze`, generates and byte-compares canonical JSON, checks
 its digest, runs the full suite and architecture checks, and verifies the diff:
 
 ```bash
