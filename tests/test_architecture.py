@@ -88,3 +88,26 @@ def test_reliability_policy_does_not_depend_on_bootstrap_implementation():
     }
 
     assert "fairlendkit.metrics.bootstrap" not in imported_modules
+
+
+def test_product_packages_do_not_depend_on_research_artifacts():
+    for source_path in Path("src/fairlendkit").glob("**/*.py"):
+        if "research" in source_path.parts:
+            continue
+        tree = ast.parse(source_path.read_text())
+        imported_modules = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+        }
+        imported_modules.update(
+            name.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for name in node.names
+        )
+        assert not any(
+            module == "fairlendkit.research"
+            or module.startswith("fairlendkit.research.")
+            for module in imported_modules
+        ), f"{source_path} imports research-only code"

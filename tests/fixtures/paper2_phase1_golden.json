@@ -1,0 +1,16 @@
+{
+  "registry": {
+    "scenario_count": 124,
+    "canonical_sha256": "ab1b32ab490661990385d26ea0e75273700f6036f0a47644fe0c229d0933e1b3"
+  },
+  "dgp": [
+    {"scenario_id": "SEL-AIR081-N025", "replicate_id": 1, "master_seed": 999, "row_count": 50, "canonical_sha256": "a4f656c09ce3d01422888cb8ebfb5722ff4ef30edc7159c05ffee6e6f073fb03"},
+    {"scenario_id": "PERF-DEC050", "replicate_id": 2, "master_seed": 999, "row_count": 500, "canonical_sha256": "0062059207429ac8f0a6f4a29034554b36219b74d8cc8321ddc2f272f196482f"},
+    {"scenario_id": "MISS-MNAR30", "replicate_id": 3, "master_seed": 999, "row_count": 500, "canonical_sha256": "2728fd9a2615b997cc2a1cb0dd2e6845818ba90328fc079f5e35436c394bcbc7"}
+  ],
+  "bootstrap_index_bytes": {
+    "encoding": "unsigned uint64 big-endian",
+    "h2_2000_by_5_sha256": "23337d668651648aaa0df08a6939a0712a406dedecf78bee10cfc86f1af6ca0b",
+    "summary_2000_by_17_sha256": "b51192f1e0de447ef0ec2553104f725464142f7ec8ff9237a960e991b3126b00"
+  }
+}
