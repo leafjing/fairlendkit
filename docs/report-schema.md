@@ -43,9 +43,10 @@ names, typed limitation-to-metric references, and new undefined reasons. Version
 `1.0` remains a strict legacy read contract and is migrated explicitly; the
 migration must not infer reliability that the old payload did not record. The
 behavioral contract, migration rules, and compatibility-alias rule are defined in
-[`milestone-3-core-audit-engine.md`](milestone-3-core-audit-engine.md). Slice
-3.1 must update this document and the generated schema together with the model;
-These fields and the explicit migration path are implemented.
+[`milestone-3-core-audit-engine.md`](milestone-3-core-audit-engine.md). These
+fields and the explicit migration path are implemented; future schema changes
+must update this document, the generated schema, the model, and migration tests
+together.
 
 In 2.0, `ObservedMetric.reliability` is required. Native `run_audit` results use
 `reliable`, `unreliable`, `undefined`, or `not_applicable`; migrated 1.0 results
