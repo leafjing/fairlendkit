@@ -538,6 +538,12 @@ class ObservedMetricV2(ResultModel):
             expected = ReliabilityStateV2.NOT_APPLICABLE if self.value.undefined_reason.code == UndefinedReasonCodeV2.METRIC_NOT_APPLICABLE else ReliabilityStateV2.UNDEFINED
             if self.reliability not in {expected, ReliabilityStateV2.NOT_ASSESSED}:
                 raise ValueError("undefined metric has contradictory reliability")
+        if self.value.is_defined and self.sample_count == 0:
+            raise ValueError("a defined metric requires a positive sample_count")
+        if self.value.value is not None:
+            lower, upper = _metric_range_v2(self.metric)
+            if not lower <= self.value.value <= upper:
+                raise ValueError(f"{self.metric.value} must be within [{lower}, {upper}]")
         return self
 
 
@@ -577,6 +583,40 @@ class AuditResultV2(ResultModel):
             raise ValueError("result contains an unknown metric reference")
         if len([item.metric_key for item in self.uncertainty]) != len(set(item.metric_key for item in self.uncertainty)):
             raise ValueError("uncertainty metric references must be unique")
+        positions = {key: index for index, key in enumerate(keys)}
+        migrated = bool(self.observed_metrics) and all(item.reliability == ReliabilityStateV2.NOT_ASSESSED for item in self.observed_metrics)
+        if not migrated and tuple(self.observed_metrics) != tuple(sorted(self.observed_metrics, key=_observed_metric_sort_key)):
+            raise ValueError("observed_metrics must use canonical order")
+        for item in self.limitations:
+            if tuple(item.affected_metric_keys) != tuple(sorted(item.affected_metric_keys, key=positions.__getitem__)):
+                raise ValueError("affected_metric_keys must use observed metric order")
+        limitation_order = {
+            LimitationCode.SMALL_GROUP: 0,
+            LimitationCode.SEVERE_OUTCOME_IMBALANCE: 1,
+            LimitationCode.SPARSE_DECISION_SUPPORT: 2,
+            LimitationCode.INSUFFICIENT_VALID_RESAMPLES: 3,
+        }
+        native = [item for item in self.limitations if isinstance(item.code, LimitationCode) and item.affected_metric_keys]
+        if native != sorted(native, key=lambda item: (min(positions[key] for key in item.affected_metric_keys), limitation_order[item.code])):
+            raise ValueError("limitations must use canonical scope and gate order")
+        by_key = {item.key: item for item in self.observed_metrics}
+        for interval in self.uncertainty:
+            lower, upper = _metric_range_v2(by_key[interval.metric_key].metric)
+            if not lower <= interval.lower <= interval.upper <= upper:
+                raise ValueError("uncertainty bounds must respect the metric range")
+        aliases: dict[tuple[tuple[tuple[str, Label], ...], tuple[tuple[str, Label], ...]], dict[MetricNameV2, ObservedMetricV2]] = {}
+        for item in self.observed_metrics:
+            if item.metric in {MetricNameV2.SELECTION_RATE_DIFFERENCE, MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE}:
+                assert item.comparison_group is not None and item.reference_group is not None
+                direction = (tuple(item.comparison_group.attributes.items()), tuple(item.reference_group.attributes.items()))
+                aliases.setdefault(direction, {})[item.metric] = item
+        for pair in (() if migrated else aliases.values()):
+            if set(pair) != {MetricNameV2.SELECTION_RATE_DIFFERENCE, MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE}:
+                raise ValueError("selection-rate difference aliases must occur together")
+            canonical = pair[MetricNameV2.SELECTION_RATE_DIFFERENCE]
+            alias = pair[MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE]
+            if (canonical.value, canonical.sample_count, canonical.reliability) != (alias.value, alias.sample_count, alias.reliability):
+                raise ValueError("selection-rate difference aliases must have identical evidence")
         return self
 
 
@@ -594,6 +634,35 @@ def migrate_audit_result_v1_0(payload: object) -> AuditResultV2:
     for limitation in data["limitations"]:
         limitation["affected_metric_keys"] = ()
     return AuditResultV2.model_validate(data)
+
+
+def _metric_range_v2(metric: MetricNameV2) -> tuple[float, float]:
+    if metric in {MetricNameV2.SELECTION_RATE_DIFFERENCE, MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE, MetricNameV2.EQUAL_OPPORTUNITY_DIFFERENCE}:
+        return -1.0, 1.0
+    if metric == MetricNameV2.ADVERSE_IMPACT_RATIO:
+        return 0.0, math.inf
+    return 0.0, 1.0
+
+
+def _observed_metric_sort_key(item: ObservedMetricV2) -> tuple[object, ...]:
+    metric_order = {metric: index for index, metric in enumerate(MetricNameV2)}
+    if item.group is not None and item.group.attributes == {"__scope__": "overall"}:
+        return (0, metric_order[item.metric])
+    if item.group is not None:
+        attribute, type_name, value = _group_sort_key(item.group)
+        return (1, attribute, 0, type_name, value, metric_order[item.metric])
+    assert item.comparison_group is not None and item.reference_group is not None
+    attribute, type_name, value = _group_sort_key(item.comparison_group)
+    _, reference_type, reference_value = _group_sort_key(item.reference_group)
+    return (1, attribute, 1, type_name, value, reference_type, reference_value, metric_order[item.metric])
+
+
+def _group_sort_key(group: AuditGroup) -> tuple[str, str, str]:
+    if len(group.attributes) != 1:
+        raise ValueError("Milestone 3 groups must contain exactly one attribute")
+    name, value = next(iter(group.attributes.items()))
+    type_name = "bool" if isinstance(value, bool) else "int" if isinstance(value, int) else "str"
+    return name, type_name, repr(value)
 
 
 def _reject_automated_verdict(text: str) -> None:
