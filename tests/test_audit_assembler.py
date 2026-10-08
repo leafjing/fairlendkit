@@ -71,6 +71,43 @@ def test_migration_rejects_non_v1_and_adds_absent_evidence_markers():
         migrate_audit_result_v1_0(migrated.model_dump(mode="json"))
 
 
+def test_migrated_uncertainty_is_lossless_but_must_reference_defined_metrics():
+    legacy = AuditResultV1_0.model_validate_json((Path(__file__).parents[1] / "examples" / "synthetic" / "audit-result.json").read_text())
+    migrated = migrate_audit_result_v1_0(legacy.model_dump(mode="json"))
+    assert all(metric.reliability == "not_assessed" for metric in migrated.observed_metrics)
+    assert [item.model_dump(mode="json") for item in migrated.uncertainty] == [item.model_dump(mode="json") for item in legacy.uncertainty]
+
+    payload = migrated.model_dump(mode="json")
+    target_key = payload["uncertainty"][0]["metric_key"]
+    target = next(item for item in payload["observed_metrics"] if item["key"] == target_key)
+    target["value"] = {
+        "value": None, "numerator": None, "denominator": None,
+        "undefined_reason": {"code": "empty_population", "message": "No records are available for this metric."},
+    }
+    with pytest.raises(ValidationError, match="only defined metrics"):
+        AuditResultV2.model_validate(payload)
+
+    payload = migrated.model_dump(mode="json")
+    payload["uncertainty"][0]["metric_key"] = "unknown.metric"
+    with pytest.raises(ValidationError, match="unknown metric reference"):
+        AuditResultV2.model_validate(payload)
+
+
+def test_native_not_assessed_with_uncertainty_and_partial_mode_spoofing_fail():
+    payload = run_audit(frame(), config()).model_dump(mode="json")
+    for metric in payload["observed_metrics"]:
+        metric["reliability"] = "not_assessed"
+    with pytest.raises(ValidationError, match="Schema 1.0 metric names"):
+        AuditResultV2.model_validate(payload)
+
+    payload = migrate_audit_result_v1_0(
+        AuditResultV1_0.model_validate_json((Path(__file__).parents[1] / "examples" / "synthetic" / "audit-result.json").read_text()).model_dump(mode="json")
+    ).model_dump(mode="json")
+    payload["observed_metrics"][0]["reliability"] = "reliable"
+    with pytest.raises(ValidationError, match="cannot be mixed"):
+        AuditResultV2.model_validate(payload)
+
+
 def test_v2_requires_new_fields_and_enforces_metric_invariants():
     payload = run_audit(frame(), config()).model_dump(mode="json")
     del payload["observed_metrics"][0]["reliability"]

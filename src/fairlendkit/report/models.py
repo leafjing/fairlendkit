@@ -609,6 +609,8 @@ class AuditResultV2(ResultModel):
             raise ValueError("limitations must use canonical scope and gate order")
         by_key = {item.key: item for item in self.observed_metrics}
         for interval in self.uncertainty:
+            if not by_key[interval.metric_key].value.is_defined:
+                raise ValueError("uncertainty may reference only defined metrics")
             if not migrated and by_key[interval.metric_key].metric == MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE:
                 raise ValueError("demographic-parity alias cannot own uncertainty")
             if not migrated and by_key[interval.metric_key].reliability != ReliabilityStateV2.RELIABLE:
