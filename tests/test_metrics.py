@@ -8,11 +8,16 @@ from fairlendkit.metrics import (
     accuracy,
     adverse_impact_ratio,
     brier_score,
+    denial_rate,
     demographic_parity_difference,
+    equalized_odds_gap,
     equal_opportunity_difference,
     false_negative_rate,
     false_positive_rate,
+    precision,
+    roc_auc,
     selection_rate,
+    selection_rate_difference,
     true_positive_rate,
 )
 
@@ -31,12 +36,17 @@ def test_hand_calculated_group_metrics(hand_fixture):
         decision = group["favorable_decision"]
         results[group_name] = {
             "selection_rate": selection_rate(decision),
+            "denial_rate": denial_rate(decision),
+            "accuracy": accuracy(outcome, decision),
+            "precision": precision(outcome, decision),
             "true_positive_rate": true_positive_rate(outcome, decision),
             "false_positive_rate": false_positive_rate(outcome, decision),
             "false_negative_rate": false_negative_rate(outcome, decision),
+            "brier_score": brier_score(outcome, group["favorable_probability"]),
+            "roc_auc": roc_auc(outcome, group["favorable_probability"]),
         }
         for metric_name, result in results[group_name].items():
-            assert result.value == group[metric_name]
+            assert result.value == pytest.approx(group[metric_name])
 
     expected = hand_fixture["comparison_to_reference"]
     assert adverse_impact_ratio(
@@ -47,10 +57,20 @@ def test_hand_calculated_group_metrics(hand_fixture):
         results["comparison"]["selection_rate"],
         results["reference"]["selection_rate"],
     ).value == expected["demographic_parity_difference"]
+    assert selection_rate_difference(
+        results["comparison"]["selection_rate"],
+        results["reference"]["selection_rate"],
+    ).value == expected["selection_rate_difference"]
     assert equal_opportunity_difference(
         results["comparison"]["true_positive_rate"],
         results["reference"]["true_positive_rate"],
     ).value == expected["equal_opportunity_difference"]
+    assert equalized_odds_gap(
+        results["comparison"]["true_positive_rate"],
+        results["reference"]["true_positive_rate"],
+        results["comparison"]["false_positive_rate"],
+        results["reference"]["false_positive_rate"],
+    ).value == expected["equalized_odds_gap"]
 
 
 def test_approval_rate_is_selection_rate_when_approval_is_favorable_decision():
@@ -66,7 +86,7 @@ def test_zero_denominator_is_undefined_not_zero():
     defined_zero = false_positive_rate([False, False], [False, False])
 
     assert undefined.value is None
-    assert undefined.undefined_reason == "no favorable outcomes or positive weight"
+    assert undefined.undefined_reason == "no_favorable_outcomes"
     assert defined_zero.value == 0.0
     assert defined_zero.undefined_reason is None
 
@@ -79,7 +99,41 @@ def test_air_is_undefined_when_reference_selection_rate_is_zero():
 
     assert result.value is None
     assert result.denominator == 0.0
-    assert result.undefined_reason == "reference selection rate is zero"
+    assert result.undefined_reason == "zero_reference_selection_rate"
+
+
+def test_precision_distinguishes_absent_decisions_from_zero_decision_weight():
+    absent = precision([True, False], [False, False])
+    zero_weight = precision([True, False], [True, False], [0.0, 1.0])
+
+    assert absent.undefined_reason == "no_favorable_decisions"
+    assert zero_weight.undefined_reason == "zero_favorable_decision_weight"
+
+
+def test_roc_auc_counts_ties_and_supports_weights():
+    result = roc_auc(
+        [True, True, False, False],
+        [0.9, 0.5, 0.5, 0.2],
+        [2.0, 1.0, 3.0, 1.0],
+    )
+
+    assert result.numerator == pytest.approx(7 / 6)
+    assert result.denominator == pytest.approx(4 / 3)
+    assert result.value == pytest.approx(0.875)
+
+
+@pytest.mark.parametrize(
+    ("outcomes", "scores", "weights", "reason"),
+    [
+        ([False, False], [0.2, 0.3], None, "no_favorable_outcomes"),
+        ([True, True], [0.2, 0.3], None, "no_unfavorable_outcomes"),
+        ([True, False], [0.2, 0.3], [0.0, 1.0], "zero_favorable_outcome_weight"),
+        ([True, False], [0.2, 0.3], [1.0, 0.0], "zero_unfavorable_outcome_weight"),
+        ([True, False], [0.2, 0.2], None, "constant_score"),
+    ],
+)
+def test_roc_auc_uses_typed_undefined_reasons(outcomes, scores, weights, reason):
+    assert roc_auc(outcomes, scores, weights).undefined_reason == reason
 
 
 def test_reference_group_reversal_changes_direction():
@@ -147,6 +201,34 @@ def test_metric_value_rejects_non_finite_evidence():
 def test_metric_value_rejects_undefined_state_without_reason():
     with pytest.raises(ValueError, match="requires undefined_reason"):
         MetricValue(None, None, None)
+
+
+def test_metric_value_rejects_noncanonical_undefined_reason():
+    with pytest.raises(ValueError, match="canonical reason code"):
+        MetricValue(None, None, None, "not enough data")
+
+
+def test_uncertainty_limitation_code_is_not_an_observed_metric_reason():
+    with pytest.raises(ValueError, match="canonical reason code"):
+        MetricValue(None, None, None, "insufficient_valid_resamples")
+
+
+@pytest.mark.parametrize("invalid", [True, "0.5", float("nan"), float("inf")])
+def test_score_metrics_reject_non_numeric_or_non_finite_values(invalid):
+    with pytest.raises((TypeError, ValueError)):
+        roc_auc([True, False], [0.8, invalid])
+    with pytest.raises((TypeError, ValueError)):
+        brier_score([True, False], [0.8, invalid])
+
+
+def test_equalized_odds_gap_is_undefined_when_a_component_is_undefined():
+    defined = MetricValue(0.5, 1.0, 2.0)
+    undefined = MetricValue(None, None, 0.0, "no_favorable_outcomes")
+
+    result = equalized_odds_gap(undefined, defined, defined, defined)
+
+    assert result.value is None
+    assert result.undefined_reason == "component_metric_undefined"
 
 
 @pytest.mark.parametrize(
