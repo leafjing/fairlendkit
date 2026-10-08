@@ -14,6 +14,7 @@ from fairlendkit.research.paper2.resource_benchmark import (
     BENCHMARK_SCENARIO_IDS,
     _benchmark_coverage_matrix,
     _mapped_peak_rss,
+    _measure_representative,
     _project_benchmark_costs,
     _validate_representative_output,
     _validate_benchmark_coverage,
@@ -599,3 +600,68 @@ def test_mapped_rss_requires_every_representative_and_rejects_underestimate():
         )
     with pytest.raises(IntegrityError, match="positive integers"):
         _mapped_peak_rss(coverage, {"small": 100, "large": True})
+
+
+def test_representative_rss_uses_spawned_isolated_process(monkeypatch, manifest):
+    calls = []
+
+    class Connection:
+        def close(self):
+            pass
+
+        def poll(self):
+            return True
+
+        def recv(self):
+            return (
+                "ok",
+                {
+                    "scenario_id": "REG",
+                    "measurement_pid": 12345,
+                    "cpu_seconds": 1.0,
+                    "wall_seconds": 2.0,
+                    "peak_rss_bytes": 100,
+                    "artifact_bytes": 10,
+                },
+            )
+
+    class Process:
+        exitcode = 0
+
+        def start(self):
+            calls.append("start")
+
+        def join(self, timeout=None):
+            calls.append(("join", timeout))
+
+        def is_alive(self):
+            return False
+
+    class Context:
+        def Pipe(self, duplex=False):
+            assert duplex is False
+            return Connection(), Connection()
+
+        def Process(self, *, target, args, name):
+            calls.append((target.__name__, args[2], name))
+            return Process()
+
+    def get_context(method):
+        assert method == "spawn"
+        calls.append(method)
+        return Context()
+
+    monkeypatch.setattr(
+        "fairlendkit.research.paper2.resource_benchmark.multiprocessing.get_context",
+        get_context,
+    )
+
+    measurement = _measure_representative(manifest, "REG")
+
+    assert measurement.measurement_pid == 12345
+    assert calls == [
+        "spawn",
+        ("_representative_worker", "REG", "paper2-benchmark-REG"),
+        "start",
+        ("join", 600),
+    ]
