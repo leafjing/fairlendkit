@@ -28,7 +28,6 @@ from fairlendkit.research.paper2.execution import (
     RepresentativeCost,
     ShardSpec,
     build_manifest,
-    benchmark_smoke_resources,
     frozen_confirmatory_shards,
     frozen_execution_scenario_ids,
     smoke_shards,
@@ -80,6 +79,30 @@ def _records(spec):
             payload=_payload(float(replicate_id)),
         )
         for replicate_id in range(spec.start_replicate, spec.stop_replicate)
+    )
+
+
+def _resource_evidence():
+    costs = (
+        RepresentativeCost("MISS-MCAR30", 101, 1.0, 2.0, 100, 10),
+        RepresentativeCost("MISS-MNAR30", 102, 2.0, 3.0, 200, 20),
+        RepresentativeCost("REG", 103, 3.0, 4.0, 300, 30),
+        RepresentativeCost("SEL-AIR081-N1000", 104, 4.0, 5.0, 400, 40),
+    )
+    return execution.SmokeBenchmarkEvidence(
+        schema_version="paper2-resource-benchmark-v1",
+        smoke_records=4,
+        wall_seconds=5.0,
+        cpu_seconds=4.0,
+        peak_rss_bytes=400,
+        artifact_bytes=100,
+        projected_records=29 * 50_000,
+        projected_cpu_hours=1.0,
+        projected_wall_hours=1.0,
+        projected_disk_bytes=1_000,
+        required_memory_bytes=16 * 1024**3,
+        safety_factor=2.0,
+        representative_costs=costs,
     )
 
 
@@ -387,24 +410,16 @@ def test_complete_set_rejects_reused_identity_or_range(workspace, manifest):
         validate_complete_set(workspace, manifest, reused_range)
 
 
-def test_smoke_benchmark_is_raw_only_and_resource_preflight_fails_closed(
-    workspace, manifest
-):
-    evidence = benchmark_smoke_resources(workspace, manifest)
+def test_resource_preflight_fails_closed():
+    evidence = _resource_evidence()
 
     assert evidence.schema_version == "paper2-resource-benchmark-v1"
-    assert evidence.smoke_records == 100
+    assert evidence.smoke_records == 4
     assert evidence.projected_records == 29 * 50_000
     assert evidence.safety_factor == 2.0
     assert evidence.projected_cpu_hours > 0
     assert evidence.projected_wall_hours > 0
     assert evidence.projected_disk_bytes > 0
-    assert not any(
-        forbidden in path.name.lower()
-        for path in workspace.output_dir.iterdir()
-        for forbidden in ("estimate", "p-value", "holm", "plot", "figure")
-    )
-
     sufficient = ResourceCapacity(
         cpu_count=4,
         memory_bytes=evidence.required_memory_bytes,
@@ -544,33 +559,30 @@ def test_each_cost_representative_requires_full_metric_set_and_frozen_artifact_s
 
 
 def test_representative_cost_evidence_is_unique_sorted_and_matches_aggregates():
-    costs = (
-        RepresentativeCost("a", 1.0, 2.0, 100, 10),
-        RepresentativeCost("b", 3.0, 4.0, 200, 20),
-    )
-    evidence = execution.SmokeBenchmarkEvidence(
-        schema_version="paper2-resource-benchmark-v1",
-        smoke_records=2,
-        wall_seconds=4.0,
-        cpu_seconds=3.0,
-        peak_rss_bytes=200,
-        artifact_bytes=30,
-        projected_records=29 * 50_000,
-        projected_cpu_hours=1.0,
-        projected_wall_hours=1.0,
-        projected_disk_bytes=1,
-        required_memory_bytes=16 * 1024**3,
-        safety_factor=2.0,
-        representative_costs=costs,
-    )
+    evidence = _resource_evidence()
+    costs = evidence.representative_costs
     assert evidence.representative_costs == costs
 
-    with pytest.raises(IntegrityError, match="unique and sorted"):
+    with pytest.raises(IntegrityError, match="frozen mapping references"):
         replace(evidence, representative_costs=tuple(reversed(costs)))
+    with pytest.raises(IntegrityError, match="frozen mapping references"):
+        replace(evidence, representative_costs=costs[:-1])
+    with pytest.raises(IntegrityError, match="frozen mapping references"):
+        replace(
+            evidence,
+            representative_costs=(*costs[:-1], replace(costs[-1], scenario_id="UNKNOWN")),
+        )
+    with pytest.raises(IntegrityError, match="isolated process"):
+        replace(
+            evidence,
+            representative_costs=(costs[0], replace(costs[1], measurement_pid=101), *costs[2:]),
+        )
+    with pytest.raises(IntegrityError, match="process ID"):
+        replace(costs[0], measurement_pid=False)
     with pytest.raises(IntegrityError, match="RSS"):
-        replace(evidence, peak_rss_bytes=201)
+        replace(evidence, peak_rss_bytes=399)
     with pytest.raises(IntegrityError, match="artifact evidence"):
-        replace(evidence, artifact_bytes=31)
+        replace(evidence, artifact_bytes=101)
 def test_mapped_rss_requires_every_representative_and_rejects_underestimate():
     coverage = {"scenario-a": "small", "scenario-b": "large"}
     rss = {"small": 100, "large": 250}

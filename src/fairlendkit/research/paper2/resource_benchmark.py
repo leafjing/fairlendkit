@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import multiprocessing
 import resource
 import sys
 import tempfile
@@ -24,6 +25,7 @@ from fairlendkit.research.paper2.execution import (
     RawReplicatePayload,
     RawReplicateRecord,
     RepresentativeCost,
+    RESOURCE_BENCHMARK_REPRESENTATIVE_IDS,
     SmokeBenchmarkEvidence,
     frozen_execution_scenario_ids,
     smoke_shards,
@@ -35,12 +37,7 @@ from fairlendkit.research.paper2.registry import scenario_registry
 from fairlendkit.research.paper2.smoke import run_smoke
 
 
-BENCHMARK_SCENARIO_IDS = (
-    "REG",
-    "SEL-AIR081-N1000",
-    "MISS-MCAR30",
-    "MISS-MNAR30",
-)
+BENCHMARK_SCENARIO_IDS = RESOURCE_BENCHMARK_REPRESENTATIVE_IDS
 BENCHMARK_COST_COVERAGE = (
     ("MISS-MCAR30", "MISS-MCAR30"),
     ("MISS-MNAR30", "MISS-MNAR30"),
@@ -61,51 +58,14 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
     scenario_ids = BENCHMARK_SCENARIO_IDS
     registry = scenario_registry()
     coverage = _validate_benchmark_coverage(registry, scenario_ids)
-    wall_measurements: dict[str, float] = {}
-    cpu_measurements: dict[str, float] = {}
-    artifact_measurements: dict[str, int] = {}
-    rss_measurements: dict[str, int] = {}
-    expected_metric_names = {item.value for item in MetricNameV2}
-    with tempfile.TemporaryDirectory(prefix="paper2-full-smoke-") as directory:
-        workspace = ExecutionWorkspace(Path(directory).resolve(), "smoke")
-        for scenario_id in scenario_ids:
-            scenario = registry[scenario_id]
-            cpu_start = time.process_time()
-            wall_start = time.perf_counter()
-            generated = run_smoke((scenario_id,), (0,)).audits[0]
-            frame = pd.DataFrame(
-                (
-                    {
-                        "outcome": row.outcome,
-                        "score": row.score,
-                        "decision": row.decision,
-                        "group": row.group,
-                    }
-                    for row in generated.rows
-                )
-            )
-            result = run_audit(frame, _audit_config(scenario))
-            payload = _raw_payload(result)
-            _validate_representative_output(result, payload, expected_metric_names)
-            spec = smoke_shards(scenario_id, replicates=1, shard_size=1)[0]
-            write_smoke_shard(
-                workspace,
-                manifest,
-                spec,
-                (RawReplicateRecord(scenario_id, 0, payload),),
-            )
-            validate_shard(workspace, manifest, spec)
-            wall_measurements[scenario_id] = time.perf_counter() - wall_start
-            cpu_measurements[scenario_id] = time.process_time() - cpu_start
-            artifact_measurements[scenario_id] = sum(
-                path.stat().st_size
-                for path in workspace.output_dir.glob(f"{scenario_id}--00000*")
-            )
-            observed_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-            rss_measurements[scenario_id] = (
-                observed_rss if sys.platform == "darwin" else observed_rss * 1024
-            )
-        artifact_bytes = sum(path.stat().st_size for path in workspace.output_dir.iterdir())
+    measurements = tuple(
+        _measure_representative(manifest, scenario_id) for scenario_id in scenario_ids
+    )
+    wall_measurements = {item.scenario_id: item.wall_seconds for item in measurements}
+    cpu_measurements = {item.scenario_id: item.cpu_seconds for item in measurements}
+    artifact_measurements = {item.scenario_id: item.artifact_bytes for item in measurements}
+    rss_measurements = {item.scenario_id: item.peak_rss_bytes for item in measurements}
+    artifact_bytes = sum(artifact_measurements.values())
     wall_seconds = max(wall_measurements.values())
     cpu_seconds = max(cpu_measurements.values())
     peak_rss_bytes = max(rss_measurements.values())
@@ -136,16 +96,89 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
             int(peak_rss_bytes * MEMORY_SAFETY_FACTOR),
         ),
         safety_factor=RUNTIME_SAFETY_FACTOR,
-        representative_costs=tuple(
-            RepresentativeCost(
-                scenario_id=scenario_id,
-                cpu_seconds=cpu_measurements[scenario_id],
-                wall_seconds=wall_measurements[scenario_id],
-                peak_rss_bytes=rss_measurements[scenario_id],
-                artifact_bytes=artifact_measurements[scenario_id],
-            )
-            for scenario_id in sorted(scenario_ids)
-        ),
+        representative_costs=measurements,
+    )
+
+
+def _measure_representative(
+    manifest: ExecutionManifest, scenario_id: str
+) -> RepresentativeCost:
+    """Measure one representative in a fresh process with an isolated RSS peak."""
+    context = multiprocessing.get_context("spawn")
+    receiver, sender = context.Pipe(duplex=False)
+    process = context.Process(
+        target=_representative_worker,
+        args=(sender, manifest, scenario_id),
+        name=f"paper2-benchmark-{scenario_id}",
+    )
+    process.start()
+    sender.close()
+    process.join(timeout=600)
+    if process.is_alive():
+        process.terminate()
+        process.join()
+        raise IntegrityError(f"Resource benchmark timed out for {scenario_id}.")
+    if process.exitcode != 0 or not receiver.poll():
+        raise IntegrityError(f"Resource benchmark subprocess failed for {scenario_id}.")
+    status, payload = receiver.recv()
+    receiver.close()
+    if status != "ok":
+        raise IntegrityError(f"Resource benchmark failed for {scenario_id}: {payload}")
+    return RepresentativeCost(**payload)
+
+
+def _representative_worker(connection, manifest: ExecutionManifest, scenario_id: str) -> None:
+    try:
+        measurement = _run_representative(manifest, scenario_id)
+        connection.send(("ok", measurement.__dict__))
+    except BaseException as error:  # pragma: no cover - exercised through parent failure
+        connection.send(("error", f"{type(error).__name__}: {error}"))
+    finally:
+        connection.close()
+
+
+def _run_representative(
+    manifest: ExecutionManifest, scenario_id: str
+) -> RepresentativeCost:
+    registry = scenario_registry()
+    scenario = registry[scenario_id]
+    expected_metric_names = {item.value for item in MetricNameV2}
+    with tempfile.TemporaryDirectory(prefix=f"paper2-smoke-{scenario_id}-") as directory:
+        workspace = ExecutionWorkspace(Path(directory).resolve(), "smoke")
+        cpu_start = time.process_time()
+        wall_start = time.perf_counter()
+        generated = run_smoke((scenario_id,), (0,)).audits[0]
+        frame = pd.DataFrame(
+            {
+                "outcome": [row.outcome for row in generated.rows],
+                "score": [row.score for row in generated.rows],
+                "decision": [row.decision for row in generated.rows],
+                "group": [row.group for row in generated.rows],
+            }
+        )
+        result = run_audit(frame, _audit_config(scenario))
+        payload = _raw_payload(result)
+        _validate_representative_output(result, payload, expected_metric_names)
+        spec = smoke_shards(scenario_id, replicates=1, shard_size=1)[0]
+        write_smoke_shard(
+            workspace,
+            manifest,
+            spec,
+            (RawReplicateRecord(scenario_id, 0, payload),),
+        )
+        validate_shard(workspace, manifest, spec)
+        wall_seconds = time.perf_counter() - wall_start
+        cpu_seconds = time.process_time() - cpu_start
+        artifact_bytes = sum(path.stat().st_size for path in workspace.output_dir.iterdir())
+        observed_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        peak_rss_bytes = observed_rss if sys.platform == "darwin" else observed_rss * 1024
+    return RepresentativeCost(
+        scenario_id=scenario_id,
+        measurement_pid=multiprocessing.current_process().pid or 0,
+        cpu_seconds=cpu_seconds,
+        wall_seconds=wall_seconds,
+        peak_rss_bytes=peak_rss_bytes,
+        artifact_bytes=artifact_bytes,
     )
 
 

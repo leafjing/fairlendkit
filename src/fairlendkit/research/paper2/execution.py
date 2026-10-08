@@ -7,11 +7,9 @@ import json
 import os
 import platform
 import re
-import resource
 import shutil
 import subprocess
 import sys
-import time
 from dataclasses import asdict, dataclass, fields
 from math import isfinite
 from pathlib import Path
@@ -37,6 +35,12 @@ RUNTIME_SAFETY_FACTOR = 2.0
 MEMORY_SAFETY_FACTOR = 4.0
 CPU_HOURS_LIMIT = 10_000.0
 WALL_HOURS_LIMIT = 3_000.0
+RESOURCE_BENCHMARK_REPRESENTATIVE_IDS = (
+    "MISS-MCAR30",
+    "MISS-MNAR30",
+    "REG",
+    "SEL-AIR081-N1000",
+)
 PROTOCOL_A1_COMMIT = "865a2baf549d691d602334379ed03a7883989d6f"
 IMPLEMENTATION_BASE_COMMIT = "1143d0e5795eefa1abb3de4bf52fdc9eaf8f9b91"
 PARALLEL_STRATEGY = "process-per-shard; deterministic shard queue"
@@ -80,12 +84,15 @@ class ResourceCapacity:
 @dataclass(frozen=True)
 class RepresentativeCost:
     scenario_id: str
+    measurement_pid: int
     cpu_seconds: float
     wall_seconds: float
     peak_rss_bytes: int
     artifact_bytes: int
 
     def __post_init__(self) -> None:
+        if type(self.measurement_pid) is not int or self.measurement_pid <= 0:
+            raise IntegrityError("Representative measurement process ID must be a positive integer.")
         if not self.scenario_id or any(
             not isfinite(float(value)) or value <= 0
             for value in (
@@ -151,18 +158,22 @@ class SmokeBenchmarkEvidence:
         )
         if self.required_memory_bytes != minimum_memory:
             raise IntegrityError("Resource benchmark memory requirement is not canonical.")
-        if self.representative_costs:
-            identities = tuple(item.scenario_id for item in self.representative_costs)
-            if identities != tuple(sorted(set(identities))):
-                raise IntegrityError("Representative cost identities must be unique and sorted.")
-            if self.cpu_seconds != max(item.cpu_seconds for item in self.representative_costs):
-                raise IntegrityError("Representative CPU evidence is inconsistent.")
-            if self.wall_seconds != max(item.wall_seconds for item in self.representative_costs):
-                raise IntegrityError("Representative wall evidence is inconsistent.")
-            if self.peak_rss_bytes != max(item.peak_rss_bytes for item in self.representative_costs):
-                raise IntegrityError("Representative RSS evidence is inconsistent.")
-            if self.artifact_bytes != sum(item.artifact_bytes for item in self.representative_costs):
-                raise IntegrityError("Representative artifact evidence is inconsistent.")
+        identities = tuple(item.scenario_id for item in self.representative_costs)
+        if identities != RESOURCE_BENCHMARK_REPRESENTATIVE_IDS:
+            raise IntegrityError(
+                "Representative cost identities must exactly match the frozen mapping references."
+            )
+        process_ids = tuple(item.measurement_pid for item in self.representative_costs)
+        if len(set(process_ids)) != len(process_ids):
+            raise IntegrityError("Each representative RSS measurement requires an isolated process.")
+        if self.cpu_seconds != max(item.cpu_seconds for item in self.representative_costs):
+            raise IntegrityError("Representative CPU evidence is inconsistent.")
+        if self.wall_seconds != max(item.wall_seconds for item in self.representative_costs):
+            raise IntegrityError("Representative wall evidence is inconsistent.")
+        if self.peak_rss_bytes != max(item.peak_rss_bytes for item in self.representative_costs):
+            raise IntegrityError("Representative RSS evidence is inconsistent.")
+        if self.artifact_bytes != sum(item.artifact_bytes for item in self.representative_costs):
+            raise IntegrityError("Representative artifact evidence is inconsistent.")
 
 
 @dataclass(frozen=True)
@@ -641,57 +652,6 @@ def validate_resource_preflight(
         raise IntegrityError("Projected execution exceeds the frozen CPU-hours limit.")
     if evidence.projected_wall_hours > evidence.wall_hours_limit:
         raise IntegrityError("Projected execution exceeds the frozen wall-time limit.")
-
-
-def benchmark_smoke_resources(
-    workspace: ExecutionWorkspace,
-    manifest: ExecutionManifest,
-    *,
-    scenario_id: str = "REG",
-    replicates: int = 100,
-) -> SmokeBenchmarkEvidence:
-    """Benchmark raw smoke records only; no estimates or plots are produced."""
-    if workspace.namespace != "smoke" or replicates != 100:
-        raise IntegrityError("Resource benchmark requires the frozen smoke workload.")
-    spec = smoke_shards(scenario_id, replicates=replicates, shard_size=replicates)[0]
-    key = "overall.selection_rate"
-    payload = RawReplicatePayload(
-        schema_version="paper2-raw-replicate-v1",
-        metric_values=((key, 0.5),),
-        metric_defined=((key, True),),
-        reliability=((key, "reliable"),),
-        uncertainty=((key, (0.4, 0.6)),),
-        flags=(),
-        limitations=(),
-    )
-    records = tuple(
-        RawReplicateRecord(scenario_id, replicate_id, payload)
-        for replicate_id in range(replicates)
-    )
-    cpu_start = time.process_time()
-    wall_start = time.perf_counter()
-    write_smoke_shard(workspace, manifest, spec, records)
-    validate_complete_set(workspace, manifest, (spec,))
-    wall_seconds = time.perf_counter() - wall_start
-    cpu_seconds = time.process_time() - cpu_start
-    artifact_bytes = sum(path.stat().st_size for path in workspace.output_dir.iterdir())
-    peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    peak_rss_bytes = peak_rss if sys.platform == "darwin" else peak_rss * 1024
-    projected_records = len(frozen_execution_scenario_ids()) * CONFIRMATORY_REPLICATES
-    return SmokeBenchmarkEvidence(
-        schema_version="paper2-resource-benchmark-v1",
-        smoke_records=replicates,
-        wall_seconds=wall_seconds,
-        cpu_seconds=cpu_seconds,
-        peak_rss_bytes=peak_rss_bytes,
-        artifact_bytes=artifact_bytes,
-        projected_records=projected_records,
-        projected_cpu_hours=(cpu_seconds / replicates * projected_records * RUNTIME_SAFETY_FACTOR / 3600),
-        projected_wall_hours=(wall_seconds / replicates * projected_records * RUNTIME_SAFETY_FACTOR / 3600 / WORKER_COUNT),
-        projected_disk_bytes=int(artifact_bytes / replicates * projected_records * DISK_SAFETY_FACTOR),
-        required_memory_bytes=MEMORY_BUDGET_GIB * 1024**3,
-        safety_factor=RUNTIME_SAFETY_FACTOR,
-    )
 
 
 def confirmatory_shards(scenario_ids: Iterable[str]) -> tuple[ShardSpec, ...]:
