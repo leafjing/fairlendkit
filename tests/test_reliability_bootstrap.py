@@ -11,6 +11,7 @@ from fairlendkit.metrics import (
     NormalizedAuditData,
     RNG_NAME,
     ReliabilityState,
+    Sha256CounterSampler,
     Sha256PercentileBootstrap,
     UncertaintyEstimate,
     UncertaintyRequest,
@@ -132,6 +133,25 @@ def test_sha256_counter_rng_golden_first_three_draws(bootstrap_golden):
             metric_key=bootstrap_golden["scope_metric_key"],
             stream_role=role,
         ) == tuple(tuple(draw) for draw in draws)
+
+
+@pytest.mark.parametrize("population_size,draws", [(1, 4), (3, 7), (257, 9)])
+def test_batched_sha256_draws_are_byte_for_byte_scalar_stream(
+    population_size, draws
+):
+    sampler = Sha256CounterSampler(17, "overall.roc_auc", "scope")
+    expected = tuple(
+        tuple(sampler.index(population_size) for _ in range(population_size))
+        for _ in range(draws)
+    )
+
+    assert bootstrap_index_draws(
+        population_size,
+        draws,
+        seed=17,
+        metric_key="overall.roc_auc",
+        stream_role="scope",
+    ) == expected
 
 
 def test_type7_interval_and_insufficient_valid_draws(bootstrap_golden):

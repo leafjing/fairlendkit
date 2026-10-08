@@ -6,6 +6,8 @@ import hashlib
 import math
 from typing import Callable
 
+import numpy as np
+
 from fairlendkit.metrics.contracts import (
     BootstrapInterval,
     ComparisonUncertaintyRequest,
@@ -104,11 +106,52 @@ def bootstrap_index_draws(
 
     if draws < 1:
         raise ValueError("draws must be positive")
-    sampler = Sha256CounterSampler(seed, metric_key, stream_role)
-    return tuple(
-        tuple(sampler.index(population_size) for _ in range(population_size))
-        for _ in range(draws)
+    matrix = _bootstrap_index_matrix(
+        population_size,
+        draws,
+        seed=seed,
+        metric_key=metric_key,
+        stream_role=stream_role,
     )
+    return tuple(tuple(int(value) for value in row) for row in matrix)
+
+
+def _bootstrap_index_matrix(
+    population_size: int,
+    draws: int,
+    *,
+    seed: int,
+    metric_key: str,
+    stream_role: str,
+) -> np.ndarray:
+    """Return the frozen stream as a draw-major uint64 matrix."""
+    if population_size <= 0:
+        raise ValueError("population_size must be positive")
+    if draws < 1:
+        raise ValueError("draws must be positive")
+    sampler = Sha256CounterSampler(seed, metric_key, stream_role)
+    total = population_size * draws
+    limit = _MAX_UINT64 - (_MAX_UINT64 % population_size)
+    indices: list[int] = []
+    counter = 0
+    seed_material = sampler._seed_material
+    while len(indices) < total:
+        remaining_blocks = (total - len(indices) + 3) // 4
+        block_count = min(4096, remaining_blocks + 8)
+        if counter + block_count - 1 > _MAX_UINT64:
+            raise OverflowError("SHA-256 counter overflow")
+        digest_bytes = b"".join(
+            hashlib.sha256(
+                seed_material + value.to_bytes(8, "big")
+            ).digest()
+            for value in range(counter, counter + block_count)
+        )
+        counter += block_count
+        candidates = np.frombuffer(digest_bytes, dtype=">u8")
+        accepted = candidates[candidates < limit] % population_size
+        indices.extend(accepted.tolist())
+    del indices[total:]
+    return np.asarray(indices, dtype=np.uint64).reshape(draws, population_size)
 
 
 def type7_quantile(values: tuple[float, ...], probability: float) -> float:
@@ -138,17 +181,26 @@ def bootstrap_interval(
 ) -> BootstrapInterval | None:
     """Evaluate one scope stream and return an interval only when sufficient."""
 
-    draws = bootstrap_index_draws(
+    draw_matrix = _bootstrap_index_matrix(
         population_size,
         resamples,
         seed=seed,
         metric_key=metric_key,
         stream_role=stream_role,
     )
+    evaluate_batch = getattr(evaluator, "evaluate_batch", None)
+    batch_values = None if evaluate_batch is None else evaluate_batch(draw_matrix)
+    if batch_values is None:
+        draws = (
+            tuple(int(value) for value in row) for row in draw_matrix
+        )
+        candidates = (evaluator(indices) for indices in draws)
+    else:
+        candidates = iter(batch_values)
     valid = tuple(
         float(value)
-        for indices in draws
-        if (value := evaluator(indices)) is not None and math.isfinite(value)
+        for value in candidates
+        if value is not None and math.isfinite(value)
     )
     if len(valid) < minimum_valid_resamples:
         return None
@@ -175,25 +227,38 @@ def comparison_bootstrap_interval(
 ) -> BootstrapInterval | None:
     """Evaluate independent comparison/reference streams for a directed metric."""
 
-    comparison_draws = bootstrap_index_draws(
+    comparison_matrix = _bootstrap_index_matrix(
         comparison_size,
         resamples,
         seed=seed,
         metric_key=metric_key,
         stream_role="comparison",
     )
-    reference_draws = bootstrap_index_draws(
+    reference_matrix = _bootstrap_index_matrix(
         reference_size,
         resamples,
         seed=seed,
         metric_key=metric_key,
         stream_role="reference",
     )
+    evaluate_batch = getattr(evaluator, "evaluate_comparison_batch", None)
+    if evaluate_batch is None:
+        comparison_draws = (
+            tuple(int(value) for value in row) for row in comparison_matrix
+        )
+        reference_draws = (
+            tuple(int(value) for value in row) for row in reference_matrix
+        )
+        candidates = (
+            evaluator(comparison, reference)
+            for comparison, reference in zip(comparison_draws, reference_draws)
+        )
+    else:
+        candidates = iter(evaluate_batch(comparison_matrix, reference_matrix))
     valid = tuple(
         float(value)
-        for comparison, reference in zip(comparison_draws, reference_draws)
-        if (value := evaluator(comparison, reference)) is not None
-        and math.isfinite(value)
+        for value in candidates
+        if value is not None and math.isfinite(value)
     )
     if len(valid) < minimum_valid_resamples:
         return None

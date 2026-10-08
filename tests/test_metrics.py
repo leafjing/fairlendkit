@@ -123,6 +123,23 @@ def test_roc_auc_counts_ties_and_supports_weights():
 
 
 @pytest.mark.parametrize(
+    ("outcomes", "scores"),
+    [
+        ([True, False, True, False], [0.9, 0.1, 0.5, 0.5]),
+        ([False, True, False, True, True], [0.2, 0.8, 0.4, 0.4, 0.9]),
+        ([True, False, False, True, False, True], [0.3, 0.3, 0.1, 0.8, 0.6, 0.6]),
+    ],
+)
+def test_unweighted_roc_auc_fast_path_is_exactly_pairwise_equivalent(
+    outcomes, scores
+):
+    fast = roc_auc(outcomes, scores)
+    pairwise = roc_auc(outcomes, scores, [1.0] * len(outcomes))
+
+    assert fast == pairwise
+
+
+@pytest.mark.parametrize(
     ("outcomes", "scores", "weights", "reason"),
     [
         ([False, False], [0.2, 0.3], None, "no_favorable_outcomes"),

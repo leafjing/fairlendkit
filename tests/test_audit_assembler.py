@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
+import fairlendkit.application as application
 from fairlendkit import AuditConfig, AuditResultV2, DataValidationError, run_audit
 from fairlendkit.application import (
     _comparison_evaluator,
@@ -87,6 +88,42 @@ def test_target_only_uncertainty_evaluators_match_full_metric_orchestration():
             metric, data, audit_config, group_b, group_a
         )(comparison_draw, reference_draw)
         assert actual == expected
+
+
+def test_vectorized_bootstrap_path_is_byte_exact_with_reference_path(monkeypatch):
+    audit_config = config(bootstrap_resamples=20, minimum_valid_resamples=1)
+    optimized = run_audit(frame(), audit_config).model_dump_json()
+
+    def scope_reference(metric, data, config, source):
+        def evaluate(draw):
+            sampled = application._take(
+                data, tuple(source[index] for index in draw)
+            )
+            return application._scope_metric_value(metric.metric, sampled, config)
+
+        return evaluate
+
+    def comparison_reference(metric, data, config, left, right):
+        def evaluate(left_draw, right_draw):
+            comparison = application._take(
+                data, tuple(left[index] for index in left_draw)
+            )
+            reference = application._take(
+                data, tuple(right[index] for index in right_draw)
+            )
+            return application._comparison_metric_value(
+                metric.metric, comparison, reference
+            )
+
+        return evaluate
+
+    monkeypatch.setattr(application, "_scope_evaluator", scope_reference)
+    monkeypatch.setattr(
+        application, "_comparison_evaluator", comparison_reference
+    )
+    reference = run_audit(frame(), audit_config).model_dump_json()
+
+    assert optimized.encode("utf-8") == reference.encode("utf-8")
 
 
 def test_run_audit_assembles_deterministic_schema_v2_without_mutation():

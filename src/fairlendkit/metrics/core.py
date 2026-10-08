@@ -246,6 +246,24 @@ def roc_auc(
             favorable_weight * unfavorable_weight,
             "constant_score",
         )
+    if weights is None:
+        # The pairwise definition contributes only 0, 0.5, or 1 per pair.
+        # Aggregate equal-score runs to preserve that exact numerator while
+        # avoiding the quadratic pair materialization used for weighted AUC.
+        by_score: dict[float, list[int]] = {}
+        for outcome, score in zip(outcomes, scores):
+            counts = by_score.setdefault(score, [0, 0])
+            counts[0 if outcome else 1] += 1
+        numerator = 0.0
+        unfavorable_below = 0
+        for score in sorted(by_score):
+            favorable_count, unfavorable_count = by_score[score]
+            numerator += favorable_count * (
+                unfavorable_below + 0.5 * unfavorable_count
+            )
+            unfavorable_below += unfavorable_count
+        denominator = favorable_weight * unfavorable_weight
+        return MetricValue(numerator / denominator, numerator, denominator)
     numerator = sum(
         favorable_item_weight
         * unfavorable_item_weight
