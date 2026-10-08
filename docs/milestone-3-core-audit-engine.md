@@ -211,45 +211,61 @@ The canonical undefined-reason vocabulary must be extended with:
 Reliability limitations use stable codes:
 
 - `small_group`: unweighted group count is below `minimum_group_size`;
-- `severe_outcome_imbalance`: a metric-required outcome class is below
-  `minimum_group_size` within the evaluated group;
+- `severe_outcome_imbalance`: either the favorable or unfavorable outcome
+  class has an unweighted count below `minimum_group_size` within the evaluated
+  scope;
 - `sparse_decision_support`: favorable-decision support is below
   `minimum_group_size` for precision; the unfavorable-decision count does not
   affect precision reliability;
 - `insufficient_valid_resamples`: fewer than `minimum_valid_resamples`
   bootstrap draws produced a defined finite value.
 
-A gate applies to metrics exactly as follows. `F` and `U` mean the unweighted
-eligible counts of favorable and unfavorable outcomes; `D+` means the
-unweighted favorable-decision count. A check written `count < minimum_group_size`
-is a reliability warning, not an undefined denominator test.
+A gate applies to metrics exactly as follows. `D+` means the unweighted
+favorable-decision count. A check written `count < minimum_group_size` is a
+reliability warning, not an undefined denominator test.
 
-| Metric | Small population | `F` support | `U` support | `D+` support |
-| --- | --- | --- | --- | --- |
-| `selection_rate`, `denial_rate` | applies | ignored | ignored | ignored |
-| `accuracy` | applies | applies | applies | ignored |
-| `precision` | applies | ignored | ignored | applies |
-| `true_positive_rate`, `false_negative_rate` | applies | applies | ignored | ignored |
-| `false_positive_rate` | applies | ignored | applies | ignored |
-| `brier_score` | applies | ignored | ignored | ignored |
-| `roc_auc` | applies | applies | applies | ignored |
-| `selection_rate_difference`, `adverse_impact_ratio`, `demographic_parity_difference` | inherited from both source selection rates | ignored | ignored | ignored |
-| `equal_opportunity_difference` | inherited from both source TPR values | inherited | ignored | ignored |
-| `equalized_odds_gap` | inherited from both source TPR and FPR values | inherited | inherited | ignored |
+| Metric | `small_group` | `severe_outcome_imbalance` | `sparse_decision_support` |
+| --- | --- | --- | --- |
+| `selection_rate`, `denial_rate` | applies | ignored | ignored |
+| `accuracy` | applies | applies | ignored |
+| `precision` | applies | ignored | applies when `D+ < minimum_group_size` |
+| `true_positive_rate`, `false_positive_rate`, `false_negative_rate` | applies | applies | ignored |
+| `brier_score`, `roc_auc` | applies | applies | ignored |
+| `selection_rate_difference`, `adverse_impact_ratio`, `demographic_parity_difference` | merge both source selection-rate limitations | ignored | ignored |
+| `equal_opportunity_difference` | merge both source TPR limitations | merge both source TPR limitations | ignored |
+| `equalized_odds_gap` | merge both source TPR and FPR limitations | merge both source TPR and FPR limitations | ignored |
 
-“Applies” means the metric is `unreliable` when the corresponding count is
-below the configured minimum, even if its numeric value is defined. An already
-undefined or not-applicable metric keeps that stronger state; reliability gates
-do not replace its undefined reason. Overall scope and each single-attribute
-group use the same matrix. A comparison metric is reliable only when every
-source metric is reliable.
+“Applies” means a defined metric is `unreliable` when the gate is active.
+Overall scope and each single-attribute group use the same matrix. The outcome
+imbalance gate is one condition: if either outcome class is below the minimum,
+every metric marked `applies` receives that limitation; it is not split into
+favorable- and unfavorable-support variants.
 
-The same underlying condition may affect multiple metric keys. Emit one
-limitation per `(code, scope)` with all affected metric keys in canonical metric
-order; do not emit one copy per metric. Limitations are ordered by scope in the
-canonical group order, then by code in this fixed order: `small_group`,
-`severe_outcome_imbalance`, `sparse_decision_support`,
-`insufficient_valid_resamples`. Duplicate codes within a scope are invalid.
+State precedence is `invalid input` (stop the audit), then `not_applicable` or
+`undefined`, then reliability gates. An undefined or not-applicable metric does
+not receive a reliability limitation, even when its scope also activates a
+gate. This avoids attaching a sample-strength judgment to a value that does not
+exist.
+
+A defined metric may be associated with multiple active limitations. De-duplicate
+its limitation codes, then preserve this fixed gate order:
+`small_group`, `severe_outcome_imbalance`, `sparse_decision_support`,
+`insufficient_valid_resamples`. The first three determine point-estimate
+reliability; `insufficient_valid_resamples` describes only the missing interval
+and does not change a reliable point estimate to unreliable.
+
+For a comparison metric, collect the limitations attached to every source
+metric named in the matrix, take the stable union by code, and attach all codes
+to the comparison metric in the same fixed order. A comparison is reliable only
+when it is defined and every source metric is reliable. Source limitations
+remain attached to their source metrics; merging does not remove or reorder
+them.
+
+The result emits one limitation record per `(code, scope)`, with every affected
+defined metric key in canonical metric order. Limitations are ordered by scope
+in canonical group/comparison order and then by the fixed gate order above.
+Duplicate codes within a scope and duplicate metric keys within a limitation
+are invalid.
 
 A limitation must identify affected metric keys through the new required
 `related_metric_keys: tuple[Identifier, ...]` field. For a result produced by
@@ -267,7 +283,8 @@ condition: below
 threshold: config.air_screening_threshold
 ```
 
-The flag is emitted only when AIR is defined, finite, and reliable, and
+The flag is emitted only when AIR is defined and finite, both source selection
+rates are `reliable`, AIR itself is therefore `reliable`, and
 `AIR < air_screening_threshold`. Equality does not trigger it. Undefined,
 not-applicable, or unreliable metrics never generate a flag. The flag references
 the AIR metric key and retains `requires_practitioner_review=true`.
@@ -406,9 +423,12 @@ test. A green aggregate test count does not replace these cases.
 | Sparse outcomes | No-positive and no-negative cases select the exact metric-specific reason codes. |
 | Precision support | No favorable decisions and zero favorable-decision weight are distinguished. |
 | Small groups | Values may remain descriptive but reliability is `unreliable`, limitations are linked, and no flag is emitted. |
-| Severe imbalance | A defined estimate with inadequate class support is marked unreliable and cannot flag. |
-| AIR boundary | Values below `0.8` flag; `0.8`, unreliable, and undefined values do not. |
-| Bootstrap success | Fixed seed produces the exact same bounds and valid-resample count across repeated runs. |
+| Severe imbalance | Either outcome class below the minimum marks every matrix-selected defined metric unreliable. |
+| Multiple gates | One defined metric retains all applicable limitation codes in fixed gate order without duplicates. |
+| Undefined precedence | Undefined/not-applicable metrics retain their typed reason and receive no reliability limitation. |
+| Comparison inheritance | Each comparison merges all source limitation codes once and in fixed order. |
+| AIR boundary | Values below `0.8` flag only when AIR and both selection rates are reliable; `0.8`, unreliable, and undefined values do not. |
+| Bootstrap success | Golden fixture fixes the first three index draws for every stream kind, bounds, and valid-resample count. |
 | Bootstrap insufficiency | Too few valid draws produces a linked typed limitation and no interval. |
 | Deterministic JSON | Repeated identical calls produce byte-identical canonical JSON. |
 | Input immutability | Deep equality, index, columns, dtypes, and dataframe metadata are unchanged after success and failure. |

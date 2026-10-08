@@ -47,6 +47,25 @@ behavioral contract, migration rules, and compatibility-alias rule are defined i
 3.1 must update this document and the generated schema together with the model;
 this cross-reference does not claim those fields are already implemented.
 
+In 1.1, `ObservedMetric.reliability` is required. Native `run_audit` results use
+`reliable`, `unreliable`, `undefined`, or `not_applicable`; migrated 1.0 results
+use `not_assessed` because legacy payloads do not contain enough evidence to
+reconstruct the gate decision. Undefined and not-applicable state takes
+precedence and receives no reliability limitation.
+
+In 1.1, `Limitation.related_metric_keys` is also required. Native results use a
+non-empty, unique, canonically ordered tuple whose keys resolve to
+`observed_metrics`; migrated 1.0 limitations use an empty tuple with the fixed
+meaning “relationship absent from the legacy schema.” One metric may be linked
+from multiple limitations. Comparison metrics merge source limitation codes in
+the fixed order defined by the Milestone 3 reliability matrix.
+
+`StatisticalUncertainty` remains linked to one metric key. Its deterministic
+1.1 production is guarded by the Milestone 3 bootstrap golden fixture, which
+fixes seed derivation, PCG64 stream names, the first three sampled index arrays,
+valid-resample counts, `linear` quantiles, and final bounds. A failed
+valid-resample gate emits a linked limitation instead of an interval.
+
 ## Group direction
 
 Single-group metrics use `group`. AIR, demographic parity difference, and equal
