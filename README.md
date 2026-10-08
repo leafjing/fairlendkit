@@ -41,6 +41,28 @@ synthetic rows. Repeated runs in the same supported environment produce the same
 canonical JSON. The result fingerprint intentionally includes dataframe row
 order, index, columns, and dtypes.
 
+The release-gate SHA-256 of the exact example stdout, including its final
+newline, is:
+
+```text
+3b5c7166ed4893d808dacb2bb731e2a86ae59f5706e9ac6ec6dd58a03eca823c
+```
+
+From a clean checkout, this one command creates an isolated environment,
+installs the package, runs the full suite, checks architecture boundaries and
+whitespace, and reproduces the example digest:
+
+```bash
+python -m venv .venv && .venv/bin/python -m pip install -e '.[test]' && \
+  .venv/bin/python -m pytest -q && \
+  .venv/bin/python -m pytest -q tests/test_architecture.py && \
+  git diff --check && \
+  .venv/bin/python examples/synthetic/run_audit.py | sha256sum
+```
+
+The final line must equal the digest above followed by `  -`. CI runs the full
+suite on Python 3.11 and 3.12.
+
 Programmatic use starts with:
 
 ```python
@@ -76,3 +98,16 @@ Implementation is tracked as ordered, testable work packages in the
 Pre-alpha. Milestone 3 core audit engine and reliability contracts are
 implemented and tested on Python 3.11 and 3.12. Reporting surfaces and the
 remaining V1 workflow are still under development.
+
+## Milestone 3 release evidence
+
+- Public entry point: `run_audit(data, config)` from the package root.
+- Current writer: strict `AuditResult` Schema 2.0.
+- Compatibility: strict Schema 1.0 parser and explicit lossless migration.
+- Determinism: fixed synthetic input, config, timestamp, seed, JSON order, and
+  SHA-256 oracle above.
+- Architecture: application orchestration is adapter-neutral; pandas and the
+  concrete bootstrap estimator are composed only at the outer API boundary.
+- Runtime gate: full tests on Python 3.11 and 3.12 plus `git diff --check`.
+- Scope gate: repository exports no CLI, HTML/CSV renderer, threshold scan,
+  proxy screening, governance integration, or mitigation workflow.
