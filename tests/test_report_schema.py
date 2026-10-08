@@ -6,11 +6,14 @@ from pydantic import ValidationError
 
 from fairlendkit.report import (
     AUDIT_RESULT_SCHEMA_VERSION,
+    CANONICAL_UNDEFINED_MESSAGES_V2,
     AuditResult,
     Limitation,
+    MetricNameV2,
     PractitionerReviewNote,
     ReportedMetricValue,
     UndefinedReason,
+    UndefinedReasonCodeV2,
     WarningRecord,
 )
 
@@ -150,3 +153,53 @@ def test_undefined_value_requires_structured_reason():
             denominator=0.0,
             undefined_reason=None,
         )
+
+
+@pytest.mark.parametrize(
+    "metric",
+    [
+        "denial_rate",
+        "precision",
+        "roc_auc",
+        "selection_rate_difference",
+        "equalized_odds_gap",
+    ],
+)
+def test_schema_v1_rejects_v2_metric_names(example_payload, metric):
+    example_payload["observed_metrics"][0]["metric"] = metric
+
+    with pytest.raises(ValidationError):
+        AuditResult.model_validate(example_payload)
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "no_favorable_decisions",
+        "zero_favorable_decision_weight",
+        "constant_score",
+        "metric_not_applicable",
+        "component_metric_undefined",
+    ],
+)
+def test_schema_v1_rejects_v2_undefined_reasons(example_payload, code):
+    example_payload["observed_metrics"][1]["value"]["undefined_reason"] = {
+        "code": code,
+        "message": CANONICAL_UNDEFINED_MESSAGES_V2[UndefinedReasonCodeV2(code)],
+    }
+
+    with pytest.raises(ValidationError):
+        AuditResult.model_validate(example_payload)
+
+
+def test_v2_enums_expose_milestone_3_1_additions_with_canonical_messages():
+    assert MetricNameV2.DENIAL_RATE.value == "denial_rate"
+    assert MetricNameV2.PRECISION.value == "precision"
+    assert MetricNameV2.ROC_AUC.value == "roc_auc"
+    assert MetricNameV2.SELECTION_RATE_DIFFERENCE.value == "selection_rate_difference"
+    assert MetricNameV2.EQUALIZED_ODDS_GAP.value == "equalized_odds_gap"
+    assert CANONICAL_UNDEFINED_MESSAGES_V2[
+        UndefinedReasonCodeV2.NO_FAVORABLE_DECISIONS
+    ] == "No favorable decisions are available for this metric."
+    assert set(CANONICAL_UNDEFINED_MESSAGES_V2) == set(UndefinedReasonCodeV2)
+    MetricNameV2,

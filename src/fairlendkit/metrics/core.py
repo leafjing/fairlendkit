@@ -22,7 +22,6 @@ CANONICAL_UNDEFINED_REASONS = frozenset(
         "reference_metric_undefined",
         "component_metric_undefined",
         "zero_reference_selection_rate",
-        "insufficient_valid_resamples",
     }
 )
 

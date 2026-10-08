@@ -208,6 +208,11 @@ def test_metric_value_rejects_noncanonical_undefined_reason():
         MetricValue(None, None, None, "not enough data")
 
 
+def test_uncertainty_limitation_code_is_not_an_observed_metric_reason():
+    with pytest.raises(ValueError, match="canonical reason code"):
+        MetricValue(None, None, None, "insufficient_valid_resamples")
+
+
 @pytest.mark.parametrize("invalid", [True, "0.5", float("nan"), float("inf")])
 def test_score_metrics_reject_non_numeric_or_non_finite_values(invalid):
     with pytest.raises((TypeError, ValueError)):

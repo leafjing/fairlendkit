@@ -2,11 +2,13 @@
 
 from fairlendkit.report.models import (
     AUDIT_RESULT_SCHEMA_VERSION,
+    CANONICAL_UNDEFINED_MESSAGES_V2,
     AuditGroup,
     AuditResult,
     ExclusionRecord,
     Limitation,
     MetricName,
+    MetricNameV2,
     ObservedMetric,
     PractitionerReviewNote,
     ReportedMetricValue,
@@ -16,6 +18,7 @@ from fairlendkit.report.models import (
     UncertaintyMethod,
     UndefinedReason,
     UndefinedReasonCode,
+    UndefinedReasonCodeV2,
     ValidationEvidence,
     WarningRecord,
     to_validation_evidence,
@@ -23,11 +26,13 @@ from fairlendkit.report.models import (
 
 __all__ = [
     "AUDIT_RESULT_SCHEMA_VERSION",
+    "CANONICAL_UNDEFINED_MESSAGES_V2",
     "AuditGroup",
     "AuditResult",
     "ExclusionRecord",
     "Limitation",
     "MetricName",
+    "MetricNameV2",
     "ObservedMetric",
     "PractitionerReviewNote",
     "ReportedMetricValue",
@@ -37,6 +42,7 @@ __all__ = [
     "UncertaintyMethod",
     "UndefinedReason",
     "UndefinedReasonCode",
+    "UndefinedReasonCodeV2",
     "ValidationEvidence",
     "WarningRecord",
     "to_validation_evidence",

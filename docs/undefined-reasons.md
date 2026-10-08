@@ -31,7 +31,6 @@ reason or turn it into a legal or compliance conclusion.
 | `reference_metric_undefined` | The reference-group input metric is undefined. | A directed disparity cannot be calculated because its reference-group input is undefined. |
 | `component_metric_undefined` | A required component metric is undefined. | A compound metric cannot be calculated because any required component is undefined. |
 | `zero_reference_selection_rate` | The reference-group selection rate is zero, so the ratio is undefined. | AIR has a defined reference-group selection rate of zero. |
-| `insufficient_valid_resamples` | Too few valid bootstrap resamples are available for an interval. | Uncertainty only: fewer than the configured minimum valid draws are available. |
 
 ## Selection rules
 
