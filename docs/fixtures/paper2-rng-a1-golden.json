@@ -1,0 +1,96 @@
+{
+  "schema_version": "paper2-rng-a1-v1",
+  "master_seed": "20261008",
+  "uniform_closed_open_transform": "(x >> 11) * 2**-53 in IEEE-754 binary64",
+  "uniform_open_transform": "((x >> 12) + 0.5) * 2**-52 in IEEE-754 binary64",
+  "normal_transform": "scipy.special.ndtri(uniform_open(x)) from scipy==1.17.1",
+  "shared_generator": {
+    "fields": ["generate", "PAIR-C1-N", "0", "shared", "selection_decision_uniform"],
+    "seed_hex": "666169726c656e646b69742d7061706572322d76310032303236313030380067656e657261746500504149522d43312d4e0030007368617265640073656c656374696f6e5f6465636973696f6e5f756e69666f726d",
+    "counter_0_sha256": "f630154888ecdaa140dac67a96d22885e55669ab1b177a52fb17cb411c9f00e0",
+    "first_uint64": [
+      17739702333491436193,
+      4673265793168976005,
+      16525512066297461330,
+      18093153508497752288,
+      6714534361746501651,
+      5171435870139563049,
+      10546971473163181059,
+      16506595373438138019
+    ],
+    "uniform_binary64_hex": [
+      "0x1.ec602a9111d9bp-1",
+      "0x1.036b19ea5b48ap-2",
+      "0x1.caacd356362efp-1",
+      "0x1.f62f9682393e0p-1",
+      "0x1.74bb45b52037cp-2",
+      "0x1.1f1286190986ep-2",
+      "0x1.24bcbd596423bp-1",
+      "0x1.ca266a12a9c5ep-1"
+    ],
+    "bernoulli_p_0_5": [0, 1, 0, 0, 1, 1, 0, 0]
+  },
+  "scenario_specific_normal": {
+    "fields": ["generate", "REG", "0", "scenario:REG", "performance_x_normal"],
+    "first_uint64": [
+      11751763162686921855,
+      17199124995546489458,
+      2320454660822873359,
+      5100079809395699542,
+      6637270528473217100,
+      3568246772288288094,
+      8339900554674291663,
+      811807395044246103
+    ],
+    "normal_binary64_be": [
+      "3fd6709af8f52c48",
+      "3ff7e5fd82a7cb69",
+      "bff2581ada6ff98c",
+      "bfe2fcaa0a1ec2e5",
+      "bfd6f96f5b7224f4",
+      "bfebb099250cda2c",
+      "bfbece99f0760dcd",
+      "bffb4b982b512171"
+    ]
+  },
+  "uint64_endpoint_transforms": [
+    {
+      "uint64": 0,
+      "uniform_closed_open_binary64_hex": "0x0.0p+0",
+      "uniform_open_binary64_hex": "0x1.0000000000000p-53",
+      "normal_binary64_hex": "-0x1.06b48528cea52p+3",
+      "normal_binary64_be": "c0206b48528cea52"
+    },
+    {
+      "uint64": 18446744073709551615,
+      "uniform_closed_open_binary64_hex": "0x1.fffffffffffffp-1",
+      "uniform_open_binary64_hex": "0x1.fffffffffffffp-1",
+      "normal_binary64_hex": "0x1.06b48528cea52p+3",
+      "normal_binary64_be": "40206b48528cea52"
+    }
+  ],
+  "h2_exact_indices": {
+    "fields": ["h2_bootstrap", "H2", "0", "analysis", "scenario_unit_index"],
+    "bound": 5,
+    "indices": [2, 0, 1, 1, 2],
+    "candidates_consumed": 5
+  },
+  "summary_exact_indices": {
+    "fields": ["summary_bootstrap", "REG:adverse_impact_ratio:50000", "0", "analysis", "replicate_index"],
+    "bound": 17,
+    "indices": [8, 14, 16, 5, 6, 15, 11, 7, 4, 2, 13, 1, 0, 12, 7, 4, 13],
+    "candidates_consumed": 17
+  },
+  "rejection_sampling_stress": {
+    "fields": ["h2_bootstrap", "H2", "0", "analysis", "scenario_unit_index"],
+    "bound": 9223372036854775809,
+    "indices": [
+      3890809079991114351,
+      6345598358906882502,
+      3171062905167590956,
+      5051904714269081852,
+      8928182696935006271
+    ],
+    "candidates_consumed": 17
+  }
+}

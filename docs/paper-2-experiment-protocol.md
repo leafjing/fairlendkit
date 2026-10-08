@@ -157,8 +157,9 @@ five `delta_a` values. This pairs reliability states on population AIR while
 retaining the diagnostic, non-causal interpretation.
 
 The joint paired-unit bootstrap has 2,000 draws. For draw `b`, sample one vector
-of five integer unit indices with replacement from `[0,4]` using seed material
-`fairlendkit-paper2-h2-v1\0{master_seed}\0{b}`. The same sampled unit indices
+of five integer unit indices with replacement from `[0,4]` using
+`purpose=h2_bootstrap`, `unit_id=H2`, `draw_id=b`, `scope=analysis`, and
+`role=scenario_unit_index`. The same sampled unit indices
 select both the unreliable side and its four-scenario reliable side; compute
 each selected `delta_a`, then their equal-weight mean. A selected unit is
 unavailable if its unreliable MAE or any of its four reliable MAEs is
@@ -186,33 +187,150 @@ Sensitivity results at half and twice these cutoffs are secondary.
 
 ## Synthetic data-generating processes
 
-All generators use `fairlendkit-paper2-sha256-counter-v1`. Its seed material is
-the UTF-8 encoding of
-`fairlendkit-paper2-v1\0{master_seed}\0{pairing_id}\0{replicate_id}\0{role}`.
+All experiment and analysis randomness uses
+`fairlendkit-paper2-sha256-counter-v1`. Its only seed-material format is the
+UTF-8 encoding of:
+
+```text
+fairlendkit-paper2-v1\0{master_seed}\0{purpose}\0{unit_id}\0{draw_id}\0{scope}\0{role}
+```
+
 A block is `SHA256(seed_material || counter_uint64_be)`, counter starts at zero,
 and each digest is consumed as four sequential uint64 big-endian candidates.
-Generator roles are exactly `row` and `missingness`; each has an independent
-counter. The master seed is `20261008`.
+The master seed is the decimal text `20261008`. Fields contain ASCII only and
+no embedded NUL. Values are closed:
 
-`pairing_id` is frozen by this table. A scenario not listed uses its own
-`scenario_id` as `pairing_id`.
+| `purpose` | `unit_id` | `draw_id` | `scope` | Allowed `role` |
+| --- | --- | --- | --- | --- |
+| `generate` | frozen `pair_id` | decimal replicate ID | `shared` or `scenario:{scenario_id}` | `selection_decision_uniform`, `selection_outcome_uniform`, `performance_x_normal`, `performance_outcome_uniform`, `weight_normal`, `missingness_uniform` |
+| `summary_bootstrap` | `{scenario_id}:{metric}:{checkpoint}` | decimal bootstrap draw | `analysis` | `replicate_index` |
+| `h2_bootstrap` | `H2` | decimal bootstrap draw | `analysis` | `scenario_unit_index` |
 
-| Paired inputs | `pairing_id` | Common-random-number rule |
+Each complete field tuple starts its own counter at zero. It is an error to use
+an unlisted value, concatenate fields without NULs, add lengths or counters to
+the seed material, or reset a counter while filling one array.
+
+`pair_id` is frozen by this table. A scenario not listed uses its own
+`scenario_id` as `pair_id`.
+
+| Paired inputs | `pair_id` | Shared roles and rule |
 | --- | --- | --- |
-| `SEL-AIR080-N025`, `SEL-AIR080-N1000` (C1 aliases `SEL-N025`, `SEL-N1000`) | `PAIR-C1-N` | Generate 1,000 ordered rows per group; `N025` uses the first 25. |
-| `PERF-DEC001`, `PERF-DEC050` | `PAIR-C3-DEC` | Reuse `X`, outcome uniform, and group rows; apply the scenario-specific solved threshold. |
-| gated and ungated policies on `SEL-AIR081-N025` | `SEL-AIR081-N025` | Use one generated audit; only the post-estimation flag policy differs. |
-| `MISS-MCAR30`, `MISS-MNAR30` | `PAIR-C5-MISSING` | Reuse complete rows and missingness uniforms; apply the scenario-specific missingness transform. |
-| `SEL-AIR081-N050`, `SEL-AIR081-N1000` | `PAIR-C6-COVERAGE` | Generate 1,000 ordered rows per group; `N050` uses the first 50. |
+| `SEL-AIR080-N025`, `SEL-AIR080-N1000` (C1 aliases `SEL-N025`, `SEL-N1000`) | `PAIR-C1-N` | `selection_decision_uniform`, `selection_outcome_uniform`; generate 1,000 rows per group, and `N025` takes each group's prefix 25. |
+| `PERF-DEC001`, `PERF-DEC050` | `PAIR-C3-DEC` | `performance_x_normal`, `performance_outcome_uniform`; reuse rows and apply the scenario-specific deterministic threshold. |
+| gated and ungated policies on `SEL-AIR081-N025` | `SEL-AIR081-N025` | All generated arrays are identical; only the deterministic post-estimation flag policy differs. |
+| `MISS-MCAR30`, `MISS-MNAR30` | `PAIR-C5-MISSING` | `performance_x_normal`, `performance_outcome_uniform`, `missingness_uniform`; reuse base values and apply the scenario-specific deterministic missingness formula. |
+| `SEL-AIR081-N050`, `SEL-AIR081-N1000` | `PAIR-C6-COVERAGE` | `selection_decision_uniform`, `selection_outcome_uniform`; generate 1,000 rows per group, and `N050` takes each group's prefix 50. |
 
 Changing a `scenario_id` never implicitly changes a paired row stream; only
-this table may assign the same `pairing_id`. The seed manifest stores both IDs.
+this table may assign the same `pair_id`. The seed manifest stores both IDs.
+Roles listed as shared use `scope=shared`. Any stochastic component not listed
+as shared uses `scope=scenario:{scenario_id}`. Deterministic thresholds,
+truncation, formulas, and flag policies consume no RNG.
 
-Bernoulli draws use `U < p`, where `U` is a candidate uint64 divided by
-`2**64`. Standard normals use the inverse standard-normal CDF
-`scipy.special.ndtri(U)` under a pinned SciPy version; exact endpoint uniforms
-are replaced by the nearest interior binary64 value. The research seed manifest
-and pinned environment are checked in before the first production run.
+### Array shape and stream consumption
+
+For a generate tuple, determine maximum group counts across its paired
+scenarios: `n_ref_max` and `n_cmp_max`. Each role produces one logical flat
+array of length `n_ref_max + n_cmp_max`: all reference rows in ascending row
+index, followed by all comparison rows. A scenario takes the prefix it needs
+within each group; it never takes a prefix of the combined array.
+
+Roles are independent streams, so their execution order is irrelevant. Within
+one role, fill the logical flat array from index zero upward using the candidate
+sequence `counter=0 word=0,1,2,3`, then `counter=1 word=0,1,2,3`, and so on.
+One accepted uint64 supplies one output value. Rejected bounded-integer
+candidates consume a value and the next candidate is tried; no other transform
+rejects or consumes an extra value.
+
+Variable routing is exact:
+
+| DGP variable | Role | Shape | Transform |
+| --- | --- | --- | --- |
+| selection-family `D_star` | `selection_decision_uniform` | group-major flat row array | Bernoulli with scenario `s_g` |
+| selection-family `Y` | `selection_outcome_uniform` | group-major flat row array | Bernoulli with `p=0.20` |
+| performance-family `X` | `performance_x_normal` | group-major flat row array | standard normal |
+| performance-family `Y` conditional draw | `performance_outcome_uniform` | group-major flat row array | Bernoulli with row `p_star` |
+| weighted sensitivity `Z` | `weight_normal` | group-major flat row array | standard normal, then the frozen weight formula |
+| MCAR/MAR/MNAR indicator | `missingness_uniform` | group-major flat row array | Bernoulli with row-specific missingness probability |
+| summary-bootstrap indices | `replicate_index` | `(R,)` within each of 2,000 draws | bounded integer in `[0,R)` |
+| H2 paired-unit indices | `scenario_unit_index` | `(5,)` within each of 2,000 draws | bounded integer in `[0,5)` |
+
+For summary and H2, `draw_id` selects an independent stream; fill the stated
+one-dimensional array in position order. The 2,000 arrays together have shapes
+`(2000,R)` and `(2000,5)` respectively.
+
+### Integer and numeric transforms
+
+For a positive bound `n`, use unbiased rejection sampling:
+
+```text
+limit = 2**64 - (2**64 % n)
+reject x when x >= limit
+otherwise output x % n
+```
+
+Modulo without rejection is forbidden. Bounds `n<=0` are errors. Uniform and
+distribution transforms are:
+
+```text
+q53 = x >> 11
+q52 = x >> 12
+uniform_closed_open(x) = q53 * 2**-53
+uniform_open(x) = (q52 + 0.5) * 2**-52
+Bernoulli(p, x) = 1 if uniform_closed_open(x) < p else 0
+Normal(x) = scipy.special.ndtri(uniform_open(x))
+```
+
+The shifts are unsigned-integer operations performed before conversion to
+binary64. Multiplication by the stated powers of two and addition of `0.5` are
+then IEEE-754 binary64 operations. Thus `uniform_closed_open` is exactly in
+`[0,1)`, while `uniform_open` is exactly in `[2**-53, 1-2**-53]`; endpoint
+replacement or clipping is forbidden. `p` must be finite in `[0,1]`. The A1
+fixture freezes `scipy==1.17.1` for `ndtri`; the final research lock must retain
+that version. Implementations must match the checked-in normal-output binary64
+fixture, not merely a decimal tolerance.
+
+### Exact-stream fixtures and acceptance
+
+[`fixtures/paper2-rng-a1-golden.json`](fixtures/paper2-rng-a1-golden.json) is
+normative. Its amendment-review SHA-256 is
+`6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905`.
+It fixes:
+
+- seed bytes, counter-zero digest, uint64 word order, uniform bytes, and
+  Bernoulli outputs for a shared C1 stream;
+- scenario-specific standard-normal binary64 bytes and the exact uniform and
+  normal outputs for uint64 endpoints `0` and `2**64-1`;
+- exact H2 and summary-bootstrap indices; and
+- a high-rejection bounded-integer case that distinguishes rejection sampling
+  from naive modulo.
+
+The RNG implementation PR must add tests that fail closed unless:
+
+1. two independent implementations reproduce every fixture byte and index;
+2. both scenarios in each pair table row resolve the same `shared` seed and
+   identical shared-role prefix bytes;
+3. scenario-specific scopes resolve different seed bytes from `shared` and from
+   every other scenario;
+4. prefix scenarios equal the exact per-group prefixes of their larger pair,
+   without shifting the comparison-group offset;
+5. counter word order and rejection candidate counts match the fixture;
+6. complete production H2 index bytes `(2000,5)` have a checked-in SHA-256;
+7. a small summary fixture `(2000,17)` is byte-compared in full, while each
+   production `(2000,R)` array records and verifies its SHA-256; and
+8. Python 3.11 and 3.12 produce identical fixture bytes and hashes in a locked
+   clean environment.
+
+“Independent implementations” means the production module and a test-only
+reference implementation that share no RNG helper code. Updating a fixture to
+make a failing implementation pass is prohibited unless a separately reviewed
+protocol amendment changes the normative algorithm.
+
+Bernoulli draws use `U < p`, where `U=uniform_closed_open(x)`. Standard normals
+use `scipy.special.ndtri(uniform_open(x))` under the pinned SciPy version. The
+bit-truncated formulas above are the only permitted uniform transforms. The
+research seed manifest and pinned environment are checked in before the first
+production run.
 
 ### Core DGP
 
@@ -382,7 +500,7 @@ unclear redistribution terms are excluded.
 Every scenario used by a `P2-CONFIRMATORY-V1` test or H2 generates exactly
 50,000 independent replicates. Other descriptive/exploratory simulation
 scenarios generate exactly 10,000. Replicate ID `r` uses the sole generator
-seed construction and frozen `pairing_id` table above; paired scenarios reuse
+seed construction and frozen `pair_id` table above; paired scenarios reuse
 the resulting row-level base uniforms before applying scenario transformations.
 Results are summarized by scenario and metric with MCSEs and 95%
 simulation-error intervals. For a proportion `p`, MCSE is
@@ -390,14 +508,10 @@ simulation-error intervals. For a proportion `p`, MCSE is
 
 Means use normal simulation-error intervals from the replicate standard error.
 Error quantiles and scenario-standardized H2 summaries use 2,000 deterministic
-bootstrap draws. Analysis RNGs use the same SHA-256 block/candidate construction
-but separate, explicit domains: summary seed material is
-`fairlendkit-paper2-summary-v1\0{master_seed}\0{scenario_id}\0{metric}\0{checkpoint}\0{draw_id}`;
-H2 seed material is
-`fairlendkit-paper2-h2-v1\0{master_seed}\0{draw_id}`. These are analysis RNGs,
-not alternative generator seeds. Summary bootstrap resamples replicate IDs and
-uses the Hyndman–Fan Type 7 quantile; H2 follows the joint scenario-resampling
-rule above.
+bootstrap draws through the sole seed format and routing table above. Summary
+bootstrap resamples replicate IDs and uses the Hyndman–Fan Type 7 quantile; H2
+follows the joint paired-unit resampling rule above. Analysis roles cannot
+generate DGP arrays.
 
 Paired policy comparisons, such as gated versus ungated AIR flags, use common
 random numbers and report paired risk differences with confidence intervals.
@@ -594,7 +708,37 @@ This study does not claim that:
 | H2 stratified bootstrap sampled reliability states separately, then an interim union bootstrap did not define paired units | Five AIR-keyed units pair each `N025` scenario with the equal-weight mean of its four reliable-N scenarios. One shared five-index vector resamples both sides through `delta_a`; fewer than 1,900 valid draws yields `not_estimable`. |
 | H2 scenario set expressed by brace grammar and aliases | The normative section lists all 25 unique IDs explicitly; aliases are excluded. |
 | 10,000-pair power bound (`0.0317` SD; `0.0159` worst-case proportion) | 50,000-pair bound (`0.0142` SD; `0.0071` worst-case proportion) at conservative one-sided planning level `0.01` and 80% power. |
-| Generator seed included `scenario_id` while prose claimed different scenarios shared row streams; a second abbreviated seed also appeared later | One generator seed uses frozen `pairing_id`; an explicit table assigns shared IDs and truncation/transformation rules. Summary and H2 seeds are separately named analysis-RNG domains and cannot generate rows. |
+| Generator seed included `scenario_id` while prose claimed different scenarios shared row streams; separate summary/H2 formats created multiple roots | One seven-field root format covers all purposes. A routing table maps every random variable, shape, scope, role, consumption order, transform, and bounded-integer rule. The pair table freezes shared streams and deterministic transforms. |
+| Direct binary64 midpoint `(x+0.5)/2**64` and a separate endpoint-replacement rule could round the largest uint64 to `1.0` and make `ndtri` infinite | The only normal input is `(q52+0.5)*2**-52`, where `q52=x>>12`; the only closed-open uniform is `(x>>11)*2**-53`. Endpoint clipping/replacement is forbidden, and exact fixtures freeze both uint64 endpoints. |
+
+## Protocol amendment log
+
+### A1 — deterministic RNG routing and exact streams
+
+- **Date:** 2026-10-08
+- **Base protocol:** `main@9fd45de`
+- **Reason:** method review confirmed that the base RNG text did not uniquely
+  route variables, freeze stream consumption, define bounded integers, or make
+  paired streams reproducible across independent implementations.
+- **Change:** one seven-field root; closed routing table; exact array shapes and
+  consumption order; SHA digest/uint64 ordering; unbiased rejection sampling;
+  endpoint-safe bit-truncated binary64 transforms; pair/shared/scenario rules;
+  normative golden fixture including both uint64 endpoints; and byte/index
+  acceptance requirements.
+- **Affected registered analyses:** C1, C3, C4, C5, C6, H2, every simulated DGP
+  using random rows, and secondary summaries using bootstrap indices.
+- **Unchanged:** research questions, hypotheses, DGP probability parameters,
+  scenario registry, estimands, statistical tests, `R=50,000`, Holm family,
+  monitoring/stopping rules, public-data cohort, and non-claims.
+- **Random-stream compatibility:** breaking relative to the ambiguous RNG text
+  in `9fd45de`. A1 streams and fixtures become authoritative only if this
+  amendment is approved and merged; no earlier stream is grandfathered.
+- **Result exposure:** no data were downloaded, no experiment implementation
+  was written or run, and no pilot, confirmatory, or public-data result was
+  viewed before this amendment was proposed.
+- **Activation:** pending. Until approval and merge, `main@9fd45de` remains the
+  authoritative protocol; DGP/RNG implementation, integration PRs, and all
+  experiment runs remain frozen.
 
 ## Required outputs before a paper release
 
