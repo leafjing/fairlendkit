@@ -3,7 +3,7 @@
 **FairLendKit is a reproducible fair-lending audit toolkit for credit decisioning
 systems.** It helps model-risk, responsible-AI, validation, and data-science
 teams turn explicitly configured credit data into review-ready group metrics,
-reliability states, uncertainty intervals, screening flags, and canonical audit
+reliability states, uncertainty intervals, screening flags, and typed audit
 records.
 
 Use FairLendKit when you need to preserve the meaning of outcomes, scores,
@@ -59,9 +59,11 @@ python examples/synthetic/run_audit.py > audit-result-v2.json
 ```
 
 The script uses a fixed execution timestamp, bootstrap seed, configuration, and
-synthetic rows. Repeated runs in the same supported environment produce the same
-compact canonical JSON. The result fingerprint intentionally includes dataframe row
-order, index, columns, and dtypes.
+synthetic rows. Repeated runs in the same supported locked environment produce
+byte-identical compact JSON serialization. This is a project serialization
+contract, not a claim of conformance to an external JSON standard.
+The result fingerprint intentionally includes dataframe row order, index,
+columns, and dtypes.
 
 The release-gate SHA-256 of the exact example stdout, including its final
 newline, is:
@@ -73,7 +75,8 @@ newline, is:
 From a clean checkout, the single release-verification entry point creates a
 temporary virtual environment with `python -m venv`, installs the exact versions
 in the pinned release requirement files, verifies the final `pip freeze`,
-generates and byte-compares canonical JSON, checks its digest, runs the full
+generates and byte-compares the compact JSON serialization, checks its digest,
+runs the full
 suite and architecture checks, and verifies the diff:
 
 ```bash
@@ -150,8 +153,10 @@ available in [`codemeta.json`](codemeta.json). See
 [Citation and research relationship](docs/citation-and-research.md) for scope
 and paper-version guidance.
 
-## License and contributing
+## Licensing and contributing
 
-The package metadata declares Apache-2.0. See [Contributing](CONTRIBUTING.md)
-before proposing changes. Repository discovery metadata must never advertise a
-roadmap item as an implemented capability.
+The package metadata currently declares Apache-2.0, but this repository does
+not yet contain a license text. Treat the repository license as unresolved
+until the owner adds an authoritative license file. See
+[Contributing](CONTRIBUTING.md) before proposing changes. Repository discovery
+metadata must never advertise a roadmap item as an implemented capability.

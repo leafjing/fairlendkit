@@ -9,11 +9,10 @@ authors:
     alias: "leafjing"
 repository-code: "https://github.com/leafjing/fairlendkit"
 url: "https://github.com/leafjing/fairlendkit"
-license: Apache-2.0
 abstract: >-
   FairLendKit is a reproducible fair-lending audit toolkit for credit
   decisioning systems. It produces review-ready group metrics, reliability
-  states, uncertainty intervals, screening flags, and canonical audit records.
+  states, uncertainty intervals, screening flags, and typed audit records.
 keywords:
   - fair lending
   - credit decisioning

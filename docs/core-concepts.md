@@ -54,9 +54,11 @@ fairness judgment, legal conclusion, or remediation recommendation.
 ## Reproducible reporting
 
 `run_audit(data, config)` assembles a renderer-neutral Schema 2.0 result. Stable
-metric keys, canonical JSON, explicit migration from Schema 1.0, fixed examples,
-and byte-level release oracles make the evidence traceable and reproducible.
-HTML/CSV renderers and a CLI are not currently implemented.
+metric keys, deterministic compact JSON serialization in the supported locked
+environment, explicit migration from Schema 1.0, fixed examples, and byte-level
+release oracles make the evidence traceable and reproducible. This is a project
+serialization contract, not an independent JSON standard. HTML/CSV
+renderers and a CLI are not currently implemented.
 
 See [Report schema](report-schema.md) and
 [Milestone 3 release evidence](milestone-3-release-evidence.md).

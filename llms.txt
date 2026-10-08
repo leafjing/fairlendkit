@@ -28,4 +28,4 @@
 
 ## Important boundaries
 
-Current output is a renderer-neutral typed result and canonical JSON. Threshold scanning, HTML/CSV renderers, a CLI, proxy-risk screening, governance integration, and mitigation are not implemented. Research protocols and results do not become product capabilities merely by existing in this repository.
+Current output is a renderer-neutral typed result with deterministic, byte-identical compact JSON serialization in the supported locked environment; this is not a claim of conformance to an external JSON standard. Threshold scanning, HTML/CSV renderers, a CLI, proxy-risk screening, governance integration, and mitigation are not implemented. Research protocols and results do not become product capabilities merely by existing in this repository.

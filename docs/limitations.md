@@ -22,8 +22,9 @@ human-owned investigation process.
 
 - Users remain responsible for lawful data access, permissions, privacy,
   retention, and appropriate use of protected or sensitive attributes.
-- The current core supports one protected attribute per audit execution; it
-  does not claim to cover intersectional or causal analysis.
+- The current core accepts multiple protected attributes and computes each
+  attribute's groups separately. It does not form intersectional groups or
+  claim to provide intersectional or causal analysis.
 - Dataset shift, label bias, measurement error, selection bias, historical
   inequity, and omitted variables require analysis outside the metric engine.
 - Public and synthetic examples demonstrate mechanics and reproducibility; they
