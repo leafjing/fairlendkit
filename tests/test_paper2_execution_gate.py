@@ -9,6 +9,11 @@ from pathlib import Path
 import pytest
 
 import fairlendkit.research.paper2.execution as execution
+from fairlendkit.research.paper2.resource_benchmark import (
+    BENCHMARK_SCENARIO_IDS,
+    _validate_benchmark_coverage,
+)
+from fairlendkit.research.paper2.registry import scenario_registry
 from fairlendkit.research.paper2.execution import (
     ExecutionWorkspace,
     IntegrityError,
@@ -429,3 +434,21 @@ def test_smoke_benchmark_is_raw_only_and_resource_preflight_fails_closed(
     ):
         with pytest.raises(IntegrityError, match="frozen|canonical"):
             replace(evidence, **change)
+
+
+def test_full_chain_benchmark_representatives_cover_frozen_workload_axes():
+    registry = scenario_registry()
+    _validate_benchmark_coverage(registry, BENCHMARK_SCENARIO_IDS)
+
+    without_mcar = tuple(
+        item for item in BENCHMARK_SCENARIO_IDS if item != "MISS-MCAR30"
+    )
+    with pytest.raises(IntegrityError, match="missingness"):
+        _validate_benchmark_coverage(registry, without_mcar)
+
+    without_maximum_sample = tuple(
+        "SEL-AIR081-N025" if item == "SEL-AIR081-N1000" else item
+        for item in BENCHMARK_SCENARIO_IDS
+    )
+    with pytest.raises(IntegrityError, match="sample-size"):
+        _validate_benchmark_coverage(registry, without_maximum_sample)

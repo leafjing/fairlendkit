@@ -30,7 +30,12 @@ confirmatory matrix, public-data download, analysis, or result inspection.
 ## Resource preflight
 
 The resource benchmark runs one replicate each of `REG`,
-`SEL-AIR081-N1000`, and `MISS-MNAR30` in the isolated smoke namespace. This
+`SEL-AIR081-N1000`, `MISS-MCAR30`, and `MISS-MNAR30` in the isolated smoke
+namespace. An executable coverage check proves these representatives cover
+every frozen scenario family and missingness path and dominate the frozen
+matrix on total sample size, missing fraction, bootstrap resamples, and the
+minimum-valid-resamples threshold. The benchmark also fails unless the actual
+audit results collectively contain every Schema 2.0 metric identity. This
 covers performance, selection, and expensive missingness paths through DGP,
 public `run_audit` metrics/reliability/1,000-resample uncertainty, raw-record
 writing, and shard validation. It measures elapsed time, process CPU time,

@@ -11,6 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from fairlendkit import AuditConfig, run_audit
+from fairlendkit.metrics.contracts import MetricNameV2
 from fairlendkit.research.paper2.execution import (
     DISK_SAFETY_FACTOR,
     MEMORY_BUDGET_GIB,
@@ -19,6 +20,7 @@ from fairlendkit.research.paper2.execution import (
     WORKER_COUNT,
     ExecutionManifest,
     ExecutionWorkspace,
+    IntegrityError,
     RawReplicatePayload,
     RawReplicateRecord,
     SmokeBenchmarkEvidence,
@@ -32,12 +34,22 @@ from fairlendkit.research.paper2.registry import scenario_registry
 from fairlendkit.research.paper2.smoke import run_smoke
 
 
+BENCHMARK_SCENARIO_IDS = (
+    "REG",
+    "SEL-AIR081-N1000",
+    "MISS-MCAR30",
+    "MISS-MNAR30",
+)
+
+
 def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmarkEvidence:
     """Measure representative DGP→audit/reliability smoke replicates conservatively."""
-    scenario_ids = ("REG", "SEL-AIR081-N1000", "MISS-MNAR30")
+    scenario_ids = BENCHMARK_SCENARIO_IDS
     registry = scenario_registry()
+    _validate_benchmark_coverage(registry, scenario_ids)
     wall_measurements: list[float] = []
     cpu_measurements: list[float] = []
+    observed_metric_names: set[str] = set()
     with tempfile.TemporaryDirectory(prefix="paper2-full-smoke-") as directory:
         workspace = ExecutionWorkspace(Path(directory).resolve(), "smoke")
         for scenario_id in scenario_ids:
@@ -57,6 +69,7 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
                 )
             )
             result = run_audit(frame, _audit_config(scenario))
+            observed_metric_names.update(item.metric.value for item in result.observed_metrics)
             spec = smoke_shards(scenario_id, replicates=1, shard_size=1)[0]
             write_smoke_shard(
                 workspace,
@@ -67,6 +80,9 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
             validate_shard(workspace, manifest, spec)
             wall_measurements.append(time.perf_counter() - wall_start)
             cpu_measurements.append(time.process_time() - cpu_start)
+        expected_metric_names = {item.value for item in MetricNameV2}
+        if observed_metric_names != expected_metric_names:
+            raise IntegrityError("Resource benchmark does not cover every frozen metric path.")
         artifact_bytes = sum(path.stat().st_size for path in workspace.output_dir.iterdir())
     wall_seconds = max(wall_measurements)
     cpu_seconds = max(cpu_measurements)
@@ -90,6 +106,28 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
         ),
         safety_factor=RUNTIME_SAFETY_FACTOR,
     )
+
+
+def _validate_benchmark_coverage(registry, scenario_ids: tuple[str, ...]) -> None:
+    """Fail closed unless representatives dominate every frozen workload axis."""
+    frozen = tuple(registry[item] for item in frozen_execution_scenario_ids())
+    representatives = tuple(registry[item] for item in scenario_ids)
+    if {item.family for item in representatives} != {item.family for item in frozen}:
+        raise IntegrityError("Resource benchmark does not cover every scenario family.")
+    if {item.missingness for item in representatives} != {item.missingness for item in frozen}:
+        raise IntegrityError("Resource benchmark does not cover every missingness path.")
+    if {item.calibration for item in representatives} != {item.calibration for item in frozen}:
+        raise IntegrityError("Resource benchmark does not cover every calibration path.")
+
+    maxima = (
+        (lambda item: item.comparison_n + item.reference_n, "sample-size"),
+        (lambda item: item.missing_fraction, "missing-fraction"),
+        (lambda item: item.bootstrap_resamples, "bootstrap-resamples"),
+        (lambda item: item.minimum_valid_resamples, "valid-resample"),
+    )
+    for value, label in maxima:
+        if max(map(value, representatives)) < max(map(value, frozen)):
+            raise IntegrityError(f"Resource benchmark does not cover the maximum {label} workload.")
 
 
 def _audit_config(scenario) -> AuditConfig:
