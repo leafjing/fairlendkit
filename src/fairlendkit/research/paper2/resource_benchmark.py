@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import multiprocessing
 import resource
 import sys
@@ -32,12 +33,18 @@ from fairlendkit.research.paper2.execution import (
     validate_shard,
     write_smoke_shard,
 )
-from fairlendkit.research.paper2.protocol import CONFIRMATORY_REPLICATES
+from fairlendkit.research.paper2.protocol import CONFIRMATORY_REPLICATES, load_protocol
 from fairlendkit.research.paper2.registry import scenario_registry
 from fairlendkit.research.paper2.smoke import run_smoke
 
 
 BENCHMARK_SCENARIO_IDS = RESOURCE_BENCHMARK_REPRESENTATIVE_IDS
+_SMOKE_FIXTURE = json.loads(
+    Path(__file__).with_name("resource_benchmark_smoke_fixture.json").read_text(
+        encoding="utf-8"
+    )
+)
+BENCHMARK_SMOKE_REPLICATE_ID = _SMOKE_FIXTURE["replicate_id"]
 BENCHMARK_COST_COVERAGE = (
     ("MISS-MCAR30", "MISS-MCAR30"),
     ("MISS-MNAR30", "MISS-MNAR30"),
@@ -166,7 +173,10 @@ def _run_representative(
         workspace = ExecutionWorkspace(Path(directory).resolve(), "smoke")
         cpu_start = time.process_time()
         wall_start = time.perf_counter()
-        generated = run_smoke((scenario_id,), (0,)).audits[0]
+        generated = run_smoke(
+            (scenario_id,), (BENCHMARK_SMOKE_REPLICATE_ID,)
+        ).audits[0]
+        _validate_smoke_labels(generated, scenario_id)
         frame = _smoke_frame(generated)
         result = run_audit(frame, _audit_config(scenario))
         payload = _raw_payload(result)
@@ -206,6 +216,37 @@ def _smoke_frame(generated) -> pd.DataFrame:
             "group": pd.Series([row.group for row in generated.rows], dtype=object),
         }
     )
+
+
+def _validate_smoke_labels(generated, scenario_id: str) -> None:
+    """Match the frozen smoke seed fixture and reject degenerate label support."""
+    if _SMOKE_FIXTURE.get("schema_version") != "paper2-resource-smoke-labels-v1":
+        raise IntegrityError("Resource smoke label fixture schema is not frozen.")
+    if _SMOKE_FIXTURE.get("smoke_seed_domain") != load_protocol().smoke_seed_domain:
+        raise IntegrityError("Resource smoke label fixture seed domain is inconsistent.")
+    if type(BENCHMARK_SMOKE_REPLICATE_ID) is not int or BENCHMARK_SMOKE_REPLICATE_ID < 0:
+        raise IntegrityError("Resource smoke replicate ID must be a non-negative integer.")
+    expected = _SMOKE_FIXTURE["scenarios"].get(scenario_id)
+    if expected is None:
+        raise IntegrityError(f"Missing frozen smoke label fixture for {scenario_id}.")
+    eligible = tuple(
+        row
+        for row in generated.rows
+        if None not in (row.outcome, row.score, row.decision)
+    )
+    observed = {
+        "eligible_rows": len(eligible),
+        "outcome_0": sum(type(row.outcome) is int and row.outcome == 0 for row in eligible),
+        "outcome_1": sum(type(row.outcome) is int and row.outcome == 1 for row in eligible),
+    }
+    if observed != expected:
+        raise IntegrityError(
+            f"Smoke label counts do not match the frozen fixture for {scenario_id}."
+        )
+    if observed["outcome_0"] == 0 or observed["outcome_1"] == 0:
+        raise IntegrityError(
+            f"Smoke outcome support is degenerate for {scenario_id}."
+        )
 
 
 def _validate_benchmark_coverage(registry, scenario_ids: tuple[str, ...]) -> dict[str, str]:

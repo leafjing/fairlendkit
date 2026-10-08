@@ -19,6 +19,7 @@ from fairlendkit.research.paper2.resource_benchmark import (
     _measure_representative,
     _project_benchmark_costs,
     _smoke_frame,
+    _validate_smoke_labels,
     _validate_representative_output,
     _validate_benchmark_coverage,
 )
@@ -63,6 +64,26 @@ def test_smoke_frame_preserves_nullable_categorical_label_types():
     assert frame["group"].dtype == object
     assert type(frame.loc[0, "outcome"]) is int
     assert type(frame.loc[0, "decision"]) is int
+
+
+def test_frozen_smoke_label_fixture_is_exact_and_rejects_degenerate_support():
+    valid = SimpleNamespace(
+        rows=tuple(
+            [SimpleNamespace(outcome=0, score=0.2, decision=0)] * 269
+            + [SimpleNamespace(outcome=1, score=0.8, decision=1)] * 68
+            + [SimpleNamespace(outcome=None, score=None, decision=None)] * 163
+        )
+    )
+    _validate_smoke_labels(valid, "MISS-MCAR30")
+
+    degenerate = SimpleNamespace(
+        rows=tuple(
+            [SimpleNamespace(outcome=0, score=0.2, decision=0)] * 337
+            + [SimpleNamespace(outcome=None, score=None, decision=None)] * 163
+        )
+    )
+    with pytest.raises(IntegrityError, match="frozen fixture"):
+        _validate_smoke_labels(degenerate, "MISS-MCAR30")
 CODE_COMMIT = "1" * 40
 
 
