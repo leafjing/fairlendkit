@@ -63,7 +63,7 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
     wall_measurements: dict[str, float] = {}
     cpu_measurements: dict[str, float] = {}
     artifact_measurements: dict[str, int] = {}
-    observed_metric_names: set[str] = set()
+    expected_metric_names = {item.value for item in MetricNameV2}
     with tempfile.TemporaryDirectory(prefix="paper2-full-smoke-") as directory:
         workspace = ExecutionWorkspace(Path(directory).resolve(), "smoke")
         for scenario_id in scenario_ids:
@@ -83,13 +83,14 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
                 )
             )
             result = run_audit(frame, _audit_config(scenario))
-            observed_metric_names.update(item.metric.value for item in result.observed_metrics)
+            payload = _raw_payload(result)
+            _validate_representative_output(result, payload, expected_metric_names)
             spec = smoke_shards(scenario_id, replicates=1, shard_size=1)[0]
             write_smoke_shard(
                 workspace,
                 manifest,
                 spec,
-                (RawReplicateRecord(scenario_id, 0, _raw_payload(result)),),
+                (RawReplicateRecord(scenario_id, 0, payload),),
             )
             validate_shard(workspace, manifest, spec)
             wall_measurements[scenario_id] = time.perf_counter() - wall_start
@@ -98,9 +99,6 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
                 path.stat().st_size
                 for path in workspace.output_dir.glob(f"{scenario_id}--00000*")
             )
-        expected_metric_names = {item.value for item in MetricNameV2}
-        if observed_metric_names != expected_metric_names:
-            raise IntegrityError("Resource benchmark does not cover every frozen metric path.")
         artifact_bytes = sum(path.stat().st_size for path in workspace.output_dir.iterdir())
     wall_seconds = max(wall_measurements.values())
     cpu_seconds = max(cpu_measurements.values())
@@ -211,6 +209,22 @@ def _project_benchmark_costs(
         wall_total * RUNTIME_SAFETY_FACTOR / 3600 / WORKER_COUNT,
         int(disk_total * DISK_SAFETY_FACTOR),
     )
+
+
+def _validate_representative_output(
+    result, payload: RawReplicatePayload, expected_metric_names: set[str]
+) -> None:
+    """Require each cost representative to exercise the full frozen output schema."""
+    observed = {item.metric.value for item in result.observed_metrics}
+    if observed != expected_metric_names:
+        raise IntegrityError(
+            "Each resource benchmark representative must cover every frozen metric path."
+        )
+    if payload.schema_version != "paper2-raw-replicate-v1":
+        raise IntegrityError("Resource benchmark artifact schema is not frozen.")
+    payload_keys = {key for key, _ in payload.metric_values}
+    if payload_keys != {item.key for item in result.observed_metrics}:
+        raise IntegrityError("Resource benchmark artifact does not preserve all metric keys.")
 
 
 def _audit_config(scenario) -> AuditConfig:

@@ -14,6 +14,7 @@ from fairlendkit.research.paper2.resource_benchmark import (
     BENCHMARK_SCENARIO_IDS,
     _benchmark_coverage_matrix,
     _project_benchmark_costs,
+    _validate_representative_output,
     _validate_benchmark_coverage,
 )
 from fairlendkit.research.paper2.registry import scenario_registry
@@ -514,3 +515,27 @@ def test_cost_projection_sums_mapped_artifact_bytes_without_average_underestimat
     assert projected_disk > int(sum(artifacts.values()) / 2 * 3 * 50_000 * 2)
     assert projected_cpu > 0
     assert projected_wall > 0
+
+
+def test_each_cost_representative_requires_full_metric_set_and_frozen_artifact_schema():
+    class Metric:
+        def __init__(self, name, key):
+            self.metric = type("Name", (), {"value": name})()
+            self.key = key
+
+    result = type("Result", (), {"observed_metrics": (Metric("selection_rate", "overall.selection_rate"),)})()
+    payload = _payload()
+
+    _validate_representative_output(result, payload, {"selection_rate"})
+    with pytest.raises(IntegrityError, match="every frozen metric"):
+        _validate_representative_output(result, payload, {"selection_rate", "accuracy"})
+    with pytest.raises(IntegrityError, match="schema"):
+        _validate_representative_output(
+            result, replace(payload, schema_version="wrong"), {"selection_rate"}
+        )
+    with pytest.raises(IntegrityError, match="keys|metric"):
+        _validate_representative_output(
+            result,
+            replace(payload, metric_values=(("overall.accuracy", 1.0),)),
+            {"selection_rate"},
+        )

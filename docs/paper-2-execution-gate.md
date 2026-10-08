@@ -38,7 +38,9 @@ workload. The coverage check also proves these representatives cover every
 frozen scenario family and missingness path and dominate the frozen
 matrix on total sample size, missing fraction, bootstrap resamples, and the
 minimum-valid-resamples threshold. The benchmark also fails unless the actual
-audit results collectively contain every Schema 2.0 metric identity. This
+audit result for each measured representative independently contains every
+Schema 2.0 metric identity and round-trips through the frozen
+`paper2-raw-replicate-v1` artifact schema without losing metric keys. This
 covers performance, selection, and expensive missingness paths through DGP,
 public `run_audit` metrics/reliability/1,000-resample uncertainty, raw-record
 writing, and shard validation. It measures elapsed time, process CPU time,
