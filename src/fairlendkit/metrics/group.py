@@ -66,7 +66,7 @@ class AuditScope:
         return cls((("__scope__", "overall"),))
 
 
-ScopeKey: TypeAlias = tuple[str, str, str]
+ScopeKey: TypeAlias = tuple[tuple[str, str, str], ...]
 
 
 def scope_key(scope: AuditScope) -> ScopeKey:
@@ -74,11 +74,10 @@ def scope_key(scope: AuditScope) -> ScopeKey:
 
     if not isinstance(scope, AuditScope):
         raise TypeError("scope must be AuditScope")
-    if len(scope.attributes) != 1:
-        raise ValueError("Milestone 3 scope keys require one attribute")
-    name, value = scope.attributes[0]
-    type_tag, canonical_value = _canonical_typed_parts(value)
-    return name, type_tag, canonical_value
+    return tuple(
+        (name, *_canonical_typed_parts(value))
+        for name, value in scope.attributes
+    )
 
 
 @dataclass(frozen=True)

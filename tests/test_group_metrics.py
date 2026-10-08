@@ -62,11 +62,11 @@ def test_scope_key_equality_and_hash_are_type_sensitive():
 
     assert len(scopes) == 3
     assert scope_key(AuditScope((("group", True),))) == (
-        "group", "bool", "true"
+        ("group", "bool", "true"),
     )
-    assert scope_key(AuditScope((("group", 1),))) == ("group", "int", "1")
+    assert scope_key(AuditScope((("group", 1),))) == (("group", "int", "1"),)
     assert scope_key(AuditScope((("group", "1"),))) == (
-        "group", "str", '"1"'
+        ("group", "str", '"1"'),
     )
 
 
