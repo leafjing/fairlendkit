@@ -5,6 +5,12 @@ import pytest
 from pydantic import ValidationError
 
 from fairlendkit import AuditConfig, AuditResultV2, DataValidationError, run_audit
+from fairlendkit.application import (
+    _comparison_evaluator,
+    _scope_evaluator,
+    _take,
+)
+from fairlendkit.metrics.group import NormalizedAuditData, calculate_group_metrics
 from fairlendkit.report import AuditResultV1_0, migrate_audit_result_v1_0
 
 
@@ -30,6 +36,57 @@ def frame():
         "score": [0.9, 0.7, 0.8, 0.4, 0.6, 0.1],
         "group": ["A", "A", "A", "B", "B", "B"],
     })
+
+
+def test_target_only_uncertainty_evaluators_match_full_metric_orchestration():
+    data = NormalizedAuditData(
+        favorable_outcome=(True, False, True, False, True, False),
+        favorable_decision=(True, True, True, False, True, False),
+        favorable_score=(0.9, 0.7, 0.8, 0.4, 0.6, 0.1),
+        protected_values={"group": ("A", "A", "A", "B", "B", "B")},
+    )
+    audit_config = config()
+    calculated = calculate_group_metrics(data, audit_config)
+    group_b = tuple(range(3, 6))
+    scope_draw = (2, 0, 1)
+    scope_sample = _take(data, tuple(group_b[index] for index in scope_draw))
+    full_scope = calculate_group_metrics(scope_sample, audit_config)
+    for metric in (
+        item
+        for item in calculated
+        if item.group is not None and item.group.attributes == (("group", "B"),)
+    ):
+        expected = next(
+            item.value.value
+            for item in full_scope
+            if item.group is not None
+            and item.group.attributes == (("__scope__", "overall"),)
+            and item.metric == metric.metric
+        )
+        assert _scope_evaluator(metric, data, audit_config, group_b)(scope_draw) == expected
+
+    group_a = tuple(range(0, 3))
+    comparison_draw = (1, 2, 0)
+    reference_draw = (2, 0, 1)
+    comparison_sample = _take(
+        data,
+        tuple(group_b[index] for index in comparison_draw)
+        + tuple(group_a[index] for index in reference_draw),
+    )
+    full_comparison = calculate_group_metrics(comparison_sample, audit_config)
+    for metric in (item for item in calculated if item.comparison_group is not None):
+        expected = next(
+            item.value.value
+            for item in full_comparison
+            if item.metric == metric.metric
+            and item.comparison_group is not None
+            and item.comparison_group.attributes == metric.comparison_group.attributes
+            and item.reference_group.attributes == metric.reference_group.attributes
+        )
+        actual = _comparison_evaluator(
+            metric, data, audit_config, group_b, group_a
+        )(comparison_draw, reference_draw)
+        assert actual == expected
 
 
 def test_run_audit_assembles_deterministic_schema_v2_without_mutation():
