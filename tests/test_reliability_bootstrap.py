@@ -146,8 +146,8 @@ def test_type7_interval_and_insufficient_valid_draws(bootstrap_golden):
     assert interval is not None
     expected = bootstrap_golden["scope_interval"]
     assert interval.valid_resamples == expected["valid_resamples"]
-    assert interval.lower == expected["lower"]
-    assert interval.upper == expected["upper"]
+    assert interval.lower.hex() == expected["lower_hex"]
+    assert interval.upper.hex() == expected["upper_hex"]
     assert bootstrap_interval(
         4,
         lambda indices: None,
@@ -176,8 +176,8 @@ def test_comparison_bootstrap_uses_independent_side_streams(bootstrap_golden):
 
     assert interval is not None
     assert interval.valid_resamples == expected["valid_resamples"]
-    assert interval.lower == expected["lower"]
-    assert interval.upper == expected["upper"]
+    assert interval.lower.hex() == expected["lower_hex"]
+    assert interval.upper.hex() == expected["upper_hex"]
 
 
 def test_insufficient_resamples_add_limitation_without_changing_point_reliability():
