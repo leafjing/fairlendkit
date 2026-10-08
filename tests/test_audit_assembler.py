@@ -121,6 +121,17 @@ def test_native_not_assessed_with_uncertainty_and_partial_mode_spoofing_fail():
     with pytest.raises(ValidationError, match="native results cannot contain"):
         AuditResultV2.model_validate(migrated)
 
+    migrated = migrate_audit_result_v1_0(
+        AuditResultV1_0.model_validate_json((Path(__file__).parents[1] / "examples" / "synthetic" / "audit-result.json").read_text()).model_dump(mode="json")
+    ).model_dump(mode="json")
+    undefined = next(item for item in migrated["observed_metrics"] if item["value"]["undefined_reason"] is not None)
+    undefined["value"]["undefined_reason"] = {
+        "code": "constant_score",
+        "message": "Eligible scores are constant, so ranking discrimination is undefined.",
+    }
+    with pytest.raises(ValidationError, match="Schema 1.0 undefined reasons"):
+        AuditResultV2.model_validate(migrated)
+
 
 def test_v2_requires_new_fields_and_enforces_metric_invariants():
     payload = run_audit(frame(), config()).model_dump(mode="json")

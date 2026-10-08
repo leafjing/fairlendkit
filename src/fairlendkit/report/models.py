@@ -599,6 +599,13 @@ class AuditResultV2(ResultModel):
         if migrated:
             if any(item.metric.value not in {metric.value for metric in MetricName} for item in self.observed_metrics):
                 raise ValueError("migrated results may contain only Schema 1.0 metric names")
+            v1_reason_codes = {code.value for code in UndefinedReasonCode}
+            if any(
+                item.value.undefined_reason is not None
+                and item.value.undefined_reason.code.value not in v1_reason_codes
+                for item in self.observed_metrics
+            ):
+                raise ValueError("migrated results may contain only Schema 1.0 undefined reasons")
             if any(item.affected_metric_keys for item in self.limitations):
                 raise ValueError("migrated limitations must use empty affected_metric_keys")
         if not migrated and tuple(self.observed_metrics) != tuple(sorted(self.observed_metrics, key=_observed_metric_sort_key)):
