@@ -17,7 +17,7 @@ from fairlendkit import (
     validate_audit_data,
 )
 from fairlendkit.data.contracts import ISSUE_REGISTRY, make_issue
-from fairlendkit.report import AuditResult
+from fairlendkit.report import AuditResultV1_0 as AuditResult
 
 
 def config(**overrides):

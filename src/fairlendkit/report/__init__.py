@@ -7,8 +7,11 @@ from fairlendkit.metrics.contracts import (
 )
 from fairlendkit.report.models import (
     AUDIT_RESULT_SCHEMA_VERSION,
+    AUDIT_RESULT_SCHEMA_VERSION_V1_0,
     AuditGroup,
     AuditResult,
+    AuditResultV1_0,
+    AuditResultV2,
     ExclusionRecord,
     Limitation,
     MetricName,
@@ -24,13 +27,17 @@ from fairlendkit.report.models import (
     ValidationEvidence,
     WarningRecord,
     to_validation_evidence,
+    migrate_audit_result_v1_0,
 )
 
 __all__ = [
     "AUDIT_RESULT_SCHEMA_VERSION",
+    "AUDIT_RESULT_SCHEMA_VERSION_V1_0",
     "CANONICAL_UNDEFINED_MESSAGES_V2",
     "AuditGroup",
     "AuditResult",
+    "AuditResultV1_0",
+    "AuditResultV2",
     "ExclusionRecord",
     "Limitation",
     "MetricName",
@@ -48,4 +55,5 @@ __all__ = [
     "ValidationEvidence",
     "WarningRecord",
     "to_validation_evidence",
+    "migrate_audit_result_v1_0",
 ]

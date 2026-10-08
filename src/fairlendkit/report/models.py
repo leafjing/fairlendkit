@@ -11,6 +11,12 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 from fairlendkit.config import AuditConfig
 from fairlendkit.config.models import Label
+from fairlendkit.metrics.contracts import (
+    CANONICAL_UNDEFINED_MESSAGES_V2,
+    LimitationCode,
+    MetricNameV2,
+    UndefinedReasonCodeV2,
+)
 from fairlendkit.data.contracts import (
     APPLICABILITY_STATEMENT,
     BaselineComparisonResult,
@@ -25,7 +31,9 @@ from fairlendkit.data.contracts import (
     make_issue,
 )
 
-AUDIT_RESULT_SCHEMA_VERSION = "1.0"
+AUDIT_RESULT_SCHEMA_VERSION_V1_0 = "1.0"
+AUDIT_RESULT_SCHEMA_VERSION_V2 = "2.0"
+AUDIT_RESULT_SCHEMA_VERSION = AUDIT_RESULT_SCHEMA_VERSION_V2
 Identifier = Annotated[str, Field(min_length=1, pattern=r"^[a-z][a-z0-9_.-]*$")]
 
 
@@ -426,7 +434,7 @@ class RunMetadata(ResultModel):
     configuration: AuditConfig
 
 
-class AuditResult(ResultModel):
+class AuditResultV1_0(ResultModel):
     """The only supported input contract for report renderers."""
 
     schema_version: Literal["1.0"]
@@ -459,6 +467,133 @@ class AuditResult(ResultModel):
                     f"{flag.related_metric_key!r}"
                 )
         return self
+
+
+class ReliabilityStateV2(StrEnum):
+    RELIABLE = "reliable"
+    UNRELIABLE = "unreliable"
+    UNDEFINED = "undefined"
+    NOT_APPLICABLE = "not_applicable"
+    NOT_ASSESSED = "not_assessed"
+
+
+class UndefinedReasonV2(ResultModel):
+    code: UndefinedReasonCodeV2
+    message: Annotated[str, Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def validate_canonical_message(self) -> "UndefinedReasonV2":
+        if self.message != CANONICAL_UNDEFINED_MESSAGES_V2[self.code]:
+            raise ValueError(f"message must match canonical text for {self.code.value!r}")
+        return self
+
+
+class ReportedMetricValueV2(ResultModel):
+    value: float | None
+    numerator: float | None
+    denominator: float | None
+    undefined_reason: UndefinedReasonV2 | None
+
+    @model_validator(mode="after")
+    def validate_state(self) -> "ReportedMetricValueV2":
+        if any(value is not None and not math.isfinite(value) for value in (self.value, self.numerator, self.denominator)):
+            raise ValueError("metric values and evidence must be finite or null")
+        if (self.value is None) == (self.undefined_reason is None):
+            raise ValueError("exactly one of value and undefined_reason is required")
+        return self
+
+    @property
+    def is_defined(self) -> bool:
+        return self.value is not None
+
+
+class ObservedMetricV2(ResultModel):
+    key: Identifier
+    metric: MetricNameV2
+    value: ReportedMetricValueV2
+    sample_count: int = Field(ge=0)
+    reliability: ReliabilityStateV2
+    group: AuditGroup | None = None
+    comparison_group: AuditGroup | None = None
+    reference_group: AuditGroup | None = None
+
+    @model_validator(mode="after")
+    def validate_contract(self) -> "ObservedMetricV2":
+        comparison = self.metric in {
+            MetricNameV2.SELECTION_RATE_DIFFERENCE,
+            MetricNameV2.ADVERSE_IMPACT_RATIO,
+            MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE,
+            MetricNameV2.EQUAL_OPPORTUNITY_DIFFERENCE,
+            MetricNameV2.EQUALIZED_ODDS_GAP,
+        }
+        if comparison != (self.comparison_group is not None and self.reference_group is not None):
+            raise ValueError("metric direction does not match metric kind")
+        if comparison and self.group is not None:
+            raise ValueError("comparison metrics cannot set group")
+        if not comparison and (self.group is None or self.comparison_group is not None or self.reference_group is not None):
+            raise ValueError("scope metrics require only group")
+        if self.value.is_defined and self.reliability not in {ReliabilityStateV2.RELIABLE, ReliabilityStateV2.UNRELIABLE, ReliabilityStateV2.NOT_ASSESSED}:
+            raise ValueError("defined metric has contradictory reliability")
+        if not self.value.is_defined:
+            expected = ReliabilityStateV2.NOT_APPLICABLE if self.value.undefined_reason.code == UndefinedReasonCodeV2.METRIC_NOT_APPLICABLE else ReliabilityStateV2.UNDEFINED
+            if self.reliability not in {expected, ReliabilityStateV2.NOT_ASSESSED}:
+                raise ValueError("undefined metric has contradictory reliability")
+        return self
+
+
+class LimitationV2(ResultModel):
+    code: LimitationCode | Identifier
+    detail: Annotated[str, Field(min_length=1)]
+    affected_metric_keys: tuple[Identifier, ...]
+
+    @model_validator(mode="after")
+    def validate_keys(self) -> "LimitationV2":
+        if len(self.affected_metric_keys) != len(set(self.affected_metric_keys)):
+            raise ValueError("affected_metric_keys must be unique")
+        _reject_automated_verdict(self.detail)
+        return self
+
+
+class AuditResultV2(ResultModel):
+    schema_version: Literal["2.0"]
+    metadata: RunMetadata
+    validation: ValidationEvidence
+    observed_metrics: tuple[ObservedMetricV2, ...]
+    screening_flags: tuple[ScreeningFlag, ...]
+    uncertainty: tuple[StatisticalUncertainty, ...]
+    limitations: tuple[LimitationV2, ...]
+    practitioner_review_notes: tuple[PractitionerReviewNote, ...]
+
+    @model_validator(mode="after")
+    def validate_references(self) -> "AuditResultV2":
+        keys = tuple(item.key for item in self.observed_metrics)
+        if len(keys) != len(set(keys)):
+            raise ValueError("observed metric keys must be unique")
+        known = set(keys)
+        references = [item.metric_key for item in self.uncertainty]
+        references.extend(flag.related_metric_key for flag in self.screening_flags if flag.related_metric_key)
+        references.extend(key for item in self.limitations for key in item.affected_metric_keys)
+        if any(key not in known for key in references):
+            raise ValueError("result contains an unknown metric reference")
+        if len([item.metric_key for item in self.uncertainty]) != len(set(item.metric_key for item in self.uncertainty)):
+            raise ValueError("uncertainty metric references must be unique")
+        return self
+
+
+AuditResult = AuditResultV2
+
+
+def migrate_audit_result_v1_0(payload: object) -> AuditResultV2:
+    """Strictly parse one 1.0 payload and preserve its recorded evidence in 2.0."""
+
+    legacy = AuditResultV1_0.model_validate(payload)
+    data = legacy.model_dump(mode="json")
+    data["schema_version"] = AUDIT_RESULT_SCHEMA_VERSION_V2
+    for metric in data["observed_metrics"]:
+        metric["reliability"] = ReliabilityStateV2.NOT_ASSESSED
+    for limitation in data["limitations"]:
+        limitation["affected_metric_keys"] = ()
+    return AuditResultV2.model_validate(data)
 
 
 def _reject_automated_verdict(text: str) -> None:
