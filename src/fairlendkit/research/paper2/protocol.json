@@ -1,0 +1,16 @@
+{
+  "protocol_id": "fairlendkit-paper2-v1",
+  "status": "frozen",
+  "master_seed": 20261008,
+  "confirmatory_replicates": 50000,
+  "exploratory_replicates": 10000,
+  "monitoring_checkpoints": [10000, 20000, 30000, 40000],
+  "confirmatory_test_ids": [
+    "P2-C1-AIR-MAE-N",
+    "P2-C3-PRECISION-DEFINED",
+    "P2-C4-AIR-FP-GATE",
+    "P2-C5-MISSINGNESS-MAE",
+    "P2-C6-AIR-COVERAGE"
+  ],
+  "smoke_seed_domain": "fairlendkit-paper2-smoke-v1"
+}
