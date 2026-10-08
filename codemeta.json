@@ -6,6 +6,7 @@
   "version": "0.1.0.dev0",
   "codeRepository": "https://github.com/leafjing/fairlendkit",
   "issueTracker": "https://github.com/leafjing/fairlendkit/issues",
+  "license": "https://spdx.org/licenses/Apache-2.0",
   "programmingLanguage": "Python",
   "runtimePlatform": [
     "Python 3.11",
