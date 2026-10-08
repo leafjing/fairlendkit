@@ -695,7 +695,8 @@ def test_representative_rss_uses_spawned_isolated_process(monkeypatch, manifest)
         ("start", "failed to start"),
         ("exit", "subprocess failed"),
         ("timeout", "timed out"),
-        ("timeout-stuck", "failed to terminate"),
+        ("timeout-kill", "timed out"),
+        ("timeout-stuck", "failed to stop"),
         ("missing", "subprocess failed"),
         ("worker-error", "benchmark failed"),
         ("no-rss", "finite and positive"),
@@ -707,6 +708,7 @@ def test_representative_rss_uses_spawned_isolated_process(monkeypatch, manifest)
         "start-failure",
         "nonzero-exit",
         "timeout",
+        "timeout-kill-fallback",
         "timeout-stuck",
         "missing-result",
         "worker-error",
@@ -755,6 +757,7 @@ def test_representative_rss_subprocess_failures_are_closed(
 
         def __init__(self):
             self.terminated = False
+            self.killed = False
 
         def start(self):
             if mode == "start":
@@ -766,11 +769,17 @@ def test_representative_rss_subprocess_failures_are_closed(
         def is_alive(self):
             if mode == "timeout-stuck":
                 return True
+            if mode == "timeout-kill":
+                return not self.killed
             return mode == "timeout" and not self.terminated
 
         def terminate(self):
             lifecycle.append("terminate")
             self.terminated = True
+
+        def kill(self):
+            lifecycle.append("kill")
+            self.killed = True
 
     class Context:
         def Pipe(self, duplex=False):
@@ -786,5 +795,13 @@ def test_representative_rss_subprocess_failures_are_closed(
 
     with pytest.raises(IntegrityError, match=message):
         _measure_representative(manifest, "REG")
-    if mode in {"timeout", "timeout-stuck"}:
-        assert lifecycle == [("join", 600), "terminate", ("join", None)]
+    if mode == "timeout":
+        assert lifecycle == [("join", 600), "terminate", ("join", 30)]
+    elif mode in {"timeout-kill", "timeout-stuck"}:
+        assert lifecycle == [
+            ("join", 600),
+            "terminate",
+            ("join", 30),
+            "kill",
+            ("join", 30),
+        ]
