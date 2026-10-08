@@ -9,8 +9,14 @@ import numpy as np
 from numpy.polynomial.hermite import hermgauss
 from scipy.special import ndtri
 
-from fairlendkit.research.paper2.registry import Calibration, Missingness, Scenario, ScenarioFamily
-from fairlendkit.research.paper2.rng import generator_rng
+from fairlendkit.research.paper2.registry import (
+    Calibration,
+    Missingness,
+    Scenario,
+    ScenarioFamily,
+    scenario_registry,
+)
+from fairlendkit.research.paper2.rng import generator_rng, generator_scope
 
 
 @dataclass(frozen=True)
@@ -24,7 +30,7 @@ class GeneratedRow:
 @dataclass(frozen=True)
 class GeneratedAudit:
     scenario_id: str
-    pairing_id: str
+    pair_id: str
     replicate_id: int
     rows: tuple[GeneratedRow, ...]
 
@@ -208,18 +214,27 @@ def solve_missing_intercept(
 
 
 def generate_audit(scenario: Scenario, replicate_id: int, master_seed: int) -> GeneratedAudit:
-    row_rng = generator_rng(
-        master_seed=master_seed,
-        pairing_id=scenario.effective_pairing_id,
-        replicate_id=replicate_id,
-        role="row",
+    pair_id = scenario.effective_pair_id
+    paired = tuple(
+        item for item in scenario_registry().values() if item.effective_pair_id == pair_id
     )
-    missing_rng = generator_rng(
-        master_seed=master_seed,
-        pairing_id=scenario.effective_pairing_id,
-        replicate_id=replicate_id,
-        role="missingness",
-    )
+    max_reference_n = max(item.reference_n for item in paired)
+    max_comparison_n = max(item.comparison_n for item in paired)
+
+    def stream(role: str):
+        return generator_rng(
+            master_seed=master_seed,
+            pair_id=pair_id,
+            replicate_id=replicate_id,
+            scope=generator_scope(pair_id, scenario.scenario_id, role),
+            role=role,
+        )
+
+    decision_rng = stream("selection_decision_uniform") if scenario.family is ScenarioFamily.SELECTION else None
+    selection_outcome_rng = stream("selection_outcome_uniform") if scenario.family is ScenarioFamily.SELECTION else None
+    performance_x_rng = stream("performance_x_normal") if scenario.family is ScenarioFamily.PERFORMANCE else None
+    performance_outcome_rng = stream("performance_outcome_uniform") if scenario.family is ScenarioFamily.PERFORMANCE else None
+    missing_rng = stream("missingness_uniform")
     performance_parameters = None
     threshold = 0.5
     if scenario.family is ScenarioFamily.PERFORMANCE:
@@ -232,21 +247,24 @@ def generate_audit(scenario: Scenario, replicate_id: int, master_seed: int) -> G
     missing_intercept = solve_missing_intercept(scenario, performance_parameters)
 
     rows: list[GeneratedRow] = []
-    prefix_paired = scenario.effective_pairing_id in {"PAIR-C1-N", "PAIR-C6-COVERAGE"}
-    for group, count in ((0, scenario.reference_n), (1, scenario.comparison_n)):
-        generation_count = 1_000 if prefix_paired else count
+    for group, count, generation_count in (
+        (0, scenario.reference_n, max_reference_n),
+        (1, scenario.comparison_n, max_comparison_n),
+    ):
         for row_index in range(generation_count):
             if scenario.family is ScenarioFamily.SELECTION:
+                assert decision_rng is not None and selection_outcome_rng is not None
                 selection_rate = 0.50 if group == 0 else 0.50 * scenario.population_air
-                decision = row_rng.bernoulli(selection_rate)
+                decision = decision_rng.bernoulli(selection_rate)
                 score = 0.75 if decision else 0.25
-                outcome = row_rng.bernoulli(0.20)
+                outcome = selection_outcome_rng.bernoulli(0.20)
             else:
                 assert performance_parameters is not None
+                assert performance_x_rng is not None and performance_outcome_rng is not None
                 alpha, beta = performance_parameters
-                x_value = row_rng.normal()
+                x_value = performance_x_rng.normal()
                 probability = _logistic(alpha + beta * x_value)
-                outcome = row_rng.bernoulli(probability)
+                outcome = performance_outcome_rng.bernoulli(probability)
                 score = _calibrated_score(probability, scenario.calibration)
                 decision = int(score >= threshold)
             missing = missing_rng.bernoulli(
@@ -263,7 +281,7 @@ def generate_audit(scenario: Scenario, replicate_id: int, master_seed: int) -> G
                 )
     return GeneratedAudit(
         scenario.scenario_id,
-        scenario.effective_pairing_id,
+        scenario.effective_pair_id,
         replicate_id,
         tuple(rows),
     )

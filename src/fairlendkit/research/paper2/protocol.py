@@ -19,6 +19,8 @@ CONFIRMATORY_TEST_IDS = (
     "P2-C5-MISSINGNESS-MAE",
     "P2-C6-AIR-COVERAGE",
 )
+RNG_SCHEMA_VERSION = "paper2-rng-a1-v1"
+RNG_FIXTURE_SHA256 = "6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905"
 
 
 class ExecutionMode(StrEnum):
@@ -34,6 +36,8 @@ class ProductionRunLockedError(RuntimeError):
 class Paper2Protocol:
     protocol_id: str
     status: str
+    rng_schema_version: str
+    rng_fixture_sha256: str
     master_seed: int
     confirmatory_replicates: int
     exploratory_replicates: int
@@ -57,6 +61,8 @@ def load_protocol(path: str | Path | None = None) -> Paper2Protocol:
     required = {
         "protocol_id",
         "status",
+        "rng_schema_version",
+        "rng_fixture_sha256",
         "master_seed",
         "confirmatory_replicates",
         "exploratory_replicates",
@@ -69,6 +75,8 @@ def load_protocol(path: str | Path | None = None) -> Paper2Protocol:
     protocol = Paper2Protocol(
         protocol_id=str(raw["protocol_id"]),
         status=str(raw["status"]),
+        rng_schema_version=str(raw["rng_schema_version"]),
+        rng_fixture_sha256=str(raw["rng_fixture_sha256"]),
         master_seed=int(raw["master_seed"]),
         confirmatory_replicates=int(raw["confirmatory_replicates"]),
         exploratory_replicates=int(raw["exploratory_replicates"]),
@@ -78,6 +86,8 @@ def load_protocol(path: str | Path | None = None) -> Paper2Protocol:
     )
     if (
         protocol.master_seed != MASTER_SEED
+        or protocol.rng_schema_version != RNG_SCHEMA_VERSION
+        or protocol.rng_fixture_sha256 != RNG_FIXTURE_SHA256
         or protocol.confirmatory_replicates != CONFIRMATORY_REPLICATES
         or protocol.exploratory_replicates != EXPLORATORY_REPLICATES
         or protocol.monitoring_checkpoints != MONITORING_CHECKPOINTS

@@ -16,6 +16,10 @@ def test_protocol_manifest_matches_frozen_contract():
     protocol = load_protocol()
 
     assert protocol.status == "frozen"
+    assert protocol.rng_schema_version == "paper2-rng-a1-v1"
+    assert protocol.rng_fixture_sha256 == (
+        "6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905"
+    )
     assert protocol.master_seed == 20261008
     assert protocol.confirmatory_replicates == 50_000
     assert protocol.monitoring_checkpoints == (10_000, 20_000, 30_000, 40_000)
@@ -26,6 +30,8 @@ def test_protocol_parser_fails_closed_on_extra_or_changed_fields(tmp_path):
     source = {
         "protocol_id": "fairlendkit-paper2-v1",
         "status": "frozen",
+        "rng_schema_version": "paper2-rng-a1-v1",
+        "rng_fixture_sha256": "6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905",
         "master_seed": 20261008,
         "confirmatory_replicates": 10_000,
         "exploratory_replicates": 10_000,
@@ -74,10 +80,10 @@ def test_registry_is_deterministic_exhaustive_and_has_frozen_pairing():
         "STRESS-N025-MNAR30",
     ):
         assert required in registry
-    assert registry["SEL-AIR080-N025"].effective_pairing_id == "PAIR-C1-N"
-    assert registry["SEL-AIR080-N1000"].effective_pairing_id == "PAIR-C1-N"
-    assert registry["PERF-DEC001"].effective_pairing_id == "PAIR-C3-DEC"
-    assert registry["MISS-MNAR30"].effective_pairing_id == "PAIR-C5-MISSING"
+    assert registry["SEL-AIR080-N025"].effective_pair_id == "PAIR-C1-N"
+    assert registry["SEL-AIR080-N1000"].effective_pair_id == "PAIR-C1-N"
+    assert registry["PERF-DEC001"].effective_pair_id == "PAIR-C3-DEC"
+    assert registry["MISS-MNAR30"].effective_pair_id == "PAIR-C5-MISSING"
 
 
 def test_h2_has_exactly_five_air_keyed_units_and_25_unique_ids():

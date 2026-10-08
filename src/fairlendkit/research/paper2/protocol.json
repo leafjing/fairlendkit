@@ -1,6 +1,8 @@
 {
   "protocol_id": "fairlendkit-paper2-v1",
   "status": "frozen",
+  "rng_schema_version": "paper2-rng-a1-v1",
+  "rng_fixture_sha256": "6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905",
   "master_seed": 20261008,
   "confirmatory_replicates": 50000,
   "exploratory_replicates": 10000,

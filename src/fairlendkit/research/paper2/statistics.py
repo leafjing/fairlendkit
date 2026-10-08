@@ -75,7 +75,7 @@ def h2_joint_bootstrap(
         return H2Estimate(None, None, None, 0, "not_estimable")
     estimates: list[float] = []
     for draw_id in range(draws):
-        rng = analysis_rng("fairlendkit-paper2-h2-v1", master_seed, draw_id)
+        rng = analysis_rng("h2_bootstrap", "H2", master_seed, draw_id)
         sampled: list[float] = []
         for _ in range(5):
             index = rng.randbelow(5)

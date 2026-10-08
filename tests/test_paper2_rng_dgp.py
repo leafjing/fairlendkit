@@ -4,6 +4,7 @@ import hashlib
 import json
 from dataclasses import asdict
 from pathlib import Path
+from struct import pack
 
 import pytest
 
@@ -14,7 +15,14 @@ from fairlendkit.research.paper2.dgp import (
     solve_performance_parameters,
 )
 from fairlendkit.research.paper2.registry import scenario_registry
-from fairlendkit.research.paper2.rng import analysis_rng, generator_rng
+from fairlendkit.research.paper2.rng import (
+    generator_rng,
+    generator_scope,
+    normal_from_uint64,
+    rng_stream,
+    uniform_closed_open,
+    uniform_open,
+)
 from fairlendkit.research.paper2.smoke import run_smoke
 
 
@@ -24,6 +32,14 @@ def _golden():
     )
 
 
+def _a1_golden():
+    path = Path(__file__).parents[1] / "docs" / "fixtures" / "paper2-rng-a1-golden.json"
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == (
+        "6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905"
+    )
+    return json.loads(path.read_text())
+
+
 def _canonical_sha256(value) -> str:
     payload = json.dumps(
         value, sort_keys=True, separators=(",", ":"), default=str
@@ -31,42 +47,181 @@ def _canonical_sha256(value) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def test_sha256_counter_rng_has_stable_candidates_and_separate_roles():
-    row = generator_rng(master_seed=20261008, pairing_id="PAIR", replicate_id=7, role="row")
-    missing = generator_rng(
+def _reference_uint64(seed: bytes, count: int) -> list[int]:
+    values: list[int] = []
+    counter = 0
+    while len(values) < count:
+        digest = hashlib.sha256(seed + pack(">Q", counter)).digest()
+        values.extend(
+            int.from_bytes(digest[offset : offset + 8], "big")
+            for offset in range(0, 32, 8)
+        )
+        counter += 1
+    return values[:count]
+
+
+def _reference_indices(seed: bytes, bound: int, count: int) -> list[int]:
+    limit = 2**64 - (2**64 % bound)
+    accepted: list[int] = []
+    counter = 0
+    while len(accepted) < count:
+        digest = hashlib.sha256(seed + pack(">Q", counter)).digest()
+        counter += 1
+        for offset in range(0, 32, 8):
+            candidate = int.from_bytes(digest[offset : offset + 8], "big")
+            if candidate < limit:
+                accepted.append(candidate % bound)
+                if len(accepted) == count:
+                    break
+    return accepted
+
+
+def test_a1_shared_stream_matches_normative_fixture_and_independent_reference():
+    expected = _a1_golden()["shared_generator"]
+    rng = rng_stream(
         master_seed=20261008,
-        pairing_id="PAIR",
-        replicate_id=7,
-        role="missingness",
+        purpose="generate",
+        unit_id="PAIR-C1-N",
+        draw_id=0,
+        scope="shared",
+        role="selection_decision_uniform",
     )
-
-    assert [row.uint64() for _ in range(5)] == [
-        13409849704425147760,
-        1677555839080287418,
-        17770011343145113409,
-        16097191126087581247,
-        4942100317005081386,
-    ]
-    assert missing.uint64() != generator_rng(
-        master_seed=20261008, pairing_id="PAIR", replicate_id=7, role="row"
-    ).uint64()
-    assert analysis_rng("fairlendkit-paper2-h2-v1", 20261008, 0).uint64() != row.uint64()
+    assert rng.seed_material.hex() == expected["seed_hex"]
+    assert hashlib.sha256(rng.seed_material + pack(">Q", 0)).hexdigest() == expected["counter_0_sha256"]
+    words = [rng.uint64() for _ in range(8)]
+    assert words == expected["first_uint64"]
+    assert words == _reference_uint64(bytes.fromhex(expected["seed_hex"]), 8)
+    assert [uniform_closed_open(word).hex() for word in words] == expected["uniform_binary64_hex"]
+    assert [int(uniform_closed_open(word) < 0.5) for word in words] == expected["bernoulli_p_0_5"]
 
 
-def test_all_generator_and_analysis_streams_match_exact_golden_sequences():
-    expected = _golden()["rng_uint64"]
-    streams = {
-        "generator_row": generator_rng(
-            master_seed=20261008, pairing_id="PAIR", replicate_id=7, role="row"
+def test_a1_normal_endpoints_and_scenario_stream_match_exact_binary64():
+    expected = _a1_golden()
+    for endpoint in expected["uint64_endpoint_transforms"]:
+        value = endpoint["uint64"]
+        assert uniform_closed_open(value).hex() == endpoint["uniform_closed_open_binary64_hex"]
+        assert uniform_open(value).hex() == endpoint["uniform_open_binary64_hex"]
+        assert normal_from_uint64(value).hex() == endpoint["normal_binary64_hex"]
+        assert pack(">d", normal_from_uint64(value)).hex() == endpoint["normal_binary64_be"]
+
+    vector = expected["scenario_specific_normal"]
+    rng = rng_stream(
+        master_seed=20261008,
+        purpose="generate",
+        unit_id="REG",
+        draw_id=0,
+        scope="scenario:REG",
+        role="performance_x_normal",
+    )
+    words = [rng.uint64() for _ in range(8)]
+    assert words == vector["first_uint64"]
+    assert [pack(">d", normal_from_uint64(word)).hex() for word in words] == vector["normal_binary64_be"]
+
+
+def test_a1_bounded_integer_indices_and_rejection_consumption_are_exact():
+    expected = _a1_golden()
+    for key, purpose, unit_id, role in (
+        ("h2_exact_indices", "h2_bootstrap", "H2", "scenario_unit_index"),
+        ("summary_exact_indices", "summary_bootstrap", "REG:adverse_impact_ratio:50000", "replicate_index"),
+        ("rejection_sampling_stress", "h2_bootstrap", "H2", "scenario_unit_index"),
+    ):
+        case = expected[key]
+        rng = rng_stream(
+            master_seed=20261008,
+            purpose=purpose,
+            unit_id=unit_id,
+            draw_id=0,
+            scope="analysis",
+            role=role,
+        )
+        assert [rng.randbelow(case["bound"]) for _ in case["indices"]] == case["indices"]
+        assert rng.candidates_consumed == case["candidates_consumed"]
+
+
+def test_a1_complete_h2_and_small_summary_index_bytes_match_checked_in_hashes():
+    expected = _golden()["bootstrap_index_bytes"]
+    cases = (
+        ("h2_bootstrap", "H2", "scenario_unit_index", 5, 5, "h2_2000_by_5_sha256"),
+        (
+            "summary_bootstrap",
+            "REG:adverse_impact_ratio:50000",
+            "replicate_index",
+            17,
+            17,
+            "summary_2000_by_17_sha256",
         ),
-        "generator_missingness": generator_rng(
-            master_seed=20261008, pairing_id="PAIR", replicate_id=7, role="missingness"
-        ),
-        "analysis_summary": analysis_rng("fairlendkit-paper2-summary-v1", 20261008, 0),
-        "analysis_h2": analysis_rng("fairlendkit-paper2-h2-v1", 20261008, 0),
+    )
+    for purpose, unit_id, role, bound, width, hash_key in cases:
+        payload = bytearray()
+        reference = bytearray()
+        for draw_id in range(2_000):
+            rng = rng_stream(
+                master_seed=20261008,
+                purpose=purpose,
+                unit_id=unit_id,
+                draw_id=draw_id,
+                scope="analysis",
+                role=role,
+            )
+            for _ in range(width):
+                payload.extend(pack(">Q", rng.randbelow(bound)))
+            for index in _reference_indices(rng.seed_material, bound, width):
+                reference.extend(pack(">Q", index))
+        assert bytes(payload) == bytes(reference)
+        assert hashlib.sha256(payload).hexdigest() == expected[hash_key]
+
+
+def test_a1_pair_routing_shares_only_registered_roles_without_collisions():
+    registry = scenario_registry()
+    pair_cases = {
+        "PAIR-C1-N": ("SEL-AIR080-N025", "SEL-AIR080-N1000"),
+        "PAIR-C3-DEC": ("PERF-DEC001", "PERF-DEC050"),
+        "PAIR-C5-MISSING": ("MISS-MCAR30", "MISS-MNAR30"),
+        "PAIR-C6-COVERAGE": ("SEL-AIR081-N050", "SEL-AIR081-N1000"),
     }
-    for role, rng in streams.items():
-        assert [rng.uint64() for _ in range(8)] == expected[role]
+    roles = {
+        "PAIR-C1-N": ("selection_decision_uniform", "selection_outcome_uniform"),
+        "PAIR-C3-DEC": ("performance_x_normal", "performance_outcome_uniform"),
+        "PAIR-C5-MISSING": (
+            "performance_x_normal",
+            "performance_outcome_uniform",
+            "missingness_uniform",
+        ),
+        "PAIR-C6-COVERAGE": ("selection_decision_uniform", "selection_outcome_uniform"),
+    }
+    shared_seeds: set[bytes] = set()
+    for pair_id, scenario_ids in pair_cases.items():
+        assert {registry[item].effective_pair_id for item in scenario_ids} == {pair_id}
+        for role in roles[pair_id]:
+            scopes = {generator_scope(pair_id, scenario_id, role) for scenario_id in scenario_ids}
+            assert scopes == {"shared"}
+            seed = generator_rng(
+                master_seed=20261008,
+                pair_id=pair_id,
+                replicate_id=0,
+                scope="shared",
+                role=role,
+            ).seed_material
+            assert seed not in shared_seeds
+            shared_seeds.add(seed)
+
+    scenario_a = generator_rng(
+        master_seed=20261008,
+        pair_id="REG",
+        replicate_id=0,
+        scope=generator_scope("REG", "REG", "performance_x_normal"),
+        role="performance_x_normal",
+    ).seed_material
+    scenario_b = generator_rng(
+        master_seed=20261008,
+        pair_id="PERF-AUC070",
+        replicate_id=0,
+        scope=generator_scope("PERF-AUC070", "PERF-AUC070", "performance_x_normal"),
+        role="performance_x_normal",
+    ).seed_material
+    assert scenario_a != scenario_b
+    assert scenario_a not in shared_seeds
+    assert scenario_b not in shared_seeds
 
 
 def test_registry_and_dgp_match_checked_in_golden_hashes():
@@ -123,6 +278,12 @@ def test_smoke_runner_is_deterministic_and_never_uses_production_seed():
 
 def test_unknown_rng_role_and_scenario_fail_closed():
     with pytest.raises(ValueError, match="role"):
-        generator_rng(master_seed=1, pairing_id="X", replicate_id=0, role="bootstrap")
+        generator_rng(
+            master_seed=1,
+            pair_id="X",
+            replicate_id=0,
+            scope="shared",
+            role="bootstrap",
+        )
     with pytest.raises(ValueError, match="Unknown registered"):
         run_smoke(("NOT-A-SCENARIO",), (0,))

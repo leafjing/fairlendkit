@@ -42,11 +42,11 @@ class Scenario:
     minimum_valid_resamples: int = 800
     confidence_level: float = 0.95
     air_threshold: float = 0.8
-    pairing_id: str | None = None
+    pair_id: str | None = None
 
     @property
-    def effective_pairing_id(self) -> str:
-        return self.pairing_id or self.scenario_id
+    def effective_pair_id(self) -> str:
+        return self.pair_id or self.scenario_id
 
 
 def _add(target: dict[str, Scenario], scenario: Scenario) -> None:
@@ -70,7 +70,7 @@ def scenario_registry() -> dict[str, Scenario]:
             scenarios,
             Scenario(
                 f"SEL-N{suffix}", ScenarioFamily.SELECTION, size, size, 0.80,
-                pairing_id=pairing,
+                pair_id=pairing,
             ),
         )
     for air_suffix, air in airs:
@@ -96,7 +96,7 @@ def scenario_registry() -> dict[str, Scenario]:
                     size,
                     size,
                     air,
-                    pairing_id=pairing,
+                    pair_id=pairing,
                 ),
             )
 
@@ -122,7 +122,7 @@ def scenario_registry() -> dict[str, Scenario]:
                 reg,
                 scenario_id=f"PERF-DEC{suffix}",
                 decision_prevalence=value,
-                pairing_id=pairing,
+                pair_id=pairing,
             ),
         )
         for n_suffix, size in sizes:
@@ -189,7 +189,7 @@ def scenario_registry() -> dict[str, Scenario]:
                     scenario_id=f"MISS-{mechanism}{suffix}",
                     missing_fraction=fraction,
                     missingness=enum_value,
-                    pairing_id=pairing,
+                    pair_id=pairing,
                 ),
             )
 
