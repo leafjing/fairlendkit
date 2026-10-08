@@ -103,4 +103,17 @@ Run the clean-environment preflight with:
 
 Passing this command is evidence only. It is not permission to run the matrix.
 The verifier runs the phase-one clean-environment gate and `git diff --check`
-over the complete PR range; either non-zero result fails the gate.
+over the complete PR range; either non-zero result fails the gate. Inside that
+fresh locked environment it also invokes the real, unmocked manifest builder
+and the smoke resource benchmark, binding evidence to the observed clean HEAD,
+interpreter, and installed freeze.
+
+## Post-merge execution seal
+
+This PR defines `paper2-execution-seal-v1`; it does not self-issue a seal. After
+merge, the reviewer must generate canonical seal bytes and publish their
+SHA-256 out of band. Runtime validation requires both the seal file and that
+external digest, then binds the seal to the actual clean merge HEAD, manifest
+hash, frozen 1,450-shard plan hash, protocol/A1 commit, protocol manifest,
+normative RNG fixture, and environment lock. A missing, modified, symlinked,
+self-reported, pre-merge, or identity-mismatched seal fails closed.

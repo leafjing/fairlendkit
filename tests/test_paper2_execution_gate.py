@@ -1,6 +1,8 @@
 """Smoke-only contract tests for the Paper 2 confirmatory execution gate."""
 
 import json
+import hashlib
+from dataclasses import asdict
 from dataclasses import replace
 from pathlib import Path
 
@@ -20,6 +22,7 @@ from fairlendkit.research.paper2.execution import (
     frozen_execution_scenario_ids,
     smoke_shards,
     validate_complete_set,
+    validate_execution_seal,
     validate_resource_preflight,
     validate_shard,
     write_smoke_shard,
@@ -224,6 +227,12 @@ def test_invalid_shard_boundaries_and_paths_fail_closed(spec):
         ShardSpec(*spec)
 
 
+@pytest.mark.parametrize("value", (True, 0.0, 1.0))
+def test_shard_identity_requires_exact_integers(value):
+    with pytest.raises(IntegrityError, match="exact integers"):
+        ShardSpec("smoke", "REG", value, 0, 2)
+
+
 def test_workspace_rejects_relative_root_namespace_mismatch_and_symlink_escape(
     tmp_path, manifest
 ):
@@ -252,6 +261,62 @@ def test_raw_schema_is_versioned_recursive_and_rejects_unknown_or_nonfinite_valu
     raw["payload"]["metric_values"][0].append({"p_value": 0.01})
     with pytest.raises(IntegrityError, match="invalid"):
         execution._validate_raw_payload(raw["payload"])
+
+
+def test_metric_key_grammar_and_state_associations_fail_closed():
+    with pytest.raises(IntegrityError, match="unknown metric key"):
+        replace(_payload(), metric_values=(("evil.selection_rate", 0.5),),
+                metric_defined=(("evil.selection_rate", True),),
+                reliability=(("evil.selection_rate", "reliable"),),
+                uncertainty=(("evil.selection_rate", None),))
+    with pytest.raises(IntegrityError, match="inconsistent state"):
+        replace(_payload(), metric_defined=(("overall.selection_rate", False),))
+    with pytest.raises(IntegrityError, match="not eligible"):
+        replace(_payload(), reliability=(("overall.selection_rate", "unreliable"),))
+    with pytest.raises(IntegrityError, match="flag association"):
+        replace(_payload(), flags=(("air_below_threshold", "overall.selection_rate"),))
+
+
+def test_final_and_temporary_artifact_symlinks_fail_closed(tmp_path, manifest):
+    workspace = ExecutionWorkspace(tmp_path.resolve(), "smoke")
+    spec = smoke_shards("REG", replicates=2, shard_size=2)[0]
+    workspace.output_dir.mkdir()
+    outside = tmp_path / "outside"
+    outside.write_bytes(b"outside")
+    records_path = workspace.output_dir / "REG--00000.jsonl"
+    records_path.symlink_to(outside)
+    with pytest.raises(IntegrityError, match="symlink"):
+        write_smoke_shard(workspace, manifest, spec, _records(spec))
+    records_path.unlink()
+    temp_path = workspace.output_dir / "REG--00000.jsonl.tmp"
+    temp_path.symlink_to(outside)
+    with pytest.raises(IntegrityError, match="symlink"):
+        write_smoke_shard(workspace, manifest, spec, _records(spec))
+
+
+def test_external_execution_seal_binds_bytes_and_runtime_identity(tmp_path, manifest):
+    seal = {
+        "schema_version": "paper2-execution-seal-v1",
+        "code_commit": manifest.code_commit,
+        "protocol_commit": manifest.protocol_commit,
+        "manifest_sha256": execution.manifest_sha256(manifest),
+        "shard_plan_sha256": execution.shard_plan_sha256(),
+        "protocol_manifest_sha256": manifest.protocol_manifest_sha256,
+        "rng_fixture_sha256": manifest.rng_fixture_sha256,
+        "environment_lock_sha256": manifest.environment_lock_sha256,
+    }
+    seal_path = tmp_path / "execution-seal.json"
+    seal_bytes = (json.dumps(seal, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    seal_path.write_bytes(seal_bytes)
+    seal_hash = hashlib.sha256(seal_bytes).hexdigest()
+    assert validate_execution_seal(seal_path, seal_hash, manifest).code_commit == CODE_COMMIT
+    with pytest.raises(IntegrityError, match="external seal hash"):
+        validate_execution_seal(seal_path, "0" * 64, manifest)
+    seal["code_commit"] = "2" * 40
+    modified = (json.dumps(seal, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    seal_path.write_bytes(modified)
+    with pytest.raises(IntegrityError, match="runtime identity"):
+        validate_execution_seal(seal_path, hashlib.sha256(modified).hexdigest(), manifest)
     raw = json.loads(execution._canonical_record(RawReplicateRecord("REG", 0, _payload())))
     raw["payload"]["nested_result"] = {"p_value": 0.01}
     with pytest.raises(IntegrityError, match="frozen raw-record"):

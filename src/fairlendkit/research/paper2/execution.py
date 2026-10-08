@@ -12,12 +12,13 @@ import shutil
 import subprocess
 import sys
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from math import isfinite
 from pathlib import Path
 from typing import Iterable
 
 from fairlendkit.metrics.contracts import LimitationCode, MetricNameV2
+from fairlendkit.metrics.group import canonical_typed_token
 
 from fairlendkit.research.paper2.protocol import (
     CONFIRMATORY_REPLICATES,
@@ -42,7 +43,22 @@ RELIABILITY_STATES = frozenset(
 )
 FLAG_CODES = frozenset({"air_below_threshold"})
 LIMITATION_CODES = frozenset(code.value for code in LimitationCode)
+SCOPE_METRIC_NAMES = frozenset(
+    {
+        "selection_rate", "denial_rate", "accuracy", "precision",
+        "true_positive_rate", "false_positive_rate", "false_negative_rate",
+        "brier_score", "roc_auc",
+    }
+)
+COMPARISON_METRIC_NAMES = frozenset(
+    {
+        "selection_rate_difference", "adverse_impact_ratio",
+        "demographic_parity_difference", "equal_opportunity_difference",
+        "equalized_odds_gap",
+    }
+)
 METRIC_NAMES = tuple(metric.value for metric in MetricNameV2)
+_TOKEN_RE = r"(?:str|int|bool|float)-[0-9a-f]+"
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 _COMMIT_RE = re.compile(r"[0-9a-f]{40}")
 
@@ -94,6 +110,33 @@ class SmokeBenchmarkEvidence:
 
 
 @dataclass(frozen=True)
+class ExecutionSeal:
+    schema_version: str
+    code_commit: str
+    protocol_commit: str
+    manifest_sha256: str
+    shard_plan_sha256: str
+    protocol_manifest_sha256: str
+    rng_fixture_sha256: str
+    environment_lock_sha256: str
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "paper2-execution-seal-v1":
+            raise IntegrityError("Execution seal schema is not frozen.")
+        if not _COMMIT_RE.fullmatch(self.code_commit) or self.protocol_commit != PROTOCOL_A1_COMMIT:
+            raise IntegrityError("Execution seal commit identity is invalid.")
+        for value in (
+            self.manifest_sha256,
+            self.shard_plan_sha256,
+            self.protocol_manifest_sha256,
+            self.rng_fixture_sha256,
+            self.environment_lock_sha256,
+        ):
+            if not _SHA256_RE.fullmatch(value):
+                raise IntegrityError("Execution seal hashes must be lowercase SHA-256 values.")
+
+
+@dataclass(frozen=True)
 class ExecutionManifest:
     code_commit: str
     implementation_base_commit: str
@@ -138,6 +181,44 @@ class ExecutionManifest:
             raise IntegrityError("Execution resource and shard settings are frozen.")
 
 
+def _valid_metric_key(key: object) -> bool:
+    if not isinstance(key, str):
+        return False
+    overall = re.fullmatch(r"overall\.([a-z0-9_]+)", key)
+    if overall:
+        return overall.group(1) in SCOPE_METRIC_NAMES
+    group = re.fullmatch(rf"group\.({_TOKEN_RE})\.({_TOKEN_RE})\.([a-z0-9_]+)", key)
+    if group:
+        return (
+            group.group(3) in SCOPE_METRIC_NAMES
+            and _valid_typed_token(group.group(1), require_string=True)
+            and _valid_typed_token(group.group(2))
+        )
+    comparison = re.fullmatch(
+        rf"comparison\.({_TOKEN_RE})\.({_TOKEN_RE})\.vs\.({_TOKEN_RE})\.([a-z0-9_]+)",
+        key,
+    )
+    return bool(
+        comparison
+        and comparison.group(4) in COMPARISON_METRIC_NAMES
+        and _valid_typed_token(comparison.group(1), require_string=True)
+        and _valid_typed_token(comparison.group(2))
+        and _valid_typed_token(comparison.group(3))
+    )
+
+
+def _valid_typed_token(token: str, *, require_string: bool = False) -> bool:
+    try:
+        type_tag, encoded = token.split("-", 1)
+        value = json.loads(bytes.fromhex(encoded).decode("utf-8"))
+        if require_string and type(value) is not str:
+            return False
+        expected_type = {str: "str", int: "int", bool: "bool", float: "float"}.get(type(value))
+        return expected_type == type_tag and canonical_typed_token(value) == token
+    except (UnicodeDecodeError, ValueError, json.JSONDecodeError, TypeError):
+        return False
+
+
 @dataclass(frozen=True, order=True)
 class ShardSpec:
     namespace: str
@@ -147,6 +228,11 @@ class ShardSpec:
     stop_replicate: int
 
     def __post_init__(self) -> None:
+        if any(
+            type(value) is not int
+            for value in (self.shard_id, self.start_replicate, self.stop_replicate)
+        ):
+            raise IntegrityError("Shard IDs and ranges must be exact integers.")
         if self.namespace not in {"confirmatory", "smoke"}:
             raise IntegrityError("Shard namespace must be confirmatory or smoke.")
         if not re.fullmatch(r"[A-Z0-9-]+", self.scenario_id):
@@ -192,8 +278,8 @@ class RawReplicatePayload:
     metric_defined: tuple[tuple[str, bool], ...]
     reliability: tuple[tuple[str, str], ...]
     uncertainty: tuple[tuple[str, tuple[float, float] | None], ...]
-    flags: tuple[str, ...]
-    limitations: tuple[str, ...]
+    flags: tuple[tuple[str, str], ...]
+    limitations: tuple[tuple[str, str], ...]
 
     def __post_init__(self) -> None:
         if self.schema_version != "paper2-raw-replicate-v1":
@@ -204,7 +290,7 @@ class RawReplicatePayload:
             keys = tuple(key for key, _ in entries)
             if keys != tuple(sorted(set(keys))):
                 raise IntegrityError("Raw metric keys must be unique and canonically sorted.")
-            if any(not any(key.endswith(f".{metric}") for metric in METRIC_NAMES) for key in keys):
+            if any(not _valid_metric_key(key) for key in keys):
                 raise IntegrityError("Raw payload contains an unknown metric key.")
             key_sets.append(keys)
         if len(set(key_sets)) != 1:
@@ -230,13 +316,43 @@ class RawReplicatePayload:
                 or interval[0] > interval[1]
             ):
                 raise IntegrityError("Raw uncertainty interval is invalid.")
-        if tuple(sorted(set(self.flags))) != self.flags or not set(self.flags) <= FLAG_CODES:
-            raise IntegrityError("Raw flags must be unique, sorted, and registered.")
-        if (
-            tuple(sorted(set(self.limitations))) != self.limitations
-            or not set(self.limitations) <= LIMITATION_CODES
-        ):
-            raise IntegrityError("Raw limitations must be unique, sorted, and registered.")
+        values = dict(self.metric_values)
+        defined = dict(self.metric_defined)
+        reliability = dict(self.reliability)
+        uncertainty = dict(self.uncertainty)
+        for key in key_sets[0]:
+            if defined[key]:
+                if values[key] is None or reliability[key] not in {"reliable", "unreliable"}:
+                    raise IntegrityError("Defined raw metrics have inconsistent state.")
+            elif values[key] is not None or reliability[key] not in {"undefined", "not_applicable"}:
+                raise IntegrityError("Undefined raw metrics have inconsistent state.")
+            if uncertainty[key] is not None and (
+                not defined[key]
+                or reliability[key] != "reliable"
+                or key.endswith(".demographic_parity_difference")
+            ):
+                raise IntegrityError("Raw uncertainty is not eligible for its metric state.")
+        if tuple(sorted(set(self.flags))) != self.flags:
+            raise IntegrityError("Raw flags must be unique and canonically sorted.")
+        for code, key in self.flags:
+            if (
+                code not in FLAG_CODES
+                or key not in values
+                or not key.startswith("comparison.")
+                or not key.endswith(".adverse_impact_ratio")
+                or not defined[key]
+                or reliability[key] != "reliable"
+            ):
+                raise IntegrityError("Raw flag association is invalid.")
+        if tuple(sorted(set(self.limitations))) != self.limitations:
+            raise IntegrityError("Raw limitations must be unique and canonically sorted.")
+        for code, key in self.limitations:
+            if (
+                code not in LIMITATION_CODES
+                or key not in values
+                or reliability[key] in {"undefined", "not_applicable"}
+            ):
+                raise IntegrityError("Raw limitation association is invalid.")
 
 
 @dataclass(frozen=True)
@@ -367,6 +483,55 @@ def build_manifest(repo_root: Path) -> ExecutionManifest:
         python_executable_sha256=sha256_file(Path(sys.executable).resolve()),
         python_version=platform.python_version(),
     )
+
+
+def _canonical_sha256(value: object) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def manifest_sha256(manifest: ExecutionManifest) -> str:
+    return _canonical_sha256(asdict(manifest))
+
+
+def shard_plan_sha256() -> str:
+    return _canonical_sha256([asdict(spec) for spec in frozen_confirmatory_shards()])
+
+
+def validate_execution_seal(
+    seal_path: Path,
+    expected_seal_sha256: str,
+    manifest: ExecutionManifest,
+) -> ExecutionSeal:
+    """Validate a reviewer-issued, post-merge seal against observed runtime identity."""
+    if not _SHA256_RE.fullmatch(expected_seal_sha256):
+        raise IntegrityError("Expected external execution-seal hash is invalid.")
+    if not seal_path.is_file() or seal_path.is_symlink():
+        raise IntegrityError("Reviewer-issued execution seal is missing or unsafe.")
+    seal_bytes = seal_path.read_bytes()
+    if hashlib.sha256(seal_bytes).hexdigest() != expected_seal_sha256:
+        raise IntegrityError("Execution seal bytes do not match the external seal hash.")
+    try:
+        raw = json.loads(seal_bytes)
+    except json.JSONDecodeError as error:
+        raise IntegrityError("Execution seal JSON is invalid.") from error
+    expected_fields = {field.name for field in fields(ExecutionSeal)}
+    if not isinstance(raw, dict) or set(raw) != expected_fields:
+        raise IntegrityError("Execution seal fields are invalid.")
+    seal = ExecutionSeal(**raw)
+    expected = ExecutionSeal(
+        schema_version="paper2-execution-seal-v1",
+        code_commit=manifest.code_commit,
+        protocol_commit=manifest.protocol_commit,
+        manifest_sha256=manifest_sha256(manifest),
+        shard_plan_sha256=shard_plan_sha256(),
+        protocol_manifest_sha256=manifest.protocol_manifest_sha256,
+        rng_fixture_sha256=manifest.rng_fixture_sha256,
+        environment_lock_sha256=manifest.environment_lock_sha256,
+    )
+    if seal != expected:
+        raise IntegrityError("Execution seal does not match observed runtime identity.")
+    return seal
 
 
 def host_resource_capacity(path: Path) -> ResourceCapacity:
@@ -501,6 +666,12 @@ def _paths(workspace: ExecutionWorkspace, spec: ShardSpec) -> tuple[Path, Path]:
     return output_dir / f"{stem}.jsonl", output_dir / f"{stem}.meta.json"
 
 
+def _reject_artifact_symlinks(*paths: Path) -> None:
+    for path in paths:
+        if path.is_symlink():
+            raise IntegrityError("Execution artifact cannot be a symlink.")
+
+
 def _canonical_record(record: RawReplicateRecord) -> bytes:
     if not isinstance(record.payload, RawReplicatePayload):
         raise IntegrityError("Record payload must use the frozen raw-record schema.")
@@ -528,8 +699,8 @@ def _validate_raw_payload(raw: object) -> None:
                 (key, None if value is None else tuple(value))
                 for key, value in raw["uncertainty"]
             ),
-            flags=tuple(raw["flags"]),
-            limitations=tuple(raw["limitations"]),
+            flags=tuple(tuple(item) for item in raw["flags"]),
+            limitations=tuple(tuple(item) for item in raw["limitations"]),
         )
     except (TypeError, ValueError) as error:
         raise IntegrityError("Shard raw-record payload is invalid.") from error
@@ -546,14 +717,15 @@ def write_smoke_shard(
     output_dir = workspace.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     records_path, metadata_path = _paths(workspace, spec)
+    records_tmp = records_path.with_suffix(records_path.suffix + ".tmp")
+    metadata_tmp = metadata_path.with_suffix(metadata_path.suffix + ".tmp")
+    _reject_artifact_symlinks(records_path, metadata_path, records_tmp, metadata_tmp)
     if records_path.exists() and metadata_path.exists():
         return validate_shard(workspace, manifest, spec)
     if records_path.exists() != metadata_path.exists():
         orphan = records_path if records_path.exists() else metadata_path
         orphan.unlink()
 
-    records_tmp = records_path.with_suffix(records_path.suffix + ".tmp")
-    metadata_tmp = metadata_path.with_suffix(metadata_path.suffix + ".tmp")
     records_tmp.unlink(missing_ok=True)
     metadata_tmp.unlink(missing_ok=True)
 
@@ -596,6 +768,12 @@ def validate_shard(
     workspace: ExecutionWorkspace, manifest: ExecutionManifest, spec: ShardSpec
 ) -> ShardMetadata:
     records_path, metadata_path = _paths(workspace, spec)
+    _reject_artifact_symlinks(
+        records_path,
+        metadata_path,
+        records_path.with_suffix(records_path.suffix + ".tmp"),
+        metadata_path.with_suffix(metadata_path.suffix + ".tmp"),
+    )
     if not records_path.is_file() or not metadata_path.is_file():
         raise IntegrityError("Shard records or metadata are missing.")
     try:
