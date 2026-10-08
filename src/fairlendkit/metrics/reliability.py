@@ -8,6 +8,7 @@ from enum import StrEnum
 from fairlendkit.config import AuditConfig
 from fairlendkit.metrics.contracts import (
     BootstrapInterval,
+    ComparisonUncertaintyRequest,
     LimitationCode,
     MetricNameV2,
     UncertaintyEstimator,
@@ -169,7 +170,7 @@ def collect_uncertainty(
 
 def estimate_uncertainty(
     assessed: tuple[AssessedMetric, ...],
-    requests: tuple[UncertaintyRequest, ...],
+    requests: tuple[UncertaintyRequest | ComparisonUncertaintyRequest, ...],
     estimator: UncertaintyEstimator,
 ) -> tuple[tuple[BootstrapInterval, ...], tuple[MetricLimitation, ...]]:
     """Run an injected estimator and apply the uncertainty-only gate."""

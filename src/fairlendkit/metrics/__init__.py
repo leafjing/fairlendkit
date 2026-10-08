@@ -2,6 +2,7 @@
 
 from fairlendkit.metrics.contracts import (
     BootstrapInterval,
+    ComparisonUncertaintyRequest,
     CANONICAL_UNDEFINED_MESSAGES_V2,
     LimitationCode,
     MetricNameV2,
@@ -95,6 +96,7 @@ __all__ = [
     "scope_key",
     "RNG_NAME",
     "BootstrapInterval",
+    "ComparisonUncertaintyRequest",
     "Sha256CounterSampler",
     "Sha256PercentileBootstrap",
     "bootstrap_index_draws",

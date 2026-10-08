@@ -8,6 +8,7 @@ from typing import Callable
 
 from fairlendkit.metrics.contracts import (
     BootstrapInterval,
+    ComparisonUncertaintyRequest,
     UncertaintyEstimate,
     UncertaintyRequest,
 )
@@ -21,7 +22,22 @@ _MAX_UINT64 = 2**64
 class Sha256PercentileBootstrap:
     """Concrete adapter implementing the inner uncertainty protocol."""
 
-    def estimate(self, request: UncertaintyRequest) -> UncertaintyEstimate:
+    def estimate(
+        self, request: UncertaintyRequest | ComparisonUncertaintyRequest
+    ) -> UncertaintyEstimate:
+        if isinstance(request, ComparisonUncertaintyRequest):
+            return UncertaintyEstimate(
+                comparison_bootstrap_interval(
+                    request.comparison_size,
+                    request.reference_size,
+                    request.evaluator,
+                    seed=request.seed,
+                    metric_key=request.metric_key,
+                    resamples=request.resamples,
+                    minimum_valid_resamples=request.minimum_valid_resamples,
+                    confidence_level=request.confidence_level,
+                )
+            )
         return UncertaintyEstimate(
             bootstrap_interval(
                 request.population_size,

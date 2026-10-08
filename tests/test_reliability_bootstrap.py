@@ -7,9 +7,11 @@ from pydantic import ValidationError
 from fairlendkit import AuditConfig
 from fairlendkit.metrics import (
     MetricNameV2,
+    ComparisonUncertaintyRequest,
     NormalizedAuditData,
     RNG_NAME,
     ReliabilityState,
+    Sha256PercentileBootstrap,
     UncertaintyEstimate,
     UncertaintyRequest,
     assess_reliability,
@@ -226,3 +228,57 @@ def test_uncertainty_estimator_is_replaceable_through_inner_protocol():
     assert fake.requests == [request]
     assert intervals == ()
     assert limitations[0].code == "insufficient_valid_resamples"
+
+
+def test_fake_estimator_accepts_comparison_request_through_same_protocol():
+    class FakeEstimator:
+        def estimate(self, request):
+            assert isinstance(request, ComparisonUncertaintyRequest)
+            return UncertaintyEstimate(interval=None)
+
+    cfg = config(minimum_group_size=1)
+    assessed, _ = assess_reliability(calculate_group_metrics(data(), cfg), data(), cfg)
+    air = next(
+        item
+        for item in assessed
+        if item.calculated.metric == MetricNameV2.ADVERSE_IMPACT_RATIO
+    )
+    request = ComparisonUncertaintyRequest(
+        metric_key=air.calculated.key,
+        comparison_size=2,
+        reference_size=2,
+        evaluator=lambda comparison, reference: 0.0,
+        seed=0,
+        resamples=2,
+        minimum_valid_resamples=1,
+        confidence_level=0.95,
+    )
+
+    intervals, limitations = estimate_uncertainty(
+        assessed, (request,), FakeEstimator()
+    )
+
+    assert intervals == ()
+    assert limitations[0].affected_metric_keys == (air.calculated.key,)
+
+
+def test_sha256_estimator_handles_comparison_request_via_protocol(bootstrap_golden):
+    expected = bootstrap_golden["comparison_interval"]
+    request = ComparisonUncertaintyRequest(
+        metric_key=expected["metric_key"],
+        comparison_size=4,
+        reference_size=4,
+        evaluator=lambda comparison, reference: (
+            sum(comparison) / 4 - sum(reference) / 4
+        ),
+        seed=bootstrap_golden["seed"],
+        resamples=20,
+        minimum_valid_resamples=20,
+        confidence_level=expected["confidence_level"],
+    )
+
+    estimate = Sha256PercentileBootstrap().estimate(request)
+
+    assert estimate.interval is not None
+    assert estimate.interval.lower.hex() == expected["lower_hex"]
+    assert estimate.interval.upper.hex() == expected["upper_hex"]

@@ -118,6 +118,18 @@ class UncertaintyRequest:
 
 
 @dataclass(frozen=True)
+class ComparisonUncertaintyRequest:
+    metric_key: str
+    comparison_size: int
+    reference_size: int
+    evaluator: Callable[[tuple[int, ...], tuple[int, ...]], float | None]
+    seed: int
+    resamples: int
+    minimum_valid_resamples: int
+    confidence_level: float
+
+
+@dataclass(frozen=True)
 class UncertaintyEstimate:
     interval: BootstrapInterval | None
 
@@ -125,4 +137,6 @@ class UncertaintyEstimate:
 class UncertaintyEstimator(Protocol):
     """Replaceable uncertainty implementation owned by the inner contract."""
 
-    def estimate(self, request: UncertaintyRequest) -> UncertaintyEstimate: ...
+    def estimate(
+        self, request: UncertaintyRequest | ComparisonUncertaintyRequest
+    ) -> UncertaintyEstimate: ...
