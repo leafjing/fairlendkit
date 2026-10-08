@@ -68,7 +68,9 @@ def verify_links() -> None:
 def verify_metadata() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     codemeta = json.loads((ROOT / "codemeta.json").read_text(encoding="utf-8"))
-    jsonld = json.loads((ROOT / "docs/software-source-code.jsonld").read_text(encoding="utf-8"))
+    jsonld = json.loads(
+        (ROOT / "docs/software-source-code.template.jsonld").read_text(encoding="utf-8")
+    )
     cff = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
 
     if project["description"] != DESCRIPTION or codemeta["description"] != DESCRIPTION or jsonld["description"] != DESCRIPTION:
@@ -90,12 +92,27 @@ def verify_metadata() -> None:
         fail("Discovery metadata must not assert a license before owner approval.")
     if jsonld.get("@context") != "https://schema.org" or jsonld.get("@type") != "SoftwareSourceCode":
         fail("Schema.org structured data has an invalid context or type.")
+    if jsonld.get("url") != "${CANONICAL_DOCS_URL}":
+        fail("JSON-LD template must retain the unresolved canonical-origin token.")
 
 
 def verify_deferred_site_boundary() -> None:
-    for relative in ("sitemap.xml", "robots.txt"):
+    for relative in ("sitemap.xml", "robots.txt", "software-source-code.jsonld"):
         if (ROOT / relative).exists() or (ROOT / "docs" / relative).exists():
             fail(f"{relative} requires an approved canonical documentation origin.")
+    canonical_pattern = re.compile(
+        r"<link\s+[^>]*rel=[\"']canonical[\"'][^>]*>", re.IGNORECASE
+    )
+    social_pattern = re.compile(
+        r"<meta\s+[^>]*(?:property|name)=[\"'](?:og:|twitter:)", re.IGNORECASE
+    )
+    for page in ROOT.rglob("*.html"):
+        text = page.read_text(encoding="utf-8")
+        canonical_count = len(canonical_pattern.findall(text))
+        if canonical_count > 1:
+            fail(f"Duplicate canonical links in {page.relative_to(ROOT)}")
+        if canonical_count or social_pattern.search(text):
+            fail(f"Live site metadata requires an approved origin: {page.relative_to(ROOT)}")
 
 
 def verify_installed_package() -> None:

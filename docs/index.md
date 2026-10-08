@@ -28,7 +28,7 @@ page for each topic; it does not replace the normative contracts.
 - [Milestone 3 release evidence](milestone-3-release-evidence.md)
 - [Citation and research relationship](citation-and-research.md)
 - [Repository discoverability decisions](discoverability-audit.md)
-- [Technical discovery configuration](repository-discoverability-config.md)
+- [Technical discovery configuration and site templates](repository-discoverability-config.md)
 
 ## Scope boundary
 

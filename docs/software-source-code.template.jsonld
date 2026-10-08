@@ -3,6 +3,7 @@
   "@type": "SoftwareSourceCode",
   "name": "FairLendKit",
   "description": "Reproducible fair-lending audit toolkit for credit decisioning systems",
+  "url": "${CANONICAL_DOCS_URL}",
   "codeRepository": "https://github.com/leafjing/fairlendkit",
   "issueTracker": "https://github.com/leafjing/fairlendkit/issues",
   "version": "0.1.0.dev0",

@@ -26,7 +26,7 @@
 - [Citation and research relationship](docs/citation-and-research.md)
 - [CITATION.cff](CITATION.cff)
 - [CodeMeta](codemeta.json)
-- [Schema.org software metadata](docs/software-source-code.jsonld)
+- [Schema.org software metadata template](docs/software-source-code.template.jsonld)
 - [Technical discovery configuration](docs/repository-discoverability-config.md)
 
 ## Important boundaries
