@@ -5,10 +5,31 @@ build-backend = "hatchling.build"
 [project]
 name = "fairlendkit"
 version = "0.1.0.dev0"
-description = "Reproducible fairness audits for credit underwriting models"
+description = "Reproducible fair-lending audit toolkit for credit decisioning systems"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
+authors = [
+  { name = "Zijing Ye" },
+]
+keywords = [
+  "fair lending",
+  "credit decisioning",
+  "responsible AI",
+  "model risk",
+  "fairness metrics",
+  "algorithmic auditing",
+  "reproducible research",
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Financial and Insurance Industry",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
   "pandas>=2.1",
   "pydantic>=2.8",
@@ -17,6 +38,12 @@ dependencies = [
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
 paper2 = ["numpy==1.26.4", "scipy==1.17.1"]
+
+[project.urls]
+Homepage = "https://github.com/leafjing/fairlendkit"
+Repository = "https://github.com/leafjing/fairlendkit"
+Issues = "https://github.com/leafjing/fairlendkit/issues"
+Documentation = "https://github.com/leafjing/fairlendkit/blob/main/docs/index.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fairlendkit"]

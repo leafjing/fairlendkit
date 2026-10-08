@@ -5,6 +5,7 @@
 ## Start here
 
 - [README](README.md): implemented capabilities, quick start, non-goals, status, and release evidence
+- [Documentation index](docs/index.md): topic-based navigation to authoritative contracts and guidance
 - [Core concepts](docs/core-concepts.md): semantic validation, metrics, reliability, uncertainty, flags, and reproducible reporting
 - [FAQ](docs/faq.md): direct answers for practitioners and researchers
 - [Limitations](docs/limitations.md): interpretation, data, scope, and communication boundaries
@@ -25,6 +26,8 @@
 - [Citation and research relationship](docs/citation-and-research.md)
 - [CITATION.cff](CITATION.cff)
 - [CodeMeta](codemeta.json)
+- [Schema.org software metadata](docs/software-source-code.jsonld)
+- [Technical discovery configuration](docs/repository-discoverability-config.md)
 
 ## Important boundaries
 
