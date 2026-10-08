@@ -42,7 +42,7 @@ The call contract is:
   mutated. Internal working frames must be copies or derived immutable views.
 - The function performs no file, network, renderer, CLI, notebook, governance,
   or mitigation side effects.
-- Every invocation returns schema-valid `AuditResult` version `1.1`. Milestone
+- Every invocation returns schema-valid `AuditResult` version `2.0`. Milestone
   3 is the documented schema review that introduces this version; version
   `1.0` remains a supported legacy input as described below.
 
@@ -66,8 +66,8 @@ primitives or recompute results.
 
 Milestone 3 adds the following immutable `AuditConfig` fields:
 
-- `bootstrap_seed: int = 0`, inclusive range `0` to `2**64 - 1`: seed for a
-  local random generator. The global NumPy or Python random state must not be
+- `bootstrap_seed: int = 0`, inclusive range `0` to `2**64 - 1`: seed for the
+  SHA-256 counter sampler. The global NumPy or Python random state must not be
   read or changed.
 - `bootstrap_resamples: int = 1000`, minimum `1`: requested bootstrap draws.
 - `minimum_valid_resamples: int = 800`, minimum `1` and no greater than
@@ -164,7 +164,7 @@ favorable decision. Optional weights use the existing normalization contract.
 | `roc_auc` | weighted probability that a favorable outcome ranks more favorable than an unfavorable outcome, with ties worth `0.5` | overall, group | Undefined for no favorable outcomes, no unfavorable outcomes, corresponding zero class weight, or constant eligible score. Ranking order follows `score_direction`. |
 | `selection_rate_difference` | comparison selection rate minus reference selection rate | comparison | Undefined if either source metric is undefined. This is the canonical name; it supersedes the older alias `demographic_parity_difference`. |
 | `adverse_impact_ratio` | comparison selection rate divided by reference selection rate | comparison | Undefined if either input is undefined or defined reference rate is zero. |
-| `demographic_parity_difference` | comparison selection rate minus reference selection rate | comparison | Required 1.1 compatibility alias for the name exposed by schema 1.0; value and evidence must exactly equal `selection_rate_difference`. It must not produce a second flag. |
+| `demographic_parity_difference` | comparison selection rate minus reference selection rate | comparison | Required 2.0 compatibility alias for the name exposed by schema 1.0; value and evidence must exactly equal `selection_rate_difference`. It must not produce a second flag. |
 | `equal_opportunity_difference` | comparison TPR minus reference TPR | comparison | Undefined if either source metric is undefined. |
 | `equalized_odds_gap` | `max(abs(TPR_c - TPR_r), abs(FPR_c - FPR_r))` | comparison | Undefined if any of the four source rates is undefined. Non-negative; direction remains visible in the component rates. |
 
@@ -194,7 +194,7 @@ Undefined and unreliable are distinct states:
 
 `ObservedMetric` therefore gains a required `reliability` field with values
 `reliable`, `unreliable`, `undefined`, `not_applicable`, or `not_assessed`. The
-state must agree with the value and reason. New 1.1 computations use the first
+state must agree with the value and reason. New 2.0 computations use the first
 four states: defined values can be reliable or unreliable; undefined values
 must use `undefined` or `not_applicable`. `not_assessed` is reserved solely for
 migrated 1.0 payloads and must never be emitted by `run_audit`.
@@ -297,32 +297,43 @@ pass or compliance conclusion.
 ## Uncertainty contract
 
 Milestone 3 uses the following fully specified nonparametric percentile
-bootstrap. “SHA-256” means the FIPS 180-4 hash and all text is UTF-8:
+bootstrap. It is a SHA-256 counter sampler and does not depend on a language or
+numerical library random-number generator. “SHA-256” means the FIPS 180-4 hash,
+all text is UTF-8, and all unsigned integers use fixed-width big-endian encoding:
 
 - resample eligible rows with replacement within the evaluated scope;
 - use exactly `bootstrap_resamples` attempted draws;
 - encode `bootstrap_seed` as exactly eight unsigned big-endian bytes;
-- derive a stream seed as the unsigned big-endian integer represented by the
-  first 16 bytes of
-  `SHA-256(b"fairlendkit-bootstrap-v1\x00" + seed_bytes + b"\x00" +
-  metric_key.encode("utf-8") + b"\x00" + stream_name.encode("ascii"))`;
-- instantiate a fresh `numpy.random.Generator(numpy.random.PCG64(stream_seed))`
-  for every `(metric_key, stream_name)`; no generator is shared between metric
-  keys;
 - use stream name `overall` for overall metrics, `group` for single-group
   metrics, and the two independent stream names `comparison` and `reference`
   for the corresponding sides of a directed comparison;
-- for each draw, obtain row positions using
-  `generator.integers(0, n, size=n, dtype=numpy.int64, endpoint=False)`; draws
-  and positions are consumed in increasing draw order and array order;
+- encode `metric_key` and `stream_name` as their UTF-8 bytes, each preceded by
+  its byte length as an unsigned 32-bit integer; this prevents concatenation
+  ambiguity;
+- for zero-based draw `d`, zero-based sampled position `p`, and zero-based
+  rejection counter `r`, form
+  `b"fairlendkit-bootstrap-v1\x00" + seed_u64 + key_len_u32 + key_bytes +
+  stream_len_u32 + stream_bytes + d_u64 + p_u64 + r_u32`;
+- hash that byte string and interpret the first eight digest bytes as unsigned
+  integer `x`; for population size `n`, let `limit = floor(2**64 / n) * n`;
+  accept `x` when `x < limit` and select source row position `x % n`, otherwise
+  increment `r` and hash again;
+- reject `n == 0` before sampling; counters must fit their stated widths or the
+  configuration/input is invalid;
+- generate draws in increasing `d`, positions in increasing `p`, and rejection
+  attempts in increasing `r`; no mutable random stream is shared between keys
+  or comparison sides;
 - for directed comparisons, resample comparison and reference groups from their
   separately derived streams, preserving each original group size;
 - apply configured sample weights as metric weights after row resampling; the
   weights are not also used as sampling probabilities;
 - discard draws in which the metric is undefined or non-finite;
-- sort valid draw values in ascending numeric order and calculate the lower and
-  upper quantiles with `numpy.quantile(..., method="linear")` at
-  `(1 - confidence_level) / 2` and `1 - (1 - confidence_level) / 2`;
+- sort the `m` valid draw values as `v[0] <= ... <= v[m-1]`; for either target
+  quantile `q`, set `h = (m - 1) * q`, `i = floor(h)`, `j = ceil(h)`, and return
+  `v[i] + (h - i) * (v[j] - v[i])`. Use target quantiles
+  `(1 - confidence_level) / 2` and `1 - (1 - confidence_level) / 2`. This is
+  the precisely defined linear quantile method and does not delegate semantics
+  to a library default;
 - record the number of valid draws, not merely attempted draws.
 
 Intervals are emitted only for defined, reliable numeric metrics with at least
@@ -342,15 +353,17 @@ The test suite must include a checked-in golden bootstrap fixture containing
 the config seed, canonical metric keys, sampled row-index arrays for the first
 three draws of every stream kind, valid-resample counts, and final interval
 bounds. The fixture is the cross-implementation compatibility oracle; changing
-PCG64, derivation bytes, draw consumption, or quantile method is a versioned
-method change.
+the hash preimage, integer widths/byte order, rejection rule, counter order, or
+quantile method is a versioned method change.
 
-## Schema 1.1 and legacy migration
+## Schema 2.0 and legacy migration
 
-Milestone 3 changes `AUDIT_RESULT_SCHEMA_VERSION` from `1.0` to `1.1`. Version
-1.1 makes `ObservedMetric.reliability` and `Limitation.related_metric_keys`
+Milestone 3 changes `AUDIT_RESULT_SCHEMA_VERSION` from `1.0` to `2.0`. Version
+2.0 makes `ObservedMetric.reliability` and `Limitation.related_metric_keys`
 required and adds the metric and undefined-reason enum members listed above.
 This is intentionally not represented as a backward-compatible 1.0 change.
+No public schema version 1.1 exists; the earlier PR draft was never released
+and is superseded by this 2.0 contract.
 
 The package must retain an explicit `AuditResultV1_0` parser and provide
 `migrate_audit_result_v1_0(payload) -> AuditResult` with these deterministic
@@ -363,25 +376,25 @@ rules:
 - set every legacy limitation's `related_metric_keys` to the empty tuple;
 - preserve legacy metric names; migration does not synthesize new Milestone 3
   metrics or uncertainty;
-- set `schema_version` to `1.1`, then validate all references and legacy value
-  ranges under the 1.1 model;
+- set `schema_version` to `2.0`, then validate all references and legacy value
+  ranges under the 2.0 model;
 - reject unknown source versions and reject a payload that fails the strict
   1.0 parser before migration.
 
-The 1.1 wire schema accepts `not_assessed` and an empty
+The 2.0 wire schema accepts `not_assessed` and an empty
 `related_metric_keys` tuple so migrated results can make an exact JSON round
 trip. Their stable meaning is “evidence absent from schema 1.0”; they must not
-be defaulted for missing 1.1 fields. The `run_audit` assembler applies the
+be defaulted for missing 2.0 fields. The `run_audit` assembler applies the
 stronger native-production invariant and rejects either value. Consumers must
 display migrated reliability honestly and must not reinterpret `not_assessed`
 as reliable or unreliable.
 
 Compatibility tests require: a checked-in 1.0 golden payload; strict 1.0 parse;
-1.0→1.1 migration; exact 1.1 round trip; rejection by the 1.1 parser of missing
+1.0→2.0 migration; exact 2.0 round trip; rejection by the 2.0 parser of missing
 new fields; enforcement of the stronger `run_audit` production invariant; and
 proof that migrating an already migrated payload is rejected rather than
 silently repeated. Version 1.0 remains readable but
-`run_audit` only writes 1.1.
+`run_audit` only writes 2.0.
 
 ## Result assembly and reproducibility
 

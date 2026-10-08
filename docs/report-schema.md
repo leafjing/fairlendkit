@@ -38,7 +38,7 @@ message; mismatched or arbitrary free text fails validation. Renderers must
 reproduce the stored code and message and must not invent an interpretation.
 Adding or changing a code or canonical message requires Schema version review.
 
-Milestone 3 advances the schema to `1.1` to add metric reliability, new metric
+Milestone 3 advances the schema to `2.0` to add metric reliability, new metric
 names, typed limitation-to-metric references, and new undefined reasons. Version
 `1.0` remains a strict legacy read contract and is migrated explicitly; the
 migration must not infer reliability that the old payload did not record. The
@@ -47,13 +47,13 @@ behavioral contract, migration rules, and compatibility-alias rule are defined i
 3.1 must update this document and the generated schema together with the model;
 this cross-reference does not claim those fields are already implemented.
 
-In 1.1, `ObservedMetric.reliability` is required. Native `run_audit` results use
+In 2.0, `ObservedMetric.reliability` is required. Native `run_audit` results use
 `reliable`, `unreliable`, `undefined`, or `not_applicable`; migrated 1.0 results
 use `not_assessed` because legacy payloads do not contain enough evidence to
 reconstruct the gate decision. Undefined and not-applicable state takes
 precedence and receives no reliability limitation.
 
-In 1.1, `Limitation.related_metric_keys` is also required. Native results use a
+In 2.0, `Limitation.related_metric_keys` is also required. Native results use a
 non-empty, unique, canonically ordered tuple whose keys resolve to
 `observed_metrics`; migrated 1.0 limitations use an empty tuple with the fixed
 meaning “relationship absent from the legacy schema.” One metric may be linked
@@ -61,9 +61,10 @@ from multiple limitations. Comparison metrics merge source limitation codes in
 the fixed order defined by the Milestone 3 reliability matrix.
 
 `StatisticalUncertainty` remains linked to one metric key. Its deterministic
-1.1 production is guarded by the Milestone 3 bootstrap golden fixture, which
-fixes seed derivation, PCG64 stream names, the first three sampled index arrays,
-valid-resample counts, `linear` quantiles, and final bounds. A failed
+2.0 production is guarded by the Milestone 3 bootstrap golden fixture, which
+fixes the SHA-256 counter preimage and rejection sampler, stream names, the
+first three sampled index arrays, valid-resample counts, `linear` quantiles,
+and final bounds. A failed
 valid-resample gate emits a linked limitation instead of an interval.
 
 ## Group direction
@@ -98,7 +99,7 @@ separate. The embedded result exposes all four layers, technical status, and
 ## Versioning and serialization
 
 The currently implemented `schema_version` is required and fixed to `"1.0"`.
-Milestone 3 changes the writer version to `"1.1"` and retains a strict 1.0
+Milestone 3 changes the writer version to `"2.0"` and retains a strict 1.0
 reader plus the migration defined above. Pydantic's generated JSON Schema is the
 normative machine-readable equivalent of each version and is tested for version
 constants, required sections, strict unknown-field rejection, migration, and
