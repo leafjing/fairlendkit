@@ -23,9 +23,15 @@ reason or turn it into a legal or compliance conclusion.
 | `zero_favorable_outcome_weight` | Favorable observed outcomes have no positive total weight. | Favorable outcomes exist, but their eligible weights sum to zero. |
 | `no_unfavorable_outcomes` | No unfavorable observed outcomes are available for this metric. | A metric conditioned on unfavorable outcomes has no qualifying records. |
 | `zero_unfavorable_outcome_weight` | Unfavorable observed outcomes have no positive total weight. | Unfavorable outcomes exist, but their eligible weights sum to zero. |
+| `no_favorable_decisions` | No favorable decisions are available for this metric. | Precision has no favorable decisions. |
+| `zero_favorable_decision_weight` | Favorable decisions have no positive total weight. | Favorable decisions exist, but their eligible weights sum to zero. |
+| `constant_score` | Eligible scores are constant, so ranking discrimination is undefined. | AUC has both outcome classes but no score variation. |
+| `metric_not_applicable` | The metric does not apply to the configured score semantics. | The configured score semantics do not support the metric. |
 | `comparison_metric_undefined` | The comparison-group input metric is undefined. | A directed disparity cannot be calculated because its comparison-group input is undefined. |
 | `reference_metric_undefined` | The reference-group input metric is undefined. | A directed disparity cannot be calculated because its reference-group input is undefined. |
+| `component_metric_undefined` | A required component metric is undefined. | A compound metric cannot be calculated because any required component is undefined. |
 | `zero_reference_selection_rate` | The reference-group selection rate is zero, so the ratio is undefined. | AIR has a defined reference-group selection rate of zero. |
+| `insufficient_valid_resamples` | Too few valid bootstrap resamples are available for an interval. | Uncertainty only: fewer than the configured minimum valid draws are available. |
 
 ## Selection rules
 

@@ -35,6 +35,13 @@ defined/undefined states fail validation.
   decision.
 - Undefined: no records or no positive total weight.
 
+### Denial rate
+
+- Definition: share receiving the configured unfavorable decision.
+- Formula: `sum(w * (not favorable_decision)) / sum(w)`.
+- Range: `[0, 1]`; it equals `1 - selection_rate` when defined.
+- Undefined: no records or no positive total weight.
+
 ### Accuracy
 
 - Definition: share for which favorable/unfavorable decision matches the
@@ -55,6 +62,13 @@ defined/undefined states fail validation.
 - Interpretation: opportunity to receive the favorable decision conditional on
   the configured favorable outcome.
 - Undefined: no favorable outcomes or no positive weight among them.
+
+### Precision
+
+- Definition: favorable-outcome rate among favorable decisions.
+- Formula: `TP / (TP + FP)`.
+- Range: `[0, 1]`.
+- Undefined: no favorable decisions or no positive weight among favorable decisions.
 
 ### False-positive rate
 
@@ -119,6 +133,19 @@ limitations.
   rate in the stated direction.
 - Undefined: either true-positive rate is undefined.
 
+### Selection-rate difference
+
+- Definition and formula: comparison selection rate minus reference selection rate.
+- Range: `[-1, 1]`.
+- Undefined: either selection rate is undefined.
+- `demographic_parity_difference` is the required compatibility alias.
+
+### Equalized-odds gap
+
+- Formula: `max(abs(TPR_c - TPR_r), abs(FPR_c - FPR_r))`.
+- Range: `[0, 1]`.
+- Undefined: any required TPR or FPR component is undefined.
+
 ## Calibration metric
 
 ### Brier score
@@ -132,6 +159,17 @@ limitations.
 - Undefined: no records or no positive total weight.
 - Invalid input: an arbitrary score is not accepted as a probability. Values
   outside `[0, 1]` fail validation.
+
+## Ranking metric
+
+### ROC AUC
+
+- Definition: weighted probability that a favorable-outcome score ranks above
+  an unfavorable-outcome score, with ties worth `0.5`.
+- Range: `[0, 1]`.
+- Undefined: either outcome class is absent or has zero positive weight, or all
+  eligible scores are constant.
+- Invalid input: scores must be finite numeric values.
 
 ## Hand-calculated fixture
 

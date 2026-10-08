@@ -37,14 +37,19 @@ class ResultModel(BaseModel):
 
 class MetricName(StrEnum):
     SELECTION_RATE = "selection_rate"
+    DENIAL_RATE = "denial_rate"
     ACCURACY = "accuracy"
+    PRECISION = "precision"
     TRUE_POSITIVE_RATE = "true_positive_rate"
     FALSE_POSITIVE_RATE = "false_positive_rate"
     FALSE_NEGATIVE_RATE = "false_negative_rate"
     BRIER_SCORE = "brier_score"
+    ROC_AUC = "roc_auc"
+    SELECTION_RATE_DIFFERENCE = "selection_rate_difference"
     ADVERSE_IMPACT_RATIO = "adverse_impact_ratio"
     DEMOGRAPHIC_PARITY_DIFFERENCE = "demographic_parity_difference"
     EQUAL_OPPORTUNITY_DIFFERENCE = "equal_opportunity_difference"
+    EQUALIZED_ODDS_GAP = "equalized_odds_gap"
 
 
 class UncertaintyMethod(StrEnum):
@@ -61,6 +66,12 @@ class UndefinedReasonCode(StrEnum):
     COMPARISON_METRIC_UNDEFINED = "comparison_metric_undefined"
     REFERENCE_METRIC_UNDEFINED = "reference_metric_undefined"
     ZERO_REFERENCE_SELECTION_RATE = "zero_reference_selection_rate"
+    NO_FAVORABLE_DECISIONS = "no_favorable_decisions"
+    ZERO_FAVORABLE_DECISION_WEIGHT = "zero_favorable_decision_weight"
+    CONSTANT_SCORE = "constant_score"
+    METRIC_NOT_APPLICABLE = "metric_not_applicable"
+    COMPONENT_METRIC_UNDEFINED = "component_metric_undefined"
+    INSUFFICIENT_VALID_RESAMPLES = "insufficient_valid_resamples"
 
 
 CANONICAL_UNDEFINED_MESSAGES = {
@@ -88,6 +99,24 @@ CANONICAL_UNDEFINED_MESSAGES = {
     ),
     UndefinedReasonCode.ZERO_REFERENCE_SELECTION_RATE: (
         "The reference-group selection rate is zero, so the ratio is undefined."
+    ),
+    UndefinedReasonCode.NO_FAVORABLE_DECISIONS: (
+        "No favorable decisions are available for this metric."
+    ),
+    UndefinedReasonCode.ZERO_FAVORABLE_DECISION_WEIGHT: (
+        "Favorable decisions have no positive total weight."
+    ),
+    UndefinedReasonCode.CONSTANT_SCORE: (
+        "Eligible scores are constant, so ranking discrimination is undefined."
+    ),
+    UndefinedReasonCode.METRIC_NOT_APPLICABLE: (
+        "The metric does not apply to the configured score semantics."
+    ),
+    UndefinedReasonCode.COMPONENT_METRIC_UNDEFINED: (
+        "A required component metric is undefined."
+    ),
+    UndefinedReasonCode.INSUFFICIENT_VALID_RESAMPLES: (
+        "Too few valid bootstrap resamples are available for an interval."
     ),
 }
 
@@ -158,8 +187,10 @@ class ObservedMetric(ResultModel):
     def validate_group_direction(self) -> "ObservedMetric":
         disparity_metrics = {
             MetricName.ADVERSE_IMPACT_RATIO,
+            MetricName.SELECTION_RATE_DIFFERENCE,
             MetricName.DEMOGRAPHIC_PARITY_DIFFERENCE,
             MetricName.EQUAL_OPPORTUNITY_DIFFERENCE,
+            MetricName.EQUALIZED_ODDS_GAP,
         }
         if self.metric in disparity_metrics:
             if self.comparison_group is None or self.reference_group is None:
@@ -180,14 +211,19 @@ class ObservedMetric(ResultModel):
         if self.value.value is not None:
             ranges = {
                 MetricName.SELECTION_RATE: (0.0, 1.0),
+                MetricName.DENIAL_RATE: (0.0, 1.0),
                 MetricName.ACCURACY: (0.0, 1.0),
+                MetricName.PRECISION: (0.0, 1.0),
                 MetricName.TRUE_POSITIVE_RATE: (0.0, 1.0),
                 MetricName.FALSE_POSITIVE_RATE: (0.0, 1.0),
                 MetricName.FALSE_NEGATIVE_RATE: (0.0, 1.0),
                 MetricName.BRIER_SCORE: (0.0, 1.0),
+                MetricName.ROC_AUC: (0.0, 1.0),
+                MetricName.SELECTION_RATE_DIFFERENCE: (-1.0, 1.0),
                 MetricName.ADVERSE_IMPACT_RATIO: (0.0, math.inf),
                 MetricName.DEMOGRAPHIC_PARITY_DIFFERENCE: (-1.0, 1.0),
                 MetricName.EQUAL_OPPORTUNITY_DIFFERENCE: (-1.0, 1.0),
+                MetricName.EQUALIZED_ODDS_GAP: (0.0, 1.0),
             }
             lower, upper = ranges[self.metric]
             if not lower <= self.value.value <= upper:
