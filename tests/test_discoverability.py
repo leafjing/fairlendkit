@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -26,9 +27,28 @@ verify_installed_package = VERIFY_MODULE.verify_installed_package
 def test_discoverability_verification_matrix_is_complete():
     matrix = (ROOT / "docs/discoverability-verification-matrix.md").read_text()
     expected_ids = {f"DV-{index:02d}" for index in range(1, 18)}
-    observed_ids = set(__import__("re").findall(r"`(DV-\d{2})`", matrix))
+    rows = [line for line in matrix.splitlines() if re.match(r"^\| `DV-\d{2}` ", line)]
+    observed_ids = {re.search(r"`(DV-\d{2})`", row).group(1) for row in rows}
 
     assert observed_ids == expected_ids
+    assert len(rows) == len(expected_ids)
+
+    collected = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q", "tests/test_discoverability.py"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    collected_nodes = {line.strip() for line in collected if line.startswith("tests/")}
+    for row in rows:
+        cells = [cell.strip() for cell in row.strip("|").split("|")]
+        verifier_names = re.findall(r"`(verify_[a-z_]+)`", cells[2])
+        test_nodes = re.findall(r"`(tests/test_discoverability\.py::[^`]+)`", cells[3])
+        assert verifier_names, row
+        assert test_nodes, row
+        assert all(callable(getattr(VERIFY_MODULE, name, None)) for name in verifier_names)
+        assert set(test_nodes).issubset(collected_nodes)
 
 
 def test_discoverability_metadata_and_links_are_consistent():
@@ -59,6 +79,7 @@ def test_recursive_link_check_covers_contributing_nested_docs_and_fragments(tmp_
         ("CONTRIBUTING.md", "missing.md", "Broken internal link"),
         ("docs/decisions/note.md", "../index.md#missing-heading", "Broken heading anchor"),
     ),
+    ids=("broken-link", "broken-anchor"),
 )
 def test_recursive_link_check_fails_closed(source, target, message, tmp_path):
     (tmp_path / "README.md").write_text("# Readme\n")
@@ -71,6 +92,31 @@ def test_recursive_link_check_fails_closed(source, target, message, tmp_path):
     path.write_text(path.read_text() + f"[broken]({target})\n")
 
     with pytest.raises(SystemExit, match=message):
+        verify_links(tmp_path)
+
+
+def test_recursive_link_check_rejects_path_escape(tmp_path):
+    (tmp_path / "README.md").write_text("[escape](../outside.md)\n")
+    (tmp_path / "CONTRIBUTING.md").write_text("# Contributing\n")
+    (tmp_path / "llms.txt").write_text("docs\n")
+    (tmp_path / "docs").mkdir()
+    outside = tmp_path.parent / "outside.md"
+    outside.write_text("# Outside\n")
+    try:
+        with pytest.raises(SystemExit, match="Broken internal link"):
+            verify_links(tmp_path)
+    finally:
+        outside.unlink()
+
+
+def test_duplicate_heading_suffix_fails_closed(tmp_path):
+    (tmp_path / "README.md").write_text("[bad](docs/note.md#same-heading-2)\n")
+    (tmp_path / "CONTRIBUTING.md").write_text("# Contributing\n")
+    (tmp_path / "llms.txt").write_text("docs\n")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "note.md").write_text("# Same heading\n# Same heading\n")
+
+    with pytest.raises(SystemExit, match="Broken heading anchor"):
         verify_links(tmp_path)
 
 
@@ -104,6 +150,22 @@ def _metadata_fixture(tmp_path):
         ("codemeta.json", "codeRepository", "https://example.invalid", "Repository URLs"),
         ("codemeta.json", "issueTracker", "https://example.invalid", "Issue tracker"),
         ("codemeta.json", "description", "Wrong", "descriptions"),
+        ("codemeta.json", "developmentStatus", "stable", "development status"),
+    ),
+    ids=(
+        "license",
+        "runtime-platform",
+        "keywords",
+        "name",
+        "context",
+        "type",
+        "maintainer",
+        "author",
+        "version",
+        "repository-url",
+        "issue-url",
+        "description",
+        "development-status",
     ),
 )
 def test_metadata_cross_validation_fails_closed(relative, field, value, message, tmp_path):
@@ -127,6 +189,7 @@ def test_metadata_cross_validation_fails_closed(relative, field, value, message,
             "classifiers",
         ),
     ),
+    ids=("requires-python", "classifier"),
 )
 def test_package_metadata_source_fields_fail_closed(field, replacement, message, tmp_path):
     _metadata_fixture(tmp_path)
@@ -158,6 +221,17 @@ def test_duplicate_canonical_links_fail_closed(tmp_path):
         verify_deferred_site_boundary(tmp_path)
 
 
+def test_unresolved_jsonld_template_token_fails_closed(tmp_path):
+    _metadata_fixture(tmp_path)
+    path = tmp_path / "docs/software-source-code.template.jsonld"
+    payload = json.loads(path.read_text())
+    payload["url"] = "https://example.invalid/docs"
+    path.write_text(json.dumps(payload))
+
+    with pytest.raises(SystemExit, match="unresolved canonical-origin token"):
+        verify_metadata(tmp_path)
+
+
 @pytest.mark.parametrize(
     ("relative", "content", "message"),
     (
@@ -167,6 +241,14 @@ def test_duplicate_canonical_links_fail_closed(tmp_path):
         ("sitemap.xml", "<urlset/>", "sitemap.xml"),
         ("docs/robots.txt", "User-agent: *", "robots.txt"),
         ("docs/software-source-code.jsonld", "{}", "software-source-code.jsonld"),
+    ),
+    ids=(
+        "single-canonical",
+        "open-graph",
+        "twitter",
+        "sitemap",
+        "robots",
+        "published-jsonld",
     ),
 )
 def test_live_site_metadata_fails_closed(relative, content, message, tmp_path):
@@ -216,6 +298,17 @@ def _wheel_metadata():
         ("Keywords", ["wrong"], "keywords"),
         ("License", "MIT", "wheel license"),
         ("Project-URL", [], "project URLs"),
+    ),
+    ids=(
+        "name",
+        "summary",
+        "version",
+        "author",
+        "requires-python",
+        "classifiers",
+        "keywords",
+        "license",
+        "project-urls",
     ),
 )
 def test_installed_wheel_metadata_fails_closed(field, value, message):
