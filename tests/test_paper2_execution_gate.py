@@ -686,3 +686,74 @@ def test_representative_rss_uses_spawned_isolated_process(monkeypatch, manifest)
         "start",
         ("join", 600),
     ]
+
+
+@pytest.mark.parametrize(
+    ("mode", "message"),
+    (
+        ("start", "failed to start"),
+        ("exit", "subprocess failed"),
+        ("timeout", "timed out"),
+        ("missing", "subprocess failed"),
+        ("worker-error", "benchmark failed"),
+        ("no-rss", "finite and positive"),
+    ),
+    ids=("start-failure", "nonzero-exit", "timeout", "missing-result", "worker-error", "missing-rss"),
+)
+def test_representative_rss_subprocess_failures_are_closed(
+    monkeypatch, manifest, mode, message
+):
+    class Connection:
+        def close(self):
+            pass
+
+        def poll(self):
+            return mode != "missing"
+
+        def recv(self):
+            if mode == "worker-error":
+                return "error", "boom"
+            return (
+                "ok",
+                {
+                    "scenario_id": "REG",
+                    "measurement_pid": 12345,
+                    "cpu_seconds": 1.0,
+                    "wall_seconds": 2.0,
+                    "peak_rss_bytes": 0 if mode == "no-rss" else 100,
+                    "artifact_bytes": 10,
+                    "metric_identities": tuple(sorted(item.value for item in MetricNameV2)),
+                    "artifact_schema": "paper2-raw-replicate-v1",
+                },
+            )
+
+    class Process:
+        exitcode = 1 if mode == "exit" else 0
+
+        def start(self):
+            if mode == "start":
+                raise OSError("cannot spawn")
+
+        def join(self, timeout=None):
+            pass
+
+        def is_alive(self):
+            return mode == "timeout"
+
+        def terminate(self):
+            pass
+
+    class Context:
+        def Pipe(self, duplex=False):
+            return Connection(), Connection()
+
+        def Process(self, **kwargs):
+            return Process()
+
+    monkeypatch.setattr(
+        "fairlendkit.research.paper2.resource_benchmark.multiprocessing.get_context",
+        lambda method: Context(),
+    )
+
+    with pytest.raises(IntegrityError, match=message):
+        _measure_representative(manifest, "REG")

@@ -111,7 +111,14 @@ def _measure_representative(
         args=(sender, manifest, scenario_id),
         name=f"paper2-benchmark-{scenario_id}",
     )
-    process.start()
+    try:
+        process.start()
+    except BaseException as error:
+        receiver.close()
+        sender.close()
+        raise IntegrityError(
+            f"Resource benchmark subprocess failed to start for {scenario_id}."
+        ) from error
     sender.close()
     process.join(timeout=600)
     if process.is_alive():
