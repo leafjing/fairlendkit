@@ -42,8 +42,9 @@ The call contract is:
   mutated. Internal working frames must be copies or derived immutable views.
 - The function performs no file, network, renderer, CLI, notebook, governance,
   or mitigation side effects.
-- Every invocation returns schema-valid `AuditResult` version `1.0`, until a
-  documented schema review explicitly changes that version.
+- Every invocation returns schema-valid `AuditResult` version `1.1`. Milestone
+  3 is the documented schema review that introduces this version; version
+  `1.0` remains a supported legacy input as described below.
 
 `run_audit` owns this fixed orchestration order:
 
@@ -65,8 +66,9 @@ primitives or recompute results.
 
 Milestone 3 adds the following immutable `AuditConfig` fields:
 
-- `bootstrap_seed: int = 0`: seed for a local random generator. The global
-  NumPy or Python random state must not be read or changed.
+- `bootstrap_seed: int = 0`, inclusive range `0` to `2**64 - 1`: seed for a
+  local random generator. The global NumPy or Python random state must not be
+  read or changed.
 - `bootstrap_resamples: int = 1000`, minimum `1`: requested bootstrap draws.
 - `minimum_valid_resamples: int = 800`, minimum `1` and no greater than
   `bootstrap_resamples`: minimum defined draws required to emit an interval.
@@ -162,7 +164,7 @@ favorable decision. Optional weights use the existing normalization contract.
 | `roc_auc` | weighted probability that a favorable outcome ranks more favorable than an unfavorable outcome, with ties worth `0.5` | overall, group | Undefined for no favorable outcomes, no unfavorable outcomes, corresponding zero class weight, or constant eligible score. Ranking order follows `score_direction`. |
 | `selection_rate_difference` | comparison selection rate minus reference selection rate | comparison | Undefined if either source metric is undefined. This is the canonical name; it supersedes the older alias `demographic_parity_difference`. |
 | `adverse_impact_ratio` | comparison selection rate divided by reference selection rate | comparison | Undefined if either input is undefined or defined reference rate is zero. |
-| `demographic_parity_difference` | comparison selection rate minus reference selection rate | comparison | Required compatibility alias in schema `1.0`; value and evidence must exactly equal `selection_rate_difference`. It must not produce a second flag. |
+| `demographic_parity_difference` | comparison selection rate minus reference selection rate | comparison | Required 1.1 compatibility alias for the name exposed by schema 1.0; value and evidence must exactly equal `selection_rate_difference`. It must not produce a second flag. |
 | `equal_opportunity_difference` | comparison TPR minus reference TPR | comparison | Undefined if either source metric is undefined. |
 | `equalized_odds_gap` | `max(abs(TPR_c - TPR_r), abs(FPR_c - FPR_r))` | comparison | Undefined if any of the four source rates is undefined. Non-negative; direction remains visible in the component rates. |
 
@@ -191,9 +193,11 @@ Undefined and unreliable are distinct states:
   the audit stops and is not represented as a metric state.
 
 `ObservedMetric` therefore gains a required `reliability` field with values
-`reliable`, `unreliable`, `undefined`, or `not_applicable`. The state must agree
-with the value and reason. Defined values can be reliable or unreliable;
-undefined values must use `undefined` or `not_applicable`.
+`reliable`, `unreliable`, `undefined`, `not_applicable`, or `not_assessed`. The
+state must agree with the value and reason. New 1.1 computations use the first
+four states: defined values can be reliable or unreliable; undefined values
+must use `undefined` or `not_applicable`. `not_assessed` is reserved solely for
+migrated 1.0 payloads and must never be emitted by `run_audit`.
 
 The canonical undefined-reason vocabulary must be extended with:
 
@@ -207,17 +211,51 @@ The canonical undefined-reason vocabulary must be extended with:
 Reliability limitations use stable codes:
 
 - `small_group`: unweighted group count is below `minimum_group_size`;
-- `severe_outcome_imbalance`: either outcome class is below
+- `severe_outcome_imbalance`: a metric-required outcome class is below
   `minimum_group_size` within the evaluated group;
-- `sparse_decision_support`: either decision class is below
-  `minimum_group_size` for a metric conditioned on decision;
+- `sparse_decision_support`: favorable-decision support is below
+  `minimum_group_size` for precision; the unfavorable-decision count does not
+  affect precision reliability;
 - `insufficient_valid_resamples`: fewer than `minimum_valid_resamples`
   bootstrap draws produced a defined finite value.
 
-A comparison metric is reliable only when all source group metrics are reliable
-and both groups meet the group-size gate. A limitation must identify affected
-metric keys through a structured field added to `Limitation`; implementations
-must not encode key relationships only in prose.
+A gate applies to metrics exactly as follows. `F` and `U` mean the unweighted
+eligible counts of favorable and unfavorable outcomes; `D+` means the
+unweighted favorable-decision count. A check written `count < minimum_group_size`
+is a reliability warning, not an undefined denominator test.
+
+| Metric | Small population | `F` support | `U` support | `D+` support |
+| --- | --- | --- | --- | --- |
+| `selection_rate`, `denial_rate` | applies | ignored | ignored | ignored |
+| `accuracy` | applies | applies | applies | ignored |
+| `precision` | applies | ignored | ignored | applies |
+| `true_positive_rate`, `false_negative_rate` | applies | applies | ignored | ignored |
+| `false_positive_rate` | applies | ignored | applies | ignored |
+| `brier_score` | applies | ignored | ignored | ignored |
+| `roc_auc` | applies | applies | applies | ignored |
+| `selection_rate_difference`, `adverse_impact_ratio`, `demographic_parity_difference` | inherited from both source selection rates | ignored | ignored | ignored |
+| `equal_opportunity_difference` | inherited from both source TPR values | inherited | ignored | ignored |
+| `equalized_odds_gap` | inherited from both source TPR and FPR values | inherited | inherited | ignored |
+
+“Applies” means the metric is `unreliable` when the corresponding count is
+below the configured minimum, even if its numeric value is defined. An already
+undefined or not-applicable metric keeps that stronger state; reliability gates
+do not replace its undefined reason. Overall scope and each single-attribute
+group use the same matrix. A comparison metric is reliable only when every
+source metric is reliable.
+
+The same underlying condition may affect multiple metric keys. Emit one
+limitation per `(code, scope)` with all affected metric keys in canonical metric
+order; do not emit one copy per metric. Limitations are ordered by scope in the
+canonical group order, then by code in this fixed order: `small_group`,
+`severe_outcome_imbalance`, `sparse_decision_support`,
+`insufficient_valid_resamples`. Duplicate codes within a scope are invalid.
+
+A limitation must identify affected metric keys through the new required
+`related_metric_keys: tuple[Identifier, ...]` field. For a result produced by
+`run_audit` it must be non-empty, unique, canonically ordered, and resolve to
+observed metrics; implementations must not encode key relationships only in
+prose. The empty tuple has the legacy migration meaning defined below.
 
 ## Screening flags
 
@@ -241,18 +279,32 @@ pass or compliance conclusion.
 
 ## Uncertainty contract
 
-Milestone 3 uses a seeded nonparametric percentile bootstrap:
+Milestone 3 uses the following fully specified nonparametric percentile
+bootstrap. “SHA-256” means the FIPS 180-4 hash and all text is UTF-8:
 
 - resample eligible rows with replacement within the evaluated scope;
 - use exactly `bootstrap_resamples` attempted draws;
-- derive all randomness from a local generator initialized with
-  `bootstrap_seed` and stable per-metric key derivation;
-- for directed comparisons, resample comparison and reference groups
-  independently, preserving each original group size;
+- encode `bootstrap_seed` as exactly eight unsigned big-endian bytes;
+- derive a stream seed as the unsigned big-endian integer represented by the
+  first 16 bytes of
+  `SHA-256(b"fairlendkit-bootstrap-v1\x00" + seed_bytes + b"\x00" +
+  metric_key.encode("utf-8") + b"\x00" + stream_name.encode("ascii"))`;
+- instantiate a fresh `numpy.random.Generator(numpy.random.PCG64(stream_seed))`
+  for every `(metric_key, stream_name)`; no generator is shared between metric
+  keys;
+- use stream name `overall` for overall metrics, `group` for single-group
+  metrics, and the two independent stream names `comparison` and `reference`
+  for the corresponding sides of a directed comparison;
+- for each draw, obtain row positions using
+  `generator.integers(0, n, size=n, dtype=numpy.int64, endpoint=False)`; draws
+  and positions are consumed in increasing draw order and array order;
+- for directed comparisons, resample comparison and reference groups from their
+  separately derived streams, preserving each original group size;
 - apply configured sample weights as metric weights after row resampling; the
   weights are not also used as sampling probabilities;
 - discard draws in which the metric is undefined or non-finite;
-- use the deterministic lower and upper quantiles at
+- sort valid draw values in ascending numeric order and calculate the lower and
+  upper quantiles with `numpy.quantile(..., method="linear")` at
   `(1 - confidence_level) / 2` and `1 - (1 - confidence_level) / 2`;
 - record the number of valid draws, not merely attempted draws.
 
@@ -268,6 +320,51 @@ uncertainty records for one key are invalid. Bounds must respect the metric's
 declared range. Compatibility-alias `demographic_parity_difference` does not
 receive a duplicate interval; its canonical `selection_rate_difference` key
 owns the interval.
+
+The test suite must include a checked-in golden bootstrap fixture containing
+the config seed, canonical metric keys, sampled row-index arrays for the first
+three draws of every stream kind, valid-resample counts, and final interval
+bounds. The fixture is the cross-implementation compatibility oracle; changing
+PCG64, derivation bytes, draw consumption, or quantile method is a versioned
+method change.
+
+## Schema 1.1 and legacy migration
+
+Milestone 3 changes `AUDIT_RESULT_SCHEMA_VERSION` from `1.0` to `1.1`. Version
+1.1 makes `ObservedMetric.reliability` and `Limitation.related_metric_keys`
+required and adds the metric and undefined-reason enum members listed above.
+This is intentionally not represented as a backward-compatible 1.0 change.
+
+The package must retain an explicit `AuditResultV1_0` parser and provide
+`migrate_audit_result_v1_0(payload) -> AuditResult` with these deterministic
+rules:
+
+- preserve metadata, validation, observed values, flags, uncertainty,
+  limitations, and practitioner notes without recomputation;
+- set every legacy observed metric's reliability to `not_assessed`, because a
+  1.0 payload lacks sufficient evidence to reconstruct historical gates;
+- set every legacy limitation's `related_metric_keys` to the empty tuple;
+- preserve legacy metric names; migration does not synthesize new Milestone 3
+  metrics or uncertainty;
+- set `schema_version` to `1.1`, then validate all references and legacy value
+  ranges under the 1.1 model;
+- reject unknown source versions and reject a payload that fails the strict
+  1.0 parser before migration.
+
+The 1.1 wire schema accepts `not_assessed` and an empty
+`related_metric_keys` tuple so migrated results can make an exact JSON round
+trip. Their stable meaning is “evidence absent from schema 1.0”; they must not
+be defaulted for missing 1.1 fields. The `run_audit` assembler applies the
+stronger native-production invariant and rejects either value. Consumers must
+display migrated reliability honestly and must not reinterpret `not_assessed`
+as reliable or unreliable.
+
+Compatibility tests require: a checked-in 1.0 golden payload; strict 1.0 parse;
+1.0→1.1 migration; exact 1.1 round trip; rejection by the 1.1 parser of missing
+new fields; enforcement of the stronger `run_audit` production invariant; and
+proof that migrating an already migrated payload is rejected rather than
+silently repeated. Version 1.0 remains readable but
+`run_audit` only writes 1.1.
 
 ## Result assembly and reproducibility
 
