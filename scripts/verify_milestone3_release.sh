@@ -35,4 +35,5 @@ test "$actual_hash" = "$expected_hash"
 cd "$repo_root"
 "$venv_python" -m pytest -q
 "$venv_python" -m pytest -q tests/test_architecture.py
+"$venv_python" "$repo_root/scripts/verify_discoverability.py" --installed
 git diff --check
