@@ -332,8 +332,8 @@ all text is UTF-8, and all unsigned integers use fixed-width big-endian encoding
   quantile `q`, set `h = (m - 1) * q`, `i = floor(h)`, `j = ceil(h)`, and return
   `v[i] + (h - i) * (v[j] - v[i])`. Use target quantiles
   `(1 - confidence_level) / 2` and `1 - (1 - confidence_level) / 2`. This is
-  the precisely defined linear quantile method and does not delegate semantics
-  to a library default;
+  the Hyndman–Fan Type 7 linear quantile method, defined here explicitly so no
+  implementation delegates semantics to a library default;
 - record the number of valid draws, not merely attempted draws.
 
 Intervals are emitted only for defined, reliable numeric metrics with at least
