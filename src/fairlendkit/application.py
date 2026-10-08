@@ -38,7 +38,7 @@ from fairlendkit.report.models import (
     ObservedMetricV2,
     ReliabilityStateV2,
     ReportedMetricValueV2,
-    RunMetadataV2,
+    RunMetadata,
     ScreeningFlag,
     StatisticalUncertainty,
     UndefinedReasonV2,
@@ -75,12 +75,11 @@ class RunAudit:
         limitations = (*point_limitations, *interval_limitations)
         result = AuditResultV2(
             schema_version=AUDIT_RESULT_SCHEMA_VERSION_V2,
-            metadata=RunMetadataV2(
+            metadata=RunMetadata(
                 data_fingerprint=prepared.fingerprint,
                 package_version=_package_version(),
                 generated_at=config.execution_timestamp,
                 configuration=config,
-                migration_provenance=None,
             ),
             validation=to_validation_evidence(
                 validation,
