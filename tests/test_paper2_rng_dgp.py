@@ -1,5 +1,10 @@
 """Deterministic smoke tests for the preregistered generator."""
 
+import hashlib
+import json
+from dataclasses import asdict
+from pathlib import Path
+
 import pytest
 
 from fairlendkit.research.paper2.dgp import (
@@ -11,6 +16,19 @@ from fairlendkit.research.paper2.dgp import (
 from fairlendkit.research.paper2.registry import scenario_registry
 from fairlendkit.research.paper2.rng import analysis_rng, generator_rng
 from fairlendkit.research.paper2.smoke import run_smoke
+
+
+def _golden():
+    return json.loads(
+        (Path(__file__).parent / "fixtures" / "paper2_phase1_golden.json").read_text()
+    )
+
+
+def _canonical_sha256(value) -> str:
+    payload = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), default=str
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def test_sha256_counter_rng_has_stable_candidates_and_separate_roles():
@@ -33,6 +51,37 @@ def test_sha256_counter_rng_has_stable_candidates_and_separate_roles():
         master_seed=20261008, pairing_id="PAIR", replicate_id=7, role="row"
     ).uint64()
     assert analysis_rng("fairlendkit-paper2-h2-v1", 20261008, 0).uint64() != row.uint64()
+
+
+def test_all_generator_and_analysis_streams_match_exact_golden_sequences():
+    expected = _golden()["rng_uint64"]
+    streams = {
+        "generator_row": generator_rng(
+            master_seed=20261008, pairing_id="PAIR", replicate_id=7, role="row"
+        ),
+        "generator_missingness": generator_rng(
+            master_seed=20261008, pairing_id="PAIR", replicate_id=7, role="missingness"
+        ),
+        "analysis_summary": analysis_rng("fairlendkit-paper2-summary-v1", 20261008, 0),
+        "analysis_h2": analysis_rng("fairlendkit-paper2-h2-v1", 20261008, 0),
+    }
+    for role, rng in streams.items():
+        assert [rng.uint64() for _ in range(8)] == expected[role]
+
+
+def test_registry_and_dgp_match_checked_in_golden_hashes():
+    golden = _golden()
+    registry = scenario_registry()
+    registry_payload = [asdict(registry[key]) for key in registry]
+
+    assert len(registry) == golden["registry"]["scenario_count"]
+    assert _canonical_sha256(registry_payload) == golden["registry"]["canonical_sha256"]
+    for case in golden["dgp"]:
+        audit = generate_audit(
+            registry[case["scenario_id"]], case["replicate_id"], case["master_seed"]
+        )
+        assert len(audit.rows) == case["row_count"]
+        assert _canonical_sha256(asdict(audit)) == case["canonical_sha256"]
 
 
 def test_paired_size_scenarios_use_prefixes_of_the_same_row_stream():
