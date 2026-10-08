@@ -39,13 +39,14 @@ edge cases, tests, report representation, and limitations are documented.
 - Epic 1.3: structural integrity — complete.
 - Epic 1.4: layered validation results — complete; Epic 1 is closed.
 - Epic 2.1: single-run data-quality profile — contract defined in
-  [`epic-2.1-single-run-profile.md`](epic-2.1-single-run-profile.md); implement
-  and independently review before starting Epic 2.2.
-- Epic 2.2: baseline comparison — blocked until Epic 2.1 is merged and `main`
-  CI is green.
-
-Epic 2.1 is descriptive and must not silently establish the comparison API or
-drift semantics owned by Epic 2.2.
+  [`epic-2.1-single-run-profile.md`](epic-2.1-single-run-profile.md) and
+  implemented.
+- Epic 2.2: baseline comparison — contract defined in
+  [`epic-2.2-baseline-comparison.md`](epic-2.2-baseline-comparison.md) and
+  implemented; Epic 2 is closed.
+- Milestone 3: core audit engine and reliability — contract defined in
+  [`milestone-3-core-audit-engine.md`](milestone-3-core-audit-engine.md); work
+  proceeds through slices 3.1–3.5 only after the contract is reviewed.
 
 ## V1.1 — Mitigation experiments
 

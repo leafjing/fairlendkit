@@ -1,7 +1,8 @@
 # Audit result and report schema
 
-`AuditResult` schema version `1.0` is the canonical renderer-neutral result
-contract. HTML, JSON, and CSV renderers consume this model and must not receive
+`AuditResult` schema version `1.0` is the currently implemented
+renderer-neutral result contract. HTML, JSON, and CSV renderers consume this
+model and must not receive
 raw outcomes, decisions, scores, or weights. They format already-computed values
 and never recompute metrics.
 
@@ -37,6 +38,37 @@ message; mismatched or arbitrary free text fails validation. Renderers must
 reproduce the stored code and message and must not invent an interpretation.
 Adding or changing a code or canonical message requires Schema version review.
 
+Milestone 3 advances the schema to `2.0` to add metric reliability, new metric
+names, typed limitation-to-metric references, and new undefined reasons. Version
+`1.0` remains a strict legacy read contract and is migrated explicitly; the
+migration must not infer reliability that the old payload did not record. The
+behavioral contract, migration rules, and compatibility-alias rule are defined in
+[`milestone-3-core-audit-engine.md`](milestone-3-core-audit-engine.md). Slice
+3.1 must update this document and the generated schema together with the model;
+this cross-reference does not claim those fields are already implemented.
+
+In 2.0, `ObservedMetric.reliability` is required. Native `run_audit` results use
+`reliable`, `unreliable`, `undefined`, or `not_applicable`; migrated 1.0 results
+use `not_assessed` because legacy payloads do not contain enough evidence to
+reconstruct the gate decision. Undefined and not-applicable state takes
+precedence and receives no reliability limitation.
+
+In 2.0, `Limitation.affected_metric_keys` is also required. Native results use a
+non-empty, unique, canonically ordered tuple whose keys resolve to
+`observed_metrics`; migrated 1.0 limitations use an empty tuple with the fixed
+meaning “relationship absent from the legacy schema.” One metric may be linked
+from multiple limitations. Comparison metrics merge source limitation codes in
+the fixed order defined by the Milestone 3 reliability matrix.
+
+`StatisticalUncertainty` remains linked to one metric key. Its deterministic
+2.0 production is guarded by the Milestone 3 bootstrap golden fixture, which
+fixes the `fairlendkit-bootstrap-v1` seed-material format, SHA-256 counter
+blocks, four-candidate digest split, rejection sampler, stream roles, the first
+three sampled index arrays, valid-resample counts, Type 7 quantiles, and final
+bounds. The interpolation is the explicitly specified Hyndman–Fan Type 7
+method. A failed
+valid-resample gate emits a linked limitation instead of an interval.
+
 ## Group direction
 
 Single-group metrics use `group`. AIR, demographic parity difference, and equal
@@ -68,11 +100,13 @@ separate. The embedded result exposes all four layers, technical status, and
 
 ## Versioning and serialization
 
-`schema_version` is required and fixed to `"1.0"`. Pydantic's generated JSON
-Schema is the normative machine-readable equivalent contract and is tested for
-the version constant, required sections, strict unknown-field rejection, and
-JSON round trips. A breaking field or semantic change requires a new schema
-version and migration notes.
+The currently implemented `schema_version` is required and fixed to `"1.0"`.
+Milestone 3 changes the writer version to `"2.0"` and retains a strict 1.0
+reader plus the migration defined above. Pydantic's generated JSON Schema is the
+normative machine-readable equivalent of each version and is tested for version
+constants, required sections, strict unknown-field rejection, migration, and
+JSON round trips. Any later breaking field or semantic change requires another
+schema version and migration notes.
 
 The synthetic example at `examples/synthetic/audit-result.json` contains no
 real applicant, lender, or proprietary data.
