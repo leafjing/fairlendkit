@@ -5,6 +5,7 @@ import hashlib
 from dataclasses import asdict
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,6 +18,7 @@ from fairlendkit.research.paper2.resource_benchmark import (
     _mapped_peak_rss,
     _measure_representative,
     _project_benchmark_costs,
+    _smoke_frame,
     _validate_representative_output,
     _validate_benchmark_coverage,
 )
@@ -43,6 +45,24 @@ from fairlendkit.research.paper2.protocol import ProductionRunLockedError
 
 
 REPO_ROOT = Path(__file__).parents[1]
+
+
+def test_smoke_frame_preserves_nullable_categorical_label_types():
+    generated = SimpleNamespace(
+        rows=(
+            SimpleNamespace(outcome=1, score=0.8, decision=1, group=0),
+            SimpleNamespace(outcome=None, score=None, decision=None, group=1),
+            SimpleNamespace(outcome=0, score=0.2, decision=0, group=1),
+        )
+    )
+
+    frame = _smoke_frame(generated)
+
+    assert frame["outcome"].dtype == object
+    assert frame["decision"].dtype == object
+    assert frame["group"].dtype == object
+    assert type(frame.loc[0, "outcome"]) is int
+    assert type(frame.loc[0, "decision"]) is int
 CODE_COMMIT = "1" * 40
 
 

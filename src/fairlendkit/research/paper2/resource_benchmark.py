@@ -167,14 +167,7 @@ def _run_representative(
         cpu_start = time.process_time()
         wall_start = time.perf_counter()
         generated = run_smoke((scenario_id,), (0,)).audits[0]
-        frame = pd.DataFrame(
-            {
-                "outcome": [row.outcome for row in generated.rows],
-                "score": [row.score for row in generated.rows],
-                "decision": [row.decision for row in generated.rows],
-                "group": [row.group for row in generated.rows],
-            }
-        )
+        frame = _smoke_frame(generated)
         result = run_audit(frame, _audit_config(scenario))
         payload = _raw_payload(result)
         _validate_representative_output(result, payload, expected_metric_names)
@@ -200,6 +193,18 @@ def _run_representative(
         artifact_bytes=artifact_bytes,
         metric_identities=tuple(sorted(expected_metric_names)),
         artifact_schema="paper2-raw-replicate-v1",
+    )
+
+
+def _smoke_frame(generated) -> pd.DataFrame:
+    """Build a frame without coercing nullable categorical integers to floats."""
+    return pd.DataFrame(
+        {
+            "outcome": pd.Series([row.outcome for row in generated.rows], dtype=object),
+            "score": [row.score for row in generated.rows],
+            "decision": pd.Series([row.decision for row in generated.rows], dtype=object),
+            "group": pd.Series([row.group for row in generated.rows], dtype=object),
+        }
     )
 
 
