@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import platform
 import re
+import resource
+import shutil
 import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass
 from math import isfinite
 from pathlib import Path
@@ -27,6 +31,8 @@ SHARD_SIZE = 1_000
 WORKER_COUNT = 4
 CPU_BUDGET = 4
 MEMORY_BUDGET_GIB = 16
+DISK_SAFETY_FACTOR = 2.0
+RUNTIME_SAFETY_FACTOR = 2.0
 PROTOCOL_A1_COMMIT = "865a2baf549d691d602334379ed03a7883989d6f"
 IMPLEMENTATION_BASE_COMMIT = "1143d0e5795eefa1abb3de4bf52fdc9eaf8f9b91"
 PARALLEL_STRATEGY = "process-per-shard; deterministic shard queue"
@@ -43,6 +49,48 @@ _COMMIT_RE = re.compile(r"[0-9a-f]{40}")
 
 class IntegrityError(ValueError):
     """Raised when execution artifacts fail closed validation."""
+
+
+@dataclass(frozen=True)
+class ResourceCapacity:
+    cpu_count: int
+    memory_bytes: int
+    disk_free_bytes: int
+
+
+@dataclass(frozen=True)
+class SmokeBenchmarkEvidence:
+    schema_version: str
+    smoke_records: int
+    wall_seconds: float
+    cpu_seconds: float
+    peak_rss_bytes: int
+    artifact_bytes: int
+    projected_records: int
+    projected_cpu_hours: float
+    projected_wall_hours: float
+    projected_disk_bytes: int
+    required_memory_bytes: int
+    safety_factor: float
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "paper2-resource-benchmark-v1":
+            raise IntegrityError("Resource benchmark schema is not frozen.")
+        numeric = (
+            self.smoke_records,
+            self.wall_seconds,
+            self.cpu_seconds,
+            self.peak_rss_bytes,
+            self.artifact_bytes,
+            self.projected_records,
+            self.projected_cpu_hours,
+            self.projected_wall_hours,
+            self.projected_disk_bytes,
+            self.required_memory_bytes,
+            self.safety_factor,
+        )
+        if any(not isfinite(float(value)) or value <= 0 for value in numeric):
+            raise IntegrityError("Resource benchmark values must be finite and positive.")
 
 
 @dataclass(frozen=True)
@@ -318,6 +366,81 @@ def build_manifest(repo_root: Path) -> ExecutionManifest:
         pip_freeze_sha256=hashlib.sha256(actual_environment).hexdigest(),
         python_executable_sha256=sha256_file(Path(sys.executable).resolve()),
         python_version=platform.python_version(),
+    )
+
+
+def host_resource_capacity(path: Path) -> ResourceCapacity:
+    """Return execution-host capacity without inspecting experiment results."""
+    cpu_count = os.cpu_count() or 0
+    page_size = os.sysconf("SC_PAGE_SIZE")
+    physical_pages = os.sysconf("SC_PHYS_PAGES")
+    return ResourceCapacity(
+        cpu_count=cpu_count,
+        memory_bytes=page_size * physical_pages,
+        disk_free_bytes=shutil.disk_usage(path).free,
+    )
+
+
+def validate_resource_preflight(
+    capacity: ResourceCapacity, evidence: SmokeBenchmarkEvidence
+) -> None:
+    """Fail closed before execution when the frozen resource envelope is absent."""
+    if capacity.cpu_count < CPU_BUDGET:
+        raise IntegrityError("Execution host has insufficient CPU capacity.")
+    if capacity.memory_bytes < evidence.required_memory_bytes:
+        raise IntegrityError("Execution host has insufficient memory capacity.")
+    if capacity.disk_free_bytes < evidence.projected_disk_bytes:
+        raise IntegrityError("Execution host has insufficient disk capacity.")
+
+
+def benchmark_smoke_resources(
+    workspace: ExecutionWorkspace,
+    manifest: ExecutionManifest,
+    *,
+    scenario_id: str = "REG",
+    replicates: int = 100,
+) -> SmokeBenchmarkEvidence:
+    """Benchmark raw smoke records only; no estimates or plots are produced."""
+    if workspace.namespace != "smoke" or replicates != 100:
+        raise IntegrityError("Resource benchmark requires the frozen smoke workload.")
+    spec = smoke_shards(scenario_id, replicates=replicates, shard_size=replicates)[0]
+    key = "overall.selection_rate"
+    payload = RawReplicatePayload(
+        schema_version="paper2-raw-replicate-v1",
+        metric_values=((key, 0.5),),
+        metric_defined=((key, True),),
+        reliability=((key, "reliable"),),
+        uncertainty=((key, (0.4, 0.6)),),
+        flags=(),
+        limitations=(),
+    )
+    records = tuple(
+        RawReplicateRecord(scenario_id, replicate_id, payload)
+        for replicate_id in range(replicates)
+    )
+    cpu_start = time.process_time()
+    wall_start = time.perf_counter()
+    write_smoke_shard(workspace, manifest, spec, records)
+    validate_complete_set(workspace, manifest, (spec,))
+    wall_seconds = time.perf_counter() - wall_start
+    cpu_seconds = time.process_time() - cpu_start
+    artifact_bytes = sum(path.stat().st_size for path in workspace.output_dir.iterdir())
+    peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    peak_rss_bytes = peak_rss if sys.platform == "darwin" else peak_rss * 1024
+    projected_records = len(frozen_execution_scenario_ids()) * CONFIRMATORY_REPLICATES
+    return SmokeBenchmarkEvidence(
+        schema_version="paper2-resource-benchmark-v1",
+        smoke_records=replicates,
+        wall_seconds=wall_seconds,
+        cpu_seconds=cpu_seconds,
+        peak_rss_bytes=peak_rss_bytes,
+        artifact_bytes=artifact_bytes,
+        projected_records=projected_records,
+        projected_cpu_hours=(cpu_seconds / replicates * projected_records * RUNTIME_SAFETY_FACTOR / 3600),
+        projected_wall_hours=(wall_seconds / replicates * projected_records * RUNTIME_SAFETY_FACTOR / 3600 / WORKER_COUNT),
+        projected_disk_bytes=int(artifact_bytes / replicates * projected_records * DISK_SAFETY_FACTOR),
+        required_memory_bytes=MEMORY_BUDGET_GIB * 1024**3,
+        safety_factor=RUNTIME_SAFETY_FACTOR,
     )
 
 

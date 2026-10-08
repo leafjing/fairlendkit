@@ -12,12 +12,15 @@ from fairlendkit.research.paper2.execution import (
     IntegrityError,
     RawReplicatePayload,
     RawReplicateRecord,
+    ResourceCapacity,
     ShardSpec,
     build_manifest,
+    benchmark_smoke_resources,
     frozen_confirmatory_shards,
     frozen_execution_scenario_ids,
     smoke_shards,
     validate_complete_set,
+    validate_resource_preflight,
     validate_shard,
     write_smoke_shard,
 )
@@ -269,3 +272,39 @@ def test_complete_set_rejects_reused_identity_or_range(workspace, manifest):
     )
     with pytest.raises(IntegrityError, match="identities or ranges overlap"):
         validate_complete_set(workspace, manifest, reused_range)
+
+
+def test_smoke_benchmark_is_raw_only_and_resource_preflight_fails_closed(
+    workspace, manifest
+):
+    evidence = benchmark_smoke_resources(workspace, manifest)
+
+    assert evidence.schema_version == "paper2-resource-benchmark-v1"
+    assert evidence.smoke_records == 100
+    assert evidence.projected_records == 29 * 50_000
+    assert evidence.safety_factor == 2.0
+    assert evidence.projected_cpu_hours > 0
+    assert evidence.projected_wall_hours > 0
+    assert evidence.projected_disk_bytes > 0
+    assert not any(
+        forbidden in path.name.lower()
+        for path in workspace.output_dir.iterdir()
+        for forbidden in ("estimate", "p-value", "holm", "plot", "figure")
+    )
+
+    sufficient = ResourceCapacity(
+        cpu_count=4,
+        memory_bytes=evidence.required_memory_bytes,
+        disk_free_bytes=evidence.projected_disk_bytes,
+    )
+    validate_resource_preflight(sufficient, evidence)
+    with pytest.raises(IntegrityError, match="CPU"):
+        validate_resource_preflight(replace(sufficient, cpu_count=3), evidence)
+    with pytest.raises(IntegrityError, match="memory"):
+        validate_resource_preflight(
+            replace(sufficient, memory_bytes=evidence.required_memory_bytes - 1), evidence
+        )
+    with pytest.raises(IntegrityError, match="disk"):
+        validate_resource_preflight(
+            replace(sufficient, disk_free_bytes=evidence.projected_disk_bytes - 1), evidence
+        )

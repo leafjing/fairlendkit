@@ -27,6 +27,35 @@ confirmatory matrix, public-data download, analysis, or result inspection.
   byte-for-byte; an interrupted incomplete pair is discarded and the whole
   shard is retried. Successful artifacts are immutable.
 
+## Resource preflight
+
+The resource benchmark runs exactly 100 records in the isolated smoke
+namespace and measures elapsed time, process CPU time, peak RSS, and canonical
+artifact bytes. It does not calculate an estimate, standard error, p-value,
+Holm result, or figure. CPU-hours, wall time, and disk are extrapolated to
+29 × 50,000 raw records with a frozen 2× safety factor; memory retains the
+frozen 16-GiB execution envelope rather than extrapolating RSS.
+
+Generate reproducible host-specific evidence on a clean locked environment:
+
+```bash
+python scripts/benchmark_paper2_execution_gate.py
+```
+
+Before an authorized run, the same command must use `--require-capacity`.
+Preflight fails closed unless the host exposes at least 4 CPUs, 16 GiB memory,
+and free disk no smaller than the conservative projected artifact size. The
+evidence contains only resource measurements and capacity—not experimental
+statistics or plots.
+
+Reference smoke evidence on Python 3.12.3 (100 raw records, isolated temporary
+workspace) measured 0.00642 wall seconds, 0.00643 CPU seconds, 94,040,064 bytes
+peak RSS, and 33,857 artifact bytes. Conservative 2× linear projection gives
+0.0518 CPU-hours, 0.0129 wall-hours at four workers, and 981,853,000 bytes of
+disk for 1,450,000 raw records. These are planning measurements, not a promise
+of runtime; the authorized host must still satisfy the frozen 4-CPU/16-GiB
+envelope and the projected disk requirement through fail-closed preflight.
+
 ## Artifact boundary
 
 Each shard writes one canonical JSONL file of raw replicate records and one
