@@ -20,6 +20,5 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e '.[test]'
-      - run: python -m pytest -q
+      - name: Run the Milestone 3 release verifier
+        run: ./scripts/verify_milestone3_release.sh

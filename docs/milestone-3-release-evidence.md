@@ -44,9 +44,10 @@ complete final environment recorded in
 - final `pip freeze --all` comparison: passed; and
 - `git diff --check`: passed.
 
-GitHub Actions independently runs the full suite on the supported Python 3.11
-and 3.12 matrix. The workflow logs are the authoritative record of exact CI
-patch versions and installed packages for each run.
+GitHub Actions runs this same fail-closed release verifier on the supported
+Python 3.11 and 3.12 matrix. Each job therefore prints its exact Python version
+and final `pip freeze --all`, and enforces the same locked environment, oracle
+bytes, SHA-256, test, architecture, and diff checks used locally.
 
 ## Scope audit
 
