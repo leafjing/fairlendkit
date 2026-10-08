@@ -9,7 +9,7 @@ data = pd.DataFrame(
     {
         "outcome": [1, 0, 1, 0, 1, 0],
         "score": [0.90, 0.70, 0.80, 0.40, 0.60, 0.10],
-        "audit_group": ["reference", "reference", "reference", "comparison", "comparison", "comparison"],
+        "audit_group": [1, 1, 1, 0, 0, 0],
     }
 )
 
@@ -26,8 +26,8 @@ config = AuditConfig(
     favorable_label=1,
     score_direction="higher_is_more_favorable",
     protected_attributes=("audit_group",),
-    reference_groups={"audit_group": "reference"},
-    allowed_groups={"audit_group": ("reference", "comparison")},
+    reference_groups={"audit_group": 1},
+    allowed_groups={"audit_group": (1, 0)},
     favorable_decision_label=1,
     decision_threshold=0.5,
     threshold_operator="ge",

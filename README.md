@@ -45,7 +45,7 @@ The release-gate SHA-256 of the exact example stdout, including its final
 newline, is:
 
 ```text
-10928c6aca2f274bf3e93037d2a7e021a5d095cf45723dce5f1ddb5f37848975
+19f9bce01b90186040346079d36ab6fd5be1f209db1ea08b064537c7ae3c02f0
 ```
 
 From a clean checkout, the single release-verification entry point creates an
@@ -110,3 +110,6 @@ remaining V1 workflow are still under development.
 - Runtime gate: full tests on Python 3.11 and 3.12 plus `git diff --check`.
 - Scope gate: repository exports no CLI, HTML/CSV renderer, threshold scan,
   proxy screening, governance integration, or mitigation workflow.
+
+The complete checked-in verification record is
+[`docs/milestone-3-release-evidence.md`](docs/milestone-3-release-evidence.md).
