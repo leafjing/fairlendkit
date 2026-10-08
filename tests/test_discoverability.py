@@ -155,8 +155,10 @@ def test_duplicate_canonical_links_fail_closed(tmp_path):
     (
         ("site/index.html", '<link rel="canonical" href="https://example.invalid">', "approved origin"),
         ("site/index.html", '<meta property="og:title" content="FairLendKit">', "approved origin"),
+        ("site/index.html", '<meta name="twitter:card" content="summary">', "approved origin"),
         ("sitemap.xml", "<urlset/>", "sitemap.xml"),
         ("docs/robots.txt", "User-agent: *", "robots.txt"),
+        ("docs/software-source-code.jsonld", "{}", "software-source-code.jsonld"),
     ),
 )
 def test_live_site_metadata_fails_closed(relative, content, message, tmp_path):
