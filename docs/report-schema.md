@@ -53,7 +53,7 @@ use `not_assessed` because legacy payloads do not contain enough evidence to
 reconstruct the gate decision. Undefined and not-applicable state takes
 precedence and receives no reliability limitation.
 
-In 2.0, `Limitation.related_metric_keys` is also required. Native results use a
+In 2.0, `Limitation.affected_metric_keys` is also required. Native results use a
 non-empty, unique, canonically ordered tuple whose keys resolve to
 `observed_metrics`; migrated 1.0 limitations use an empty tuple with the fixed
 meaning “relationship absent from the legacy schema.” One metric may be linked
@@ -62,10 +62,11 @@ the fixed order defined by the Milestone 3 reliability matrix.
 
 `StatisticalUncertainty` remains linked to one metric key. Its deterministic
 2.0 production is guarded by the Milestone 3 bootstrap golden fixture, which
-fixes the `fairlendkit-sha256-counter-v1` domain tag, SHA-256 counter preimage
-and rejection sampler, stream names, the first three sampled index arrays,
-valid-resample counts, `linear` quantiles, and final bounds. The linear interpolation is the explicitly specified
-Hyndman–Fan Type 7 method. A failed
+fixes the `fairlendkit-bootstrap-v1` seed-material format, SHA-256 counter
+blocks, four-candidate digest split, rejection sampler, stream roles, the first
+three sampled index arrays, valid-resample counts, Type 7 quantiles, and final
+bounds. The interpolation is the explicitly specified Hyndman–Fan Type 7
+method. A failed
 valid-resample gate emits a linked limitation instead of an interval.
 
 ## Group direction

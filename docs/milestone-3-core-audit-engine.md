@@ -228,7 +228,7 @@ reliability warning, not an undefined denominator test.
 | --- | --- | --- | --- |
 | `selection_rate`, `denial_rate` | applies | ignored | ignored |
 | `accuracy` | applies | applies | ignored |
-| `precision` | applies | ignored | applies when `D+ < minimum_group_size` |
+| `precision` | applies | applies | applies when `D+ < minimum_group_size` |
 | `true_positive_rate`, `false_positive_rate`, `false_negative_rate` | applies | applies | ignored |
 | `brier_score`, `roc_auc` | applies | applies | ignored |
 | `selection_rate_difference`, `adverse_impact_ratio`, `demographic_parity_difference` | merge both source selection-rate limitations | ignored | ignored |
@@ -268,7 +268,7 @@ Duplicate codes within a scope and duplicate metric keys within a limitation
 are invalid.
 
 A limitation must identify affected metric keys through the new required
-`related_metric_keys: tuple[Identifier, ...]` field. For a result produced by
+`affected_metric_keys: tuple[Identifier, ...]` field. For a result produced by
 `run_audit` it must be non-empty, unique, canonically ordered, and resolve to
 observed metrics; implementations must not encode key relationships only in
 prose. The empty tuple has the legacy migration meaning defined below.
@@ -297,32 +297,32 @@ pass or compliance conclusion.
 ## Uncertainty contract
 
 Milestone 3 uses the following fully specified nonparametric percentile
-bootstrap. It is a SHA-256 counter sampler and does not depend on a language or
-numerical library random-number generator. “SHA-256” means the FIPS 180-4 hash,
-all text is UTF-8, and all unsigned integers use fixed-width big-endian encoding:
+bootstrap. It uses the project-owned `fairlendkit-sha256-counter-v1` RNG and
+does not depend on a language or numerical-library random-number generator.
+“SHA-256” means the FIPS 180-4 hash and all unsigned integers extracted from a
+digest or used as counters are big-endian:
 
 - resample eligible rows with replacement within the evaluated scope;
 - use exactly `bootstrap_resamples` attempted draws;
-- encode `bootstrap_seed` as exactly eight unsigned big-endian bytes;
-- use stream name `overall` for overall metrics, `group` for single-group
-  metrics, and the two independent stream names `comparison` and `reference`
-  for the corresponding sides of a directed comparison;
-- encode `metric_key` and `stream_name` as their UTF-8 bytes, each preceded by
-  its byte length as an unsigned 32-bit integer; this prevents concatenation
-  ambiguity;
-- for zero-based draw `d`, zero-based sampled position `p`, and zero-based
-  rejection counter `r`, form
-  `b"fairlendkit-sha256-counter-v1\x00" + seed_u64 + key_len_u32 + key_bytes +
-  stream_len_u32 + stream_bytes + d_u64 + p_u64 + r_u32`;
-- hash that byte string and interpret the first eight digest bytes as unsigned
-  integer `x`; for population size `n`, let `limit = floor(2**64 / n) * n`;
-  accept `x` when `x < limit` and select source row position `x % n`, otherwise
-  increment `r` and hash again;
-- reject `n == 0` before sampling; counters must fit their stated widths or the
-  configuration/input is invalid;
-- generate draws in increasing `d`, positions in increasing `p`, and rejection
-  attempts in increasing `r`; no mutable random stream is shared between keys
-  or comparison sides;
+- the only stream roles are the ASCII strings `scope`, `comparison`, and
+  `reference`; overall and single-group metrics both use `scope`, while a
+  directed comparison uses the two independent side roles;
+- form seed material as the exact UTF-8 bytes of
+  `fairlendkit-bootstrap-v1\0{seed}\0{metric_key}\0{stream_role}`, where
+  `{seed}` is the base-10 ASCII representation of `bootstrap_seed` with no sign,
+  padding, or separators, and `\0` is one NUL byte;
+- initialize an unsigned 64-bit block counter to `0`. For each block, compute
+  `SHA256(seed_material || counter_uint64_be)`, then increment the counter by
+  one. Counter overflow is an error;
+- split each 32-byte digest in byte order into four consecutive unsigned
+  64-bit big-endian candidates: bytes `0:8`, `8:16`, `16:24`, and `24:32`;
+- consume candidates in counter order and then digest-chunk order. For
+  population size `n`, let `limit = floor(2**64 / n) * n`; accept candidate `x`
+  only when `x < limit`, select source row position `x % n`, and otherwise
+  discard it and consume the next candidate;
+- reject `n == 0` before sampling. Fill sampled positions in draw-major order:
+  all positions of draw zero, then all positions of draw one, without resetting
+  the counter or discarding unused candidates at a draw boundary;
 - for directed comparisons, resample comparison and reference groups from their
   separately derived streams, preserving each original group size;
 - apply configured sample weights as metric weights after row resampling; the
@@ -332,7 +332,7 @@ all text is UTF-8, and all unsigned integers use fixed-width big-endian encoding
   quantile `q`, set `h = (m - 1) * q`, `i = floor(h)`, `j = ceil(h)`, and return
   `v[i] + (h - i) * (v[j] - v[i])`. Use target quantiles
   `(1 - confidence_level) / 2` and `1 - (1 - confidence_level) / 2`. This is
-  the Hyndman–Fan Type 7 linear quantile method, defined here explicitly so no
+  the Hyndman–Fan Type 7 quantile method, defined here explicitly so no
   implementation delegates semantics to a library default;
 - record the number of valid draws, not merely attempted draws.
 
@@ -353,18 +353,16 @@ The test suite must include a checked-in golden bootstrap fixture containing
 the config seed, canonical metric keys, sampled row-index arrays for the first
 three draws of every stream kind, valid-resample counts, and final interval
 bounds. The fixture is the cross-implementation compatibility oracle; changing
-the `fairlendkit-sha256-counter-v1` domain tag, hash preimage, integer
-widths/byte order, rejection rule, counter order, or quantile method is a
-versioned method change.
+the seed-material format, counter-block construction, four-way digest split,
+integer byte order, rejection rule, candidate-consumption order, or quantile
+method is a versioned method change.
 
 ## Schema 2.0 and legacy migration
 
 Milestone 3 changes `AUDIT_RESULT_SCHEMA_VERSION` from `1.0` to `2.0`. Version
-2.0 makes `ObservedMetric.reliability` and `Limitation.related_metric_keys`
+2.0 makes `ObservedMetric.reliability` and `Limitation.affected_metric_keys`
 required and adds the metric and undefined-reason enum members listed above.
 This is intentionally not represented as a backward-compatible 1.0 change.
-No public schema version 1.1 exists; the earlier PR draft was never released
-and is superseded by this 2.0 contract.
 
 The package must retain an explicit `AuditResultV1_0` parser and provide
 `migrate_audit_result_v1_0(payload) -> AuditResult` with these deterministic
@@ -374,7 +372,7 @@ rules:
   limitations, and practitioner notes without recomputation;
 - set every legacy observed metric's reliability to `not_assessed`, because a
   1.0 payload lacks sufficient evidence to reconstruct historical gates;
-- set every legacy limitation's `related_metric_keys` to the empty tuple;
+- set every legacy limitation's `affected_metric_keys` to the empty tuple;
 - preserve legacy metric names; migration does not synthesize new Milestone 3
   metrics or uncertainty;
 - set `schema_version` to `2.0`, then validate all references and legacy value
@@ -383,7 +381,7 @@ rules:
   1.0 parser before migration.
 
 The 2.0 wire schema accepts `not_assessed` and an empty
-`related_metric_keys` tuple so migrated results can make an exact JSON round
+`affected_metric_keys` tuple so migrated results can make an exact JSON round
 trip. Their stable meaning is “evidence absent from schema 1.0”; they must not
 be defaulted for missing 2.0 fields. The `run_audit` assembler applies the
 stronger native-production invariant and rejects either value. Consumers must
