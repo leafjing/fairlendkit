@@ -55,3 +55,25 @@ def test_group_orchestration_is_dataframe_and_io_independent():
         for module in imported_modules
         for root in forbidden
     )
+
+
+def test_metrics_package_does_not_depend_on_report_package():
+    for source_path in Path("src/fairlendkit/metrics").glob("*.py"):
+        tree = ast.parse(source_path.read_text())
+        imported_modules = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+        }
+        imported_modules.update(
+            name.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for name in node.names
+        )
+
+        assert not any(
+            module == "fairlendkit.report"
+            or module.startswith("fairlendkit.report.")
+            for module in imported_modules
+        ), f"{source_path} imports the outer report package"

@@ -61,20 +61,25 @@ class AuditScope:
         if len({name for name, _ in self.attributes}) != len(self.attributes):
             raise ValueError("audit scope attributes must be unique")
 
-    def _typed_identity(self) -> tuple[tuple[str, str], ...]:
-        return tuple(
-            (name, canonical_typed_token(value)) for name, value in self.attributes
-        )
-
-    def __eq__(self, other: object) -> bool:
-        return isinstance(other, AuditScope) and self._typed_identity() == other._typed_identity()
-
-    def __hash__(self) -> int:
-        return hash(self._typed_identity())
-
     @classmethod
     def overall(cls) -> "AuditScope":
         return cls((("__scope__", "overall"),))
+
+
+@dataclass(frozen=True, order=True)
+class ScopeKey:
+    """Canonical typed identity used for lookup, sorting, and de-duplication."""
+
+    attributes: tuple[tuple[str, str], ...]
+
+    @classmethod
+    def from_scope(cls, scope: AuditScope) -> "ScopeKey":
+        return cls(
+            tuple(
+                (canonical_typed_token(name), canonical_typed_token(value))
+                for name, value in scope.attributes
+            )
+        )
 
 
 @dataclass(frozen=True)
@@ -158,7 +163,7 @@ def canonical_metric_key(
 ) -> str:
     """Build the stable key prescribed by the Milestone 3 contract."""
 
-    if group == AuditScope.overall():
+    if group is not None and group.attributes == (("__scope__", "overall"),):
         return f"overall.{metric.value}"
     if group is not None:
         if len(group.attributes) != 1:
@@ -200,7 +205,7 @@ def calculate_group_metrics(
             raise ValueError("protected values must belong to configured allowed groups")
 
     output: list[CalculatedMetric] = []
-    scope_results: dict[tuple[str, AuditScope], CalculatedMetric] = {}
+    scope_results: dict[tuple[str, ScopeKey], CalculatedMetric] = {}
     overall = AuditScope.overall()
     output.extend(_calculate_scope(data, config, overall, tuple(range(len(data.favorable_outcome)))))
 
@@ -216,7 +221,7 @@ def calculate_group_metrics(
             metrics = _calculate_scope(data, config, scope, indices)
             output.extend(metrics)
             for item in metrics:
-                scope_results[(item.metric.value, scope)] = item
+                scope_results[(item.metric.value, ScopeKey.from_scope(scope))] = item
 
         reference_value = config.reference_groups[attribute]
         reference_scope = AuditScope(((attribute, reference_value),))
@@ -269,13 +274,13 @@ def _calculate_scope(
 
 def _calculate_comparison(
     scope_results: Mapping[
-        tuple[str, AuditScope], CalculatedMetric
+        tuple[str, ScopeKey], CalculatedMetric
     ],
     comparison_scope: AuditScope,
     reference_scope: AuditScope,
 ) -> tuple[CalculatedMetric, ...]:
     def source(metric: MetricNameV2, scope: AuditScope) -> CalculatedMetric:
-        return scope_results[(metric.value, scope)]
+        return scope_results[(metric.value, ScopeKey.from_scope(scope))]
 
     comparison_selection = source(MetricNameV2.SELECTION_RATE, comparison_scope)
     reference_selection = source(MetricNameV2.SELECTION_RATE, reference_scope)

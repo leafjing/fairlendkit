@@ -1,6 +1,10 @@
 """Metric contracts for normalized favorable-outcome and decision indicators."""
 
-from fairlendkit.metrics.contracts import MetricNameV2
+from fairlendkit.metrics.contracts import (
+    CANONICAL_UNDEFINED_MESSAGES_V2,
+    MetricNameV2,
+    UndefinedReasonCodeV2,
+)
 from fairlendkit.metrics.core import (
     MetricValue,
     accuracy,
@@ -24,6 +28,7 @@ from fairlendkit.metrics.group import (
     AuditScope,
     CalculatedMetric,
     NormalizedAuditData,
+    ScopeKey,
     calculate_group_metrics,
     canonical_metric_key,
     canonical_typed_token,
@@ -32,6 +37,8 @@ from fairlendkit.metrics.group import (
 __all__ = [
     "MetricValue",
     "MetricNameV2",
+    "UndefinedReasonCodeV2",
+    "CANONICAL_UNDEFINED_MESSAGES_V2",
     "accuracy",
     "adverse_impact_ratio",
     "brier_score",
@@ -51,6 +58,7 @@ __all__ = [
     "AuditScope",
     "CalculatedMetric",
     "NormalizedAuditData",
+    "ScopeKey",
     "calculate_group_metrics",
     "canonical_metric_key",
     "canonical_typed_token",
