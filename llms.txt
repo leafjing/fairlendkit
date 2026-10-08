@@ -1,0 +1,31 @@
+# FairLendKit
+
+> FairLendKit is a reproducible fair-lending audit toolkit for credit decisioning systems. It produces statistical evidence for practitioner review and does not determine fairness, causation, legality, or compliance.
+
+## Start here
+
+- [README](README.md): implemented capabilities, quick start, non-goals, status, and release evidence
+- [Core concepts](docs/core-concepts.md): semantic validation, metrics, reliability, uncertainty, flags, and reproducible reporting
+- [FAQ](docs/faq.md): direct answers for practitioners and researchers
+- [Limitations](docs/limitations.md): interpretation, data, scope, and communication boundaries
+
+## Normative contracts
+
+- [Data specification](docs/data-spec.md)
+- [Metric contracts](docs/metric-contracts.md)
+- [Undefined reasons](docs/undefined-reasons.md)
+- [Report Schema 2.0](docs/report-schema.md)
+- [Methodology and guardrails](docs/methodology-and-guardrails.md)
+- [Canonical glossary](docs/glossary.md)
+
+## Reproducibility and status
+
+- [Milestone 3 release evidence](docs/milestone-3-release-evidence.md)
+- [Roadmap](docs/roadmap.md)
+- [Citation and research relationship](docs/citation-and-research.md)
+- [CITATION.cff](CITATION.cff)
+- [CodeMeta](codemeta.json)
+
+## Important boundaries
+
+Current output is a renderer-neutral typed result and canonical JSON. Threshold scanning, HTML/CSV renderers, a CLI, proxy-risk screening, governance integration, and mitigation are not implemented. Research protocols and results do not become product capabilities merely by existing in this repository.
