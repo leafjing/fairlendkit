@@ -157,8 +157,9 @@ five `delta_a` values. This pairs reliability states on population AIR while
 retaining the diagnostic, non-causal interpretation.
 
 The joint paired-unit bootstrap has 2,000 draws. For draw `b`, sample one vector
-of five integer unit indices with replacement from `[0,4]` using seed material
-`fairlendkit-paper2-h2-v1\0{master_seed}\0{b}`. The same sampled unit indices
+of five integer unit indices with replacement from `[0,4]` using the sole RNG
+format with `purpose=h2_bootstrap`, `unit_id=H2`, `draw_id=b`,
+`scope=analysis`, and `role=scenario_unit_index`. The same sampled unit indices
 select both the unreliable side and its four-scenario reliable side; compute
 each selected `delta_a`, then their equal-weight mean. A selected unit is
 unavailable if its unreliable MAE or any of its four reliable MAEs is
@@ -186,18 +187,34 @@ Sensitivity results at half and twice these cutoffs are secondary.
 
 ## Synthetic data-generating processes
 
-All generators use `fairlendkit-paper2-sha256-counter-v1`. Its seed material is
-the UTF-8 encoding of
-`fairlendkit-paper2-v1\0{master_seed}\0{pairing_id}\0{replicate_id}\0{role}`.
+All experiment and analysis randomness uses
+`fairlendkit-paper2-sha256-counter-v1`. Its only seed-material format is the
+UTF-8 encoding of:
+
+```text
+fairlendkit-paper2-v1\0{master_seed}\0{purpose}\0{unit_id}\0{draw_id}\0{scope}\0{role}
+```
+
 A block is `SHA256(seed_material || counter_uint64_be)`, counter starts at zero,
 and each digest is consumed as four sequential uint64 big-endian candidates.
-Generator roles are exactly `row` and `missingness`; each has an independent
-counter. The master seed is `20261008`.
+The master seed is `20261008`. Field values are closed:
 
-`pairing_id` is frozen by this table. A scenario not listed uses its own
-`scenario_id` as `pairing_id`.
+- `purpose`: `generate`, `summary_bootstrap`, or `h2_bootstrap`;
+- for `generate`, `unit_id=pair_id`, `draw_id=replicate_id`, `scope` is
+  `shared` or `scenario:{scenario_id}`, and `role` is `row`, `missingness`, or
+  `auxiliary`;
+- for `summary_bootstrap`, `unit_id={scenario_id}:{metric}:{checkpoint}`,
+  `draw_id` is the bootstrap draw, `scope=analysis`, and `role=replicate_index`;
+- for `h2_bootstrap`, `unit_id=H2`, `draw_id` is the bootstrap draw,
+  `scope=analysis`, and `role=scenario_unit_index`.
 
-| Paired inputs | `pairing_id` | Common-random-number rule |
+Every distinct complete field tuple has an independent counter. There is no
+second seed format or implicit field.
+
+`pair_id` is frozen by this table. A scenario not listed uses its own
+`scenario_id` as `pair_id`.
+
+| Paired inputs | `pair_id` | Common-random-number rule |
 | --- | --- | --- |
 | `SEL-AIR080-N025`, `SEL-AIR080-N1000` (C1 aliases `SEL-N025`, `SEL-N1000`) | `PAIR-C1-N` | Generate 1,000 ordered rows per group; `N025` uses the first 25. |
 | `PERF-DEC001`, `PERF-DEC050` | `PAIR-C3-DEC` | Reuse `X`, outcome uniform, and group rows; apply the scenario-specific solved threshold. |
@@ -206,7 +223,11 @@ counter. The master seed is `20261008`.
 | `SEL-AIR081-N050`, `SEL-AIR081-N1000` | `PAIR-C6-COVERAGE` | Generate 1,000 ordered rows per group; `N050` uses the first 50. |
 
 Changing a `scenario_id` never implicitly changes a paired row stream; only
-this table may assign the same `pairing_id`. The seed manifest stores both IDs.
+this table may assign the same `pair_id`. The seed manifest stores both IDs.
+Paired base rows and, for C5, missingness uniforms use `scope=shared`.
+Stochastic components intentionally not shared use
+`scope=scenario:{scenario_id}` with the appropriate closed role. Deterministic
+thresholds, truncation, missingness transforms, and flag policies consume no RNG.
 
 Bernoulli draws use `U < p`, where `U` is a candidate uint64 divided by
 `2**64`. Standard normals use the inverse standard-normal CDF
@@ -382,7 +403,7 @@ unclear redistribution terms are excluded.
 Every scenario used by a `P2-CONFIRMATORY-V1` test or H2 generates exactly
 50,000 independent replicates. Other descriptive/exploratory simulation
 scenarios generate exactly 10,000. Replicate ID `r` uses the sole generator
-seed construction and frozen `pairing_id` table above; paired scenarios reuse
+seed construction and frozen `pair_id` table above; paired scenarios reuse
 the resulting row-level base uniforms before applying scenario transformations.
 Results are summarized by scenario and metric with MCSEs and 95%
 simulation-error intervals. For a proportion `p`, MCSE is
@@ -390,14 +411,11 @@ simulation-error intervals. For a proportion `p`, MCSE is
 
 Means use normal simulation-error intervals from the replicate standard error.
 Error quantiles and scenario-standardized H2 summaries use 2,000 deterministic
-bootstrap draws. Analysis RNGs use the same SHA-256 block/candidate construction
-but separate, explicit domains: summary seed material is
-`fairlendkit-paper2-summary-v1\0{master_seed}\0{scenario_id}\0{metric}\0{checkpoint}\0{draw_id}`;
-H2 seed material is
-`fairlendkit-paper2-h2-v1\0{master_seed}\0{draw_id}`. These are analysis RNGs,
-not alternative generator seeds. Summary bootstrap resamples replicate IDs and
-uses the Hyndman–Fan Type 7 quantile; H2 follows the joint scenario-resampling
-rule above.
+bootstrap draws through the sole RNG format above. Summary bootstrap uses
+`purpose=summary_bootstrap` and resamples replicate IDs with the Hyndman–Fan
+Type 7 quantile. H2 uses `purpose=h2_bootstrap` and follows the joint
+scenario-unit resampling rule above. Analysis purposes cannot produce generator
+rows because their allowed scope and role values are disjoint.
 
 Paired policy comparisons, such as gated versus ungated AIR flags, use common
 random numbers and report paired risk differences with confidence intervals.
@@ -594,7 +612,36 @@ This study does not claim that:
 | H2 stratified bootstrap sampled reliability states separately, then an interim union bootstrap did not define paired units | Five AIR-keyed units pair each `N025` scenario with the equal-weight mean of its four reliable-N scenarios. One shared five-index vector resamples both sides through `delta_a`; fewer than 1,900 valid draws yields `not_estimable`. |
 | H2 scenario set expressed by brace grammar and aliases | The normative section lists all 25 unique IDs explicitly; aliases are excluded. |
 | 10,000-pair power bound (`0.0317` SD; `0.0159` worst-case proportion) | 50,000-pair bound (`0.0142` SD; `0.0071` worst-case proportion) at conservative one-sided planning level `0.01` and 80% power. |
-| Generator seed included `scenario_id` while prose claimed different scenarios shared row streams; a second abbreviated seed also appeared later | One generator seed uses frozen `pairing_id`; an explicit table assigns shared IDs and truncation/transformation rules. Summary and H2 seeds are separately named analysis-RNG domains and cannot generate rows. |
+| Generator seed included `scenario_id` while prose claimed different scenarios shared row streams; separate summary/H2 formats created multiple roots | One seven-field root format covers all purposes. Generator rows use frozen `pair_id` plus explicit `shared` or `scenario:{scenario_id}` scope; summary/H2 use disjoint allowed analysis fields. The pair table freezes shared streams and deterministic transforms. |
+
+## Protocol amendment log
+
+### A1 — unify RNG root derivation and paired streams
+
+- **Date:** 2026-10-08
+- **Base protocol:** `main@9fd45de`
+- **Reason:** post-merge method review found that the generator root included
+  `scenario_id` while paired scenarios were required to share row streams. The
+  base protocol also specified separate summary and H2 seed formats, leaving
+  multiple plausible roots.
+- **Change:** replace the RNG-only clauses with one seven-field seed-material
+  format; replace `pairing_id` with `pair_id`; freeze shared versus
+  scenario-specific scopes; place summary and H2 sampling under closed analysis
+  purposes of the same root.
+- **Affected registered analyses:** C1, C3, C4, C5, C6, H2, and all secondary
+  summaries that consume random resampling indices.
+- **Unchanged:** research questions, hypotheses, DGP probability distributions,
+  scenario registry, estimands, test statistics, `R=50,000`, Holm family,
+  stopping/monitoring rules, public-data cohort, and non-claims.
+- **Random-stream compatibility:** breaking relative to the ambiguous RNG text
+  in `9fd45de`; generated bytes and random streams must follow A1 only after A1
+  is approved and merged. No prior stream is grandfathered.
+- **Result exposure:** no data were downloaded, no experiment implementation
+  was written or run, and no pilot, confirmatory, or public-data result was
+  viewed before proposing A1.
+- **Activation:** pending. Until this amendment is approved and merged, the
+  authoritative protocol remains `main@9fd45de` and confirmatory runs remain
+  frozen.
 
 ## Required outputs before a paper release
 
