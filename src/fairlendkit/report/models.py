@@ -588,6 +588,11 @@ class AuditResultV2(ResultModel):
         if not_assessed_count not in {0, len(self.observed_metrics)}:
             raise ValueError("native and migrated reliability states cannot be mixed")
         migrated = bool(self.observed_metrics) and not_assessed_count == len(self.observed_metrics)
+        if migrated:
+            if any(item.metric.value not in {metric.value for metric in MetricName} for item in self.observed_metrics):
+                raise ValueError("migrated results may contain only Schema 1.0 metric names")
+            if any(item.affected_metric_keys for item in self.limitations):
+                raise ValueError("migrated limitations must use empty affected_metric_keys")
         if not migrated and tuple(self.observed_metrics) != tuple(sorted(self.observed_metrics, key=_observed_metric_sort_key)):
             raise ValueError("observed_metrics must use canonical order")
         for item in self.limitations:
@@ -604,6 +609,8 @@ class AuditResultV2(ResultModel):
             raise ValueError("limitations must use canonical scope and gate order")
         by_key = {item.key: item for item in self.observed_metrics}
         for interval in self.uncertainty:
+            if not migrated and by_key[interval.metric_key].metric == MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE:
+                raise ValueError("demographic-parity alias cannot own uncertainty")
             if not migrated and by_key[interval.metric_key].reliability != ReliabilityStateV2.RELIABLE:
                 raise ValueError("uncertainty may reference only reliable metrics")
             lower, upper = _metric_range_v2(by_key[interval.metric_key].metric)
@@ -623,6 +630,8 @@ class AuditResultV2(ResultModel):
             if (canonical.value, canonical.sample_count, canonical.reliability) != (alias.value, alias.sample_count, alias.reliability):
                 raise ValueError("selection-rate difference aliases must have identical evidence")
         if not migrated:
+            expected_air_keys: set[str] = set()
+            seen_air_keys: set[str] = set()
             for flag in self.screening_flags:
                 if flag.code != "air_below_threshold" or flag.related_metric_key is None:
                     raise ValueError("native results support only metric-linked AIR flags")
@@ -644,6 +653,23 @@ class AuditResultV2(ResultModel):
                 ]
                 if len(sources) != 2 or any(source.reliability != ReliabilityStateV2.RELIABLE for source in sources):
                     raise ValueError("AIR flags require reliable comparison and reference selection rates")
+                if flag.related_metric_key in seen_air_keys:
+                    raise ValueError("AIR flags must be unique per metric")
+                seen_air_keys.add(flag.related_metric_key)
+            for metric in self.observed_metrics:
+                if metric.metric != MetricNameV2.ADVERSE_IMPACT_RATIO or metric.reliability != ReliabilityStateV2.RELIABLE or metric.value.value is None:
+                    continue
+                assert metric.comparison_group is not None and metric.reference_group is not None
+                sources = [
+                    source for source in self.observed_metrics
+                    if source.metric == MetricNameV2.SELECTION_RATE
+                    and source.group is not None
+                    and source.group.attributes in (metric.comparison_group.attributes, metric.reference_group.attributes)
+                ]
+                if len(sources) == 2 and all(source.reliability == ReliabilityStateV2.RELIABLE for source in sources) and metric.value.value < self.metadata.configuration.air_screening_threshold:
+                    expected_air_keys.add(metric.key)
+            if seen_air_keys != expected_air_keys:
+                raise ValueError("AIR flag set must exactly match eligible below-threshold AIR metrics")
         return self
 
 

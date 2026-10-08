@@ -125,6 +125,29 @@ def test_v2_closes_native_state_uncertainty_and_air_flag_links():
         AuditResultV2.model_validate(payload)
 
     payload = run_audit(frame(), config()).model_dump(mode="json")
+    for metric in payload["observed_metrics"]:
+        metric["reliability"] = "not_assessed"
+    with pytest.raises(ValidationError, match="Schema 1.0 metric names"):
+        AuditResultV2.model_validate(payload)
+
+    payload = run_audit(frame(), config()).model_dump(mode="json")
+    alias = next(item for item in payload["observed_metrics"] if item["metric"] == "demographic_parity_difference")
+    comparison_interval = next(item for item in payload["uncertainty"] if item["metric_key"].startswith("comparison."))
+    comparison_interval["metric_key"] = alias["key"]
+    with pytest.raises(ValidationError, match="alias cannot own uncertainty"):
+        AuditResultV2.model_validate(payload)
+
+    payload = run_audit(frame(), config()).model_dump(mode="json")
+    payload["screening_flags"] = []
+    with pytest.raises(ValidationError, match="exactly match"):
+        AuditResultV2.model_validate(payload)
+
+    payload = run_audit(frame(), config()).model_dump(mode="json")
+    payload["screening_flags"].append(dict(payload["screening_flags"][0]))
+    with pytest.raises(ValidationError, match="unique per metric"):
+        AuditResultV2.model_validate(payload)
+
+    payload = run_audit(frame(), config()).model_dump(mode="json")
     alias = next(item for item in payload["observed_metrics"] if item["metric"] == "demographic_parity_difference")
     alias["value"]["value"] += 0.1
     with pytest.raises(ValidationError, match="identical evidence"):
