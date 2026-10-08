@@ -14,6 +14,7 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 NAME = "FairLendKit"
+PACKAGE_NAME = "fairlendkit"
 DESCRIPTION = "Reproducible fair-lending audit toolkit for credit decisioning systems"
 POSITIONING = f"{NAME} is a {DESCRIPTION[0].lower()}{DESCRIPTION[1:]}"
 CODEMETA_CONTEXT = "https://doi.org/10.5063/schema/codemeta-2.0"
@@ -59,6 +60,10 @@ def fail(message: str) -> None:
 def slug(text: str) -> str:
     value = re.sub(r"[^\w\- ]", "", text.strip().lower(), flags=re.UNICODE)
     return re.sub(r"\s+", "-", value)
+
+
+def normalized_package_name(value: str) -> str:
+    return re.sub(r"[-_.]+", "-", value).lower()
 
 
 def anchors(path: Path) -> set[str]:
@@ -150,7 +155,7 @@ def verify_metadata(root: Path = ROOT) -> None:
     readme = (root / "README.md").read_text(encoding="utf-8")
 
     if (
-        project["name"] != NAME.lower()
+        normalized_package_name(project["name"]) != PACKAGE_NAME
         or codemeta.get("name") != NAME
         or jsonld.get("name") != NAME
         or _cff_scalar(cff, "title") != NAME
@@ -240,7 +245,7 @@ def verify_deferred_site_boundary(root: Path = ROOT) -> None:
 
 def verify_installed_package(metadata=None) -> None:
     metadata = metadata or importlib.metadata.metadata("fairlendkit")
-    if metadata["Name"] != NAME:
+    if normalized_package_name(metadata["Name"]) != PACKAGE_NAME:
         fail("Installed wheel name does not match source metadata.")
     if metadata["Summary"] != DESCRIPTION or metadata["Version"] != VERSION:
         fail("Installed wheel summary or version does not match source metadata.")
