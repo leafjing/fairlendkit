@@ -1,8 +1,8 @@
 # Audit result and report schema
 
-`AuditResult` schema version `1.0` is the currently implemented
-renderer-neutral result contract. HTML, JSON, and CSV renderers consume this
-model and must not receive
+`AuditResult` schema version `2.0` is the current writer and renderer-neutral
+result contract. Future HTML, JSON, and CSV renderers consume this model and
+must not receive
 raw outcomes, decisions, scores, or weights. They format already-computed values
 and never recompute metrics.
 
@@ -43,9 +43,10 @@ names, typed limitation-to-metric references, and new undefined reasons. Version
 `1.0` remains a strict legacy read contract and is migrated explicitly; the
 migration must not infer reliability that the old payload did not record. The
 behavioral contract, migration rules, and compatibility-alias rule are defined in
-[`milestone-3-core-audit-engine.md`](milestone-3-core-audit-engine.md). Slice
-3.1 must update this document and the generated schema together with the model;
-this cross-reference does not claim those fields are already implemented.
+[`milestone-3-core-audit-engine.md`](milestone-3-core-audit-engine.md). These
+fields and the explicit migration path are implemented; future schema changes
+must update this document, the generated schema, the model, and migration tests
+together.
 
 In 2.0, `ObservedMetric.reliability` is required. Native `run_audit` results use
 `reliable`, `unreliable`, `undefined`, or `not_applicable`; migrated 1.0 results
@@ -100,13 +101,14 @@ separate. The embedded result exposes all four layers, technical status, and
 
 ## Versioning and serialization
 
-The currently implemented `schema_version` is required and fixed to `"1.0"`.
-Milestone 3 changes the writer version to `"2.0"` and retains a strict 1.0
-reader plus the migration defined above. Pydantic's generated JSON Schema is the
+The current writer's `schema_version` is required and fixed to `"2.0"`.
+FairLendKit retains a strict `AuditResultV1_0` reader plus the explicit
+`migrate_audit_result_v1_0` migration defined above. Pydantic's generated JSON Schema is the
 normative machine-readable equivalent of each version and is tested for version
 constants, required sections, strict unknown-field rejection, migration, and
 JSON round trips. Any later breaking field or semantic change requires another
 schema version and migration notes.
 
-The synthetic example at `examples/synthetic/audit-result.json` contains no
-real applicant, lender, or proprietary data.
+The legacy fixture at `examples/synthetic/audit-result.json` and executable
+Schema 2.0 example at `examples/synthetic/run_audit.py` contain no real
+applicant, lender, or proprietary data.
