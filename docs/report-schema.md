@@ -37,6 +37,13 @@ message; mismatched or arbitrary free text fails validation. Renderers must
 reproduce the stored code and message and must not invent an interpretation.
 Adding or changing a code or canonical message requires Schema version review.
 
+Milestone 3 requires schema additions for metric reliability, new metric names,
+typed limitation-to-metric references, and new undefined reasons. Their
+behavioral contract and compatibility-alias rule are defined in
+[`milestone-3-core-audit-engine.md`](milestone-3-core-audit-engine.md). Slice
+3.1 must update this document and the generated schema together with the model;
+this cross-reference does not claim those fields are already implemented.
+
 ## Group direction
 
 Single-group metrics use `group`. AIR, demographic parity difference, and equal

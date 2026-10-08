@@ -86,6 +86,14 @@ results. This separation preserves the boundary between analysis and decisions.
 
 Renderers consume `AuditResult`; they must not recompute metrics. This keeps HTML, JSON, and CSV mutually consistent.
 
+Milestone 3 introduces the package-root application entry point
+`run_audit(data: pd.DataFrame, config: AuditConfig) -> AuditResult`. Its
+orchestration order, grouping rules, stable metric keys, reliability gates, and
+determinism requirements are normative in the
+[Milestone 3 core audit engine contract](milestone-3-core-audit-engine.md).
+The pandas boundary belongs to application/adaptor composition; metric and
+result domain contracts remain dataframe-independent.
+
 ## CLI contract
 
 ```bash
