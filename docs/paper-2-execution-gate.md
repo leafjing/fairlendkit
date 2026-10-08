@@ -54,8 +54,9 @@ The evidence retains each representative's CPU seconds, wall seconds, peak RSS,
 and serialized artifact bytes under its scenario ID; aggregate maxima and totals
 must reconcile exactly with those sorted, unique measurements.
 Each representative runs in a fresh child process, and its process identity and
-peak RSS are retained independently. The memory upper bound is recomputed from
-those representative RSS values through the same frozen 29-row mapping;
+peak RSS are retained independently alongside its complete metric identity set
+and frozen raw-artifact schema. The memory upper bound is recomputed from those
+representative RSS values through the same frozen 29-row mapping;
 missing, extra, unknown, non-integer, non-isolated, or underestimated RSS
 evidence fails closed.
 Required memory is the greater of 16 GiB and 4× measured peak RSS.

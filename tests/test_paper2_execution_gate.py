@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 import fairlendkit.research.paper2.execution as execution
+from fairlendkit.metrics.contracts import MetricNameV2
 from fairlendkit.research.paper2.resource_benchmark import (
     BENCHMARK_COST_COVERAGE,
     BENCHMARK_SCENARIO_IDS,
@@ -84,11 +85,12 @@ def _records(spec):
 
 
 def _resource_evidence():
+    metrics = tuple(sorted(item.value for item in MetricNameV2))
     costs = (
-        RepresentativeCost("MISS-MCAR30", 101, 1.0, 2.0, 100, 10),
-        RepresentativeCost("MISS-MNAR30", 102, 2.0, 3.0, 200, 20),
-        RepresentativeCost("REG", 103, 3.0, 4.0, 300, 30),
-        RepresentativeCost("SEL-AIR081-N1000", 104, 4.0, 5.0, 400, 40),
+        RepresentativeCost("MISS-MCAR30", 101, 1.0, 2.0, 100, 10, metrics, "paper2-raw-replicate-v1"),
+        RepresentativeCost("MISS-MNAR30", 102, 2.0, 3.0, 200, 20, metrics, "paper2-raw-replicate-v1"),
+        RepresentativeCost("REG", 103, 3.0, 4.0, 300, 30, metrics, "paper2-raw-replicate-v1"),
+        RepresentativeCost("SEL-AIR081-N1000", 104, 4.0, 5.0, 400, 40, metrics, "paper2-raw-replicate-v1"),
     )
     return execution.SmokeBenchmarkEvidence(
         schema_version="paper2-resource-benchmark-v1",
@@ -569,6 +571,8 @@ def test_representative_cost_evidence_is_unique_sorted_and_matches_aggregates():
     with pytest.raises(IntegrityError, match="frozen mapping references"):
         replace(evidence, representative_costs=costs[:-1])
     with pytest.raises(IntegrityError, match="frozen mapping references"):
+        replace(evidence, representative_costs=())
+    with pytest.raises(IntegrityError, match="frozen mapping references"):
         replace(
             evidence,
             representative_costs=(*costs[:-1], replace(costs[-1], scenario_id="UNKNOWN")),
@@ -580,6 +584,10 @@ def test_representative_cost_evidence_is_unique_sorted_and_matches_aggregates():
         )
     with pytest.raises(IntegrityError, match="process ID"):
         replace(costs[0], measurement_pid=False)
+    with pytest.raises(IntegrityError, match="metric identity"):
+        replace(costs[0], metric_identities=costs[0].metric_identities[:-1])
+    with pytest.raises(IntegrityError, match="artifact schema"):
+        replace(costs[0], artifact_schema="wrong")
     with pytest.raises(IntegrityError, match="RSS"):
         replace(evidence, peak_rss_bytes=399)
     with pytest.raises(IntegrityError, match="artifact evidence"):
@@ -602,6 +610,17 @@ def test_mapped_rss_requires_every_representative_and_rejects_underestimate():
         _mapped_peak_rss(coverage, {"small": 100, "large": True})
 
 
+def test_rss_projection_rejects_existing_but_wrong_representative_mapping():
+    registry = scenario_registry()
+    wrong = tuple(
+        (frozen, "MISS-MNAR30") if frozen == "MISS-MCAR30" else (frozen, representative)
+        for frozen, representative in BENCHMARK_COST_COVERAGE
+    )
+
+    with pytest.raises(IntegrityError, match="does not dominate"):
+        _benchmark_coverage_matrix(registry, BENCHMARK_SCENARIO_IDS, wrong)
+
+
 def test_representative_rss_uses_spawned_isolated_process(monkeypatch, manifest):
     calls = []
 
@@ -622,6 +641,8 @@ def test_representative_rss_uses_spawned_isolated_process(monkeypatch, manifest)
                     "wall_seconds": 2.0,
                     "peak_rss_bytes": 100,
                     "artifact_bytes": 10,
+                    "metric_identities": tuple(sorted(item.value for item in MetricNameV2)),
+                    "artifact_schema": "paper2-raw-replicate-v1",
                 },
             )
 

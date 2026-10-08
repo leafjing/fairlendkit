@@ -179,6 +179,8 @@ def _run_representative(
         wall_seconds=wall_seconds,
         peak_rss_bytes=peak_rss_bytes,
         artifact_bytes=artifact_bytes,
+        metric_identities=tuple(sorted(expected_metric_names)),
+        artifact_schema="paper2-raw-replicate-v1",
     )
 
 

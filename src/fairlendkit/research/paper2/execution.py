@@ -89,6 +89,8 @@ class RepresentativeCost:
     wall_seconds: float
     peak_rss_bytes: int
     artifact_bytes: int
+    metric_identities: tuple[str, ...]
+    artifact_schema: str
 
     def __post_init__(self) -> None:
         if type(self.measurement_pid) is not int or self.measurement_pid <= 0:
@@ -103,6 +105,12 @@ class RepresentativeCost:
             )
         ):
             raise IntegrityError("Representative cost evidence must be finite and positive.")
+        if self.metric_identities != tuple(sorted(METRIC_NAMES)):
+            raise IntegrityError(
+                "Each representative must retain the complete frozen metric identity set."
+            )
+        if self.artifact_schema != "paper2-raw-replicate-v1":
+            raise IntegrityError("Representative artifact schema is not frozen.")
 
 
 @dataclass(frozen=True)
