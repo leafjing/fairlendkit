@@ -6,13 +6,10 @@ release_tmp="$(mktemp -d)"
 trap 'rm -rf -- "$release_tmp"' EXIT
 
 python_bin="${PYTHON:-python3}"
-bootstrap_site="$release_tmp/bootstrap"
-"$python_bin" -m pip install --disable-pip-version-check --break-system-packages \
-  --no-deps --target "$bootstrap_site" \
-  -r "$repo_root/requirements-release-bootstrap.txt"
-PYTHONPATH="$bootstrap_site" "$python_bin" -m virtualenv --no-download \
-  "$release_tmp/venv"
+"$python_bin" -m venv --without-pip "$release_tmp/venv"
 venv_python="$release_tmp/venv/bin/python"
+"$python_bin" -m pip --python "$venv_python" install \
+  --disable-pip-version-check --no-deps pip==24.2
 "$venv_python" -m pip install --disable-pip-version-check \
   -r "$repo_root/requirements-release-build.txt"
 "$venv_python" -m pip install --disable-pip-version-check --no-deps \

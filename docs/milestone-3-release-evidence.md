@@ -11,10 +11,10 @@ Run from a clean checkout:
 ./scripts/verify_milestone3_release.sh
 ```
 
-The script bootstraps the exactly pinned `virtualenv` tool into a temporary
-directory, creates a real temporary virtual environment, and installs the
-exact build and application/test dependency versions in the three
-`requirements-release*.txt` files. It installs the project without dependency
+The script creates a real temporary environment through `python -m venv`,
+bootstraps the pinned pip version into it, and installs the exact build and
+application/test dependency versions in `requirements-release-build.txt` and
+`requirements-release.txt`. It installs the project without dependency
 resolution or build isolation, records `python --version`, and strictly
 compares the normalized final `pip freeze --all` with
 `docs/milestone-3-release-pip-freeze.txt`. It then generates the synthetic
