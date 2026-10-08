@@ -7,7 +7,7 @@ from math import exp, log, sqrt
 
 import numpy as np
 from numpy.polynomial.hermite import hermgauss
-from scipy.special import ndtri
+from scipy.special import ndtr
 
 from fairlendkit.research.paper2.registry import (
     Calibration,
@@ -111,8 +111,20 @@ def solve_performance_parameters(prevalence: float, target_auc: float) -> tuple[
         alpha = solve_alpha(prevalence, beta)
         return population_auc(alpha, beta) - target_auc
 
-    beta = _bisect(residual, lower=1e-8, upper=12.0, tolerance=1e-8)
+    beta = _bisect(residual, lower=1e-8, upper=12.0)
     return solve_alpha(prevalence, beta), beta
+
+
+def _decision_prevalence(
+    threshold: float, alpha: float, beta: float, calibration: Calibration
+) -> float:
+    threshold_logit = log(threshold / (1.0 - threshold))
+    if calibration is Calibration.INTERCEPT_SHIFT:
+        threshold_logit -= 0.75
+    elif calibration is Calibration.SLOPE_DISTORTION:
+        threshold_logit /= 0.60
+    x_threshold = (threshold_logit - alpha) / beta
+    return 1.0 - float(ndtr(x_threshold))
 
 
 def solve_score_threshold(
@@ -120,9 +132,15 @@ def solve_score_threshold(
 ) -> float:
     if not 0.0 < target < 1.0:
         raise ValueError("Decision prevalence target must be strictly between 0 and 1.")
-    x_threshold = float(ndtri(1.0 - target))
-    probability = _logistic(alpha + beta * x_threshold)
-    return _calibrated_score(probability, calibration)
+    if beta <= 0.0:
+        raise ValueError("Decision-threshold solver requires positive beta.")
+    epsilon = 2.0**-52
+    return _bisect(
+        lambda threshold: _decision_prevalence(threshold, alpha, beta, calibration)
+        - target,
+        lower=epsilon,
+        upper=1.0 - epsilon,
+    )
 
 
 def _calibrated_score(probability: float, calibration: Calibration) -> float:

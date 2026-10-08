@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 MASTER_SEED = 20261008
+PROTOCOL_ID = "fairlendkit-paper2-v1"
+SMOKE_SEED_DOMAIN = "fairlendkit-paper2-smoke-v1"
 CONFIRMATORY_REPLICATES = 50_000
 EXPLORATORY_REPLICATES = 10_000
 MONITORING_CHECKPOINTS = (10_000, 20_000, 30_000, 40_000)
@@ -85,7 +87,8 @@ def load_protocol(path: str | Path | None = None) -> Paper2Protocol:
         smoke_seed_domain=str(raw["smoke_seed_domain"]),
     )
     if (
-        protocol.master_seed != MASTER_SEED
+        protocol.protocol_id != PROTOCOL_ID
+        or protocol.master_seed != MASTER_SEED
         or protocol.rng_schema_version != RNG_SCHEMA_VERSION
         or protocol.rng_fixture_sha256 != RNG_FIXTURE_SHA256
         or protocol.confirmatory_replicates != CONFIRMATORY_REPLICATES
@@ -93,6 +96,7 @@ def load_protocol(path: str | Path | None = None) -> Paper2Protocol:
         or protocol.monitoring_checkpoints != MONITORING_CHECKPOINTS
         or protocol.confirmatory_test_ids != CONFIRMATORY_TEST_IDS
         or protocol.status != "frozen"
+        or protocol.smoke_seed_domain != SMOKE_SEED_DOMAIN
     ):
         raise ValueError("Paper 2 manifest conflicts with the approved protocol constants.")
     return protocol

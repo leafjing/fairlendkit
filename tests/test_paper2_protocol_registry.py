@@ -26,14 +26,24 @@ def test_protocol_manifest_matches_frozen_contract():
     assert len(protocol.confirmatory_test_ids) == 5
 
 
-def test_protocol_parser_fails_closed_on_extra_or_changed_fields(tmp_path):
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    (
+        ("confirmatory_replicates", 10_000),
+        ("protocol_id", "forged-paper2"),
+        ("smoke_seed_domain", "forged-smoke-domain"),
+    ),
+)
+def test_protocol_parser_fails_closed_on_extra_or_changed_fields(
+    tmp_path, field, replacement
+):
     source = {
         "protocol_id": "fairlendkit-paper2-v1",
         "status": "frozen",
         "rng_schema_version": "paper2-rng-a1-v1",
         "rng_fixture_sha256": "6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905",
         "master_seed": 20261008,
-        "confirmatory_replicates": 10_000,
+        "confirmatory_replicates": 50_000,
         "exploratory_replicates": 10_000,
         "monitoring_checkpoints": [10_000, 20_000, 30_000, 40_000],
         "confirmatory_test_ids": [
@@ -45,6 +55,7 @@ def test_protocol_parser_fails_closed_on_extra_or_changed_fields(tmp_path):
         ],
         "smoke_seed_domain": "fairlendkit-paper2-smoke-v1",
     }
+    source[field] = replacement
     path = tmp_path / "protocol.json"
     path.write_text(json.dumps(source))
 

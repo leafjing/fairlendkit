@@ -3,18 +3,21 @@
 import hashlib
 import json
 from dataclasses import asdict
+from math import log
 from pathlib import Path
 from struct import pack
 
 import pytest
+from scipy.special import ndtr
 
 from fairlendkit.research.paper2.dgp import (
     generate_audit,
     population_auc,
     solve_alpha,
     solve_performance_parameters,
+    solve_score_threshold,
 )
-from fairlendkit.research.paper2.registry import scenario_registry
+from fairlendkit.research.paper2.registry import Calibration, scenario_registry
 from fairlendkit.research.paper2.rng import (
     generator_rng,
     generator_scope,
@@ -260,11 +263,14 @@ def test_selection_dgp_obeys_score_decision_rule_and_group_counts():
 
 def test_performance_solver_hits_prevalence_and_auc_targets():
     alpha, beta = solve_performance_parameters(0.20, 0.70)
+    threshold = solve_score_threshold(alpha, beta, Calibration.CALIBRATED, 0.20)
+    x_threshold = (log(threshold / (1.0 - threshold)) - alpha) / beta
 
     assert alpha < 0
     assert beta > 0
     assert population_auc(alpha, beta) == pytest.approx(0.70, abs=1e-6)
-    assert solve_alpha(0.20, beta) == pytest.approx(alpha, abs=1e-8)
+    assert solve_alpha(0.20, beta) == pytest.approx(alpha, abs=1e-10)
+    assert 1.0 - float(ndtr(x_threshold)) == pytest.approx(0.20, abs=1e-10)
 
 
 def test_smoke_runner_is_deterministic_and_never_uses_production_seed():

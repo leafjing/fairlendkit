@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import sqrt
+from math import isfinite, sqrt
 from typing import Mapping, Sequence
 
 from scipy.stats import t as student_t
@@ -24,6 +24,8 @@ def one_sided_studentized_mean(differences: Sequence[float]) -> StudentizedMeanR
     values = tuple(float(value) for value in differences)
     if len(values) < 2:
         raise ValueError("At least two paired differences are required.")
+    if not all(isfinite(value) for value in values):
+        raise ValueError("Paired differences must be finite.")
     mean = sum(values) / len(values)
     variance = sum((value - mean) ** 2 for value in values) / (len(values) - 1)
     if variance == 0.0:
@@ -41,13 +43,15 @@ def one_sided_studentized_mean(differences: Sequence[float]) -> StudentizedMeanR
 
 
 def holm_adjust(raw_p_values: Mapping[str, float]) -> dict[str, float]:
+    if not raw_p_values:
+        raise ValueError("At least one p-value is required.")
     ordered = sorted(raw_p_values.items(), key=lambda item: (item[1], item[0]))
     count = len(ordered)
     adjusted: dict[str, float] = {}
     running = 0.0
     for index, (test_id, p_value) in enumerate(ordered):
-        if not 0.0 <= p_value <= 1.0:
-            raise ValueError("p-values must be in [0, 1].")
+        if not isfinite(p_value) or not 0.0 <= p_value <= 1.0:
+            raise ValueError("p-values must be finite and in [0, 1].")
         running = max(running, min(1.0, (count - index) * p_value))
         adjusted[test_id] = running
     return adjusted
@@ -69,7 +73,14 @@ def h2_joint_bootstrap(
     draws: int = 2_000,
     minimum_valid_draws: int = 1_900,
 ) -> H2Estimate:
-    ordered = tuple((key, deltas_by_air[key]) for key in ("060", "079", "080", "081", "100"))
+    expected_keys = ("060", "079", "080", "081", "100")
+    if set(deltas_by_air) != set(expected_keys):
+        raise ValueError("H2 input must contain exactly the five frozen AIR keys.")
+    if draws != 2_000 or minimum_valid_draws != 1_900:
+        raise ValueError("H2 draw count and minimum-valid threshold are frozen.")
+    ordered = tuple((key, deltas_by_air[key]) for key in expected_keys)
+    if any(value is not None and not isfinite(float(value)) for _, value in ordered):
+        raise ValueError("H2 deltas must be finite or None.")
     available = tuple(value for _, value in ordered if value is not None)
     if not available:
         return H2Estimate(None, None, None, 0, "not_estimable")
@@ -99,6 +110,10 @@ def h2_joint_bootstrap(
 def _type7(values: Sequence[float], probability: float) -> float:
     if not values:
         raise ValueError("Quantile input cannot be empty.")
+    if not all(isfinite(float(value)) for value in values):
+        raise ValueError("Quantile values must be finite.")
+    if not isfinite(probability) or not 0.0 <= probability <= 1.0:
+        raise ValueError("Quantile probability must be finite and in [0, 1].")
     h = (len(values) - 1) * probability
     lower = int(h)
     upper = min(lower + 1, len(values) - 1)

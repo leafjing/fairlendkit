@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 
 from fairlendkit.research.paper2.dgp import GeneratedAudit, generate_audit
@@ -27,7 +28,8 @@ def run_smoke(
         raise ValueError(f"Unknown registered scenarios: {unknown}")
     # Smoke runs use a separate master-seed namespace and cannot overlap the
     # frozen production generator stream.
-    smoke_master_seed = protocol.master_seed + 10_000_000
+    smoke_material = f"{protocol.smoke_seed_domain}\0{protocol.master_seed}".encode("ascii")
+    smoke_master_seed = int.from_bytes(hashlib.sha256(smoke_material).digest()[:8], "big")
     audits = tuple(
         generate_audit(registry[scenario_id], replicate_id, smoke_master_seed)
         for scenario_id in scenario_ids
