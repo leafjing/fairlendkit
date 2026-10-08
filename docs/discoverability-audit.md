@@ -32,10 +32,10 @@ only where the linked documentation accurately defines them.
 ## Metadata decisions
 
 - `CITATION.cff` and `codemeta.json` identify the software, repository,
-  development version, supported Python versions, and maintainer without
-  inventing an institution, DOI, or repository license. Although package
-  metadata currently declares Apache-2.0, machine-readable discovery metadata
-  omits a license until the owner checks in an authoritative license file.
+  development version, supported Python versions, maintainer, and owner-approved
+  Apache-2.0 license without inventing an institution or DOI. The checked-in
+  `LICENSE`, package metadata, citation metadata, and CodeMeta record use the
+  same SPDX identifier.
 - `llms.txt` is a concise map, not a replacement for normative documentation.
 - The package description should use the fixed core description in a later
   technical metadata PR if changing published package metadata is approved.

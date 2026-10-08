@@ -155,8 +155,7 @@ and paper-version guidance.
 
 ## Licensing and contributing
 
-The package metadata currently declares Apache-2.0, but this repository does
-not yet contain a license text. Treat the repository license as unresolved
-until the owner adds an authoritative license file. See
-[Contributing](CONTRIBUTING.md) before proposing changes. Repository discovery
-metadata must never advertise a roadmap item as an implemented capability.
+FairLendKit is licensed under the
+[Apache License 2.0](LICENSE). See [Contributing](CONTRIBUTING.md) before
+proposing changes. Repository discovery metadata must never advertise a roadmap
+item as an implemented capability.
