@@ -61,14 +61,12 @@ def test_scope_key_equality_and_hash_are_type_sensitive():
     }
 
     assert len(scopes) == 3
-    assert scope_key(AuditScope((("group", True),))).attributes == (
-        ("group", "bool", "true"),
+    assert scope_key(AuditScope((("group", True),))) == (
+        "group", "bool", "true"
     )
-    assert scope_key(AuditScope((("group", 1),))).attributes == (
-        ("group", "int", "1"),
-    )
-    assert scope_key(AuditScope((("group", "1"),))).attributes == (
-        ("group", "str", '"1"'),
+    assert scope_key(AuditScope((("group", 1),))) == ("group", "int", "1")
+    assert scope_key(AuditScope((("group", "1"),))) == (
+        "group", "str", '"1"'
     )
 
 
@@ -266,6 +264,16 @@ def test_boolean_and_integer_groups_do_not_overwrite_comparison_sources():
     assert comparison_values == {
         scope_key(AuditScope((("group", 1),))): -1.0,
         scope_key(AuditScope((("group", "1"),))): 0.0,
+    }
+    boolean_key = scope_key(AuditScope((("group", True),)))
+    comparison_directions = {
+        scope_key(item.comparison_group): scope_key(item.reference_group)
+        for item in differences
+        if item.comparison_group is not None and item.reference_group is not None
+    }
+    assert comparison_directions == {
+        integer_key: boolean_key,
+        scope_key(AuditScope((("group", "1"),))): boolean_key,
     }
     assert difference.value.value == -1.0
     assert difference.comparison_group is not None

@@ -6,7 +6,7 @@ import json
 import math
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Mapping, Sequence
+from typing import Mapping, Sequence, TypeAlias
 
 from fairlendkit.config import AuditConfig
 from fairlendkit.metrics.core import (
@@ -66,11 +66,7 @@ class AuditScope:
         return cls((("__scope__", "overall"),))
 
 
-@dataclass(frozen=True, order=True)
-class ScopeKey:
-    """Canonical typed identity used for lookup, sorting, and de-duplication."""
-
-    attributes: tuple[tuple[str, str, str], ...]
+ScopeKey: TypeAlias = tuple[str, str, str]
 
 
 def scope_key(scope: AuditScope) -> ScopeKey:
@@ -78,12 +74,11 @@ def scope_key(scope: AuditScope) -> ScopeKey:
 
     if not isinstance(scope, AuditScope):
         raise TypeError("scope must be AuditScope")
-    return ScopeKey(
-        tuple(
-            (name, *_canonical_typed_parts(value))
-            for name, value in scope.attributes
-        )
-    )
+    if len(scope.attributes) != 1:
+        raise ValueError("Milestone 3 scope keys require one attribute")
+    name, value = scope.attributes[0]
+    type_tag, canonical_value = _canonical_typed_parts(value)
+    return name, type_tag, canonical_value
 
 
 @dataclass(frozen=True)
