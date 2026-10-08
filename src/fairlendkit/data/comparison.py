@@ -106,7 +106,16 @@ def _compatibility_reason(current: LayeredValidationResult, current_config: Audi
         return "profile_invariant_failure"
     if selection.profile_digest != canonical_profile_digest(baseline.profile):
         return "baseline_digest_mismatch"
-    semantic = ("outcome_column", "score_column", "favorable_label", "favorable_decision_label", "score_type", "score_direction")
+    semantic = (
+        "outcome_column",
+        "score_column",
+        "population_definition",
+        "sampling_definition",
+        "favorable_label",
+        "favorable_decision_label",
+        "score_type",
+        "score_direction",
+    )
     if any(getattr(current_config, name) != getattr(baseline_config, name) for name in semantic) or _required_fields(current.profile) != _required_fields(baseline.profile):
         return "analysis_semantics_mismatch"
     if current_config.protected_attributes != baseline_config.protected_attributes or current_config.allowed_groups != baseline_config.allowed_groups or current_config.reference_groups != baseline_config.reference_groups:

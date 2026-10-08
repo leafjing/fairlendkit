@@ -85,6 +85,34 @@ def test_digest_mismatch_is_all_or_nothing_incompatible():
     assert result.flags == ()
 
 
+@pytest.mark.parametrize(
+    ("field", "baseline_value"),
+    [
+        ("population_definition", "Declined applications"),
+        ("sampling_definition", "Random sample of eligible records"),
+    ],
+)
+def test_population_scope_mismatch_is_all_or_nothing_incompatible(field, baseline_value):
+    current_config = config()
+    baseline_config = config(**{field: baseline_value})
+    current = validate_audit_data(frame(), current_config)
+    baseline = validate_audit_data(frame(), baseline_config)
+
+    result = compare_profiles(
+        current,
+        current_config,
+        baseline,
+        baseline_config,
+        selection(baseline.profile),
+        policy(),
+    )
+
+    assert result.status == "incompatible"
+    assert {check.status for check in result.checks} == {"incompatible"}
+    assert {check.reason_code for check in result.checks} == {"analysis_semantics_mismatch"}
+    assert result.flags == ()
+
+
 def test_numeric_boundaries_versions_zero_groups_and_flag_evidence():
     current = validate_audit_data(frame(shifted=True), config(dataset_version="data-v2"))
     baseline = validate_audit_data(frame(), config())
