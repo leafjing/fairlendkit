@@ -7,7 +7,7 @@ page for each topic; it does not replace the normative contracts.
 ## Start and evaluate
 
 - [Repository overview and quick start](../README.md)
-- [Core concepts](core-concepts.md)
+- [Core concepts](core-concepts.md#core-concepts)
 - [Frequently asked questions](faq.md)
 - [Limitations and responsible use](limitations.md)
 - [Product roadmap](roadmap.md)
