@@ -44,9 +44,11 @@ edge cases, tests, report representation, and limitations are documented.
 - Epic 2.2: baseline comparison — contract defined in
   [`epic-2.2-baseline-comparison.md`](epic-2.2-baseline-comparison.md) and
   implemented; Epic 2 is closed.
-- Milestone 3: core audit engine and reliability — implemented through release
-  gate 3.5 under the contract in
-  [`milestone-3-core-audit-engine.md`](milestone-3-core-audit-engine.md).
+- Milestone 3: core audit engine and reliability — slices 3.0–3.4 are complete;
+  the release-gate 3.5 candidate is under review against
+  [`milestone-3-core-audit-engine.md`](milestone-3-core-audit-engine.md). The
+  milestone closes only after the release gate is merged and the final audit
+  satisfies the definition of done.
   Threshold scanning, renderers, CLI, proxy screening, governance integration,
   and mitigation remain later milestones.
 

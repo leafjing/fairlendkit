@@ -40,7 +40,7 @@ complete final environment recorded in
 - full suite: `239 passed`;
 - architecture suite: `4 passed`;
 - canonical JSON byte comparison: passed;
-- fixed SHA-256 comparison: passed; and
+- fixed SHA-256 comparison: passed;
 - final `pip freeze --all` comparison: passed; and
 - `git diff --check`: passed.
 
