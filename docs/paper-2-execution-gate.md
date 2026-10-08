@@ -29,12 +29,15 @@ confirmatory matrix, public-data download, analysis, or result inspection.
 
 ## Resource preflight
 
-The resource benchmark runs one real `REG` replicate in the isolated smoke
-namespace through DGP, public `run_audit` metrics/reliability/1,000-resample
-uncertainty, raw-record writing, and shard validation. It measures elapsed
-time, process CPU time, peak RSS, and canonical artifact bytes but never
-serializes or reports the smoke audit result. CPU-hours, wall time, and disk
-are extrapolated to 29 × 50,000 replicates with a frozen 2× safety factor.
+The resource benchmark runs one replicate each of `REG`,
+`SEL-AIR081-N1000`, and `MISS-MNAR30` in the isolated smoke namespace. This
+covers performance, selection, and expensive missingness paths through DGP,
+public `run_audit` metrics/reliability/1,000-resample uncertainty, raw-record
+writing, and shard validation. It measures elapsed time, process CPU time,
+peak RSS, and canonical artifact bytes but never serializes or reports a smoke
+audit result. Projection uses the slowest measured scenario, not their mean.
+CPU-hours, wall time, and disk are extrapolated to 29 × 50,000 replicates with
+a frozen 2× safety factor.
 Required memory is the greater of 16 GiB and 4× measured peak RSS.
 
 Generate reproducible host-specific evidence on a clean locked environment:
@@ -49,12 +52,12 @@ and free disk no smaller than the conservative projected artifact size. The
 evidence contains only resource measurements and capacity—not experimental
 statistics or plots.
 
-Reference smoke evidence on Python 3.12.3 measured 114.60 wall seconds, 107.60
+An initial `REG` lower-bound measurement on Python 3.12.3 measured 114.60 wall seconds, 107.60
 CPU seconds, 119,144,448 bytes peak RSS, and 33,857 raw artifact bytes.
 Conservative 2× linear projection gives 86,680.49 CPU-hours, 23,079.06
 wall-hours at four workers, and 981,853,000 bytes of disk for 1,450,000
 replicates. This exceeds the frozen 10,000 CPU-hour and 3,000 wall-hour limits,
-so `--require-capacity` currently fails closed even on a host with sufficient
+so even this lower bound makes `--require-capacity` fail closed on a host with sufficient
 CPU, memory, and disk. This evidence therefore does not authorize a run; the
 runtime must be reduced or the resource plan separately reviewed before a
 one-time authorization can be issued.

@@ -261,6 +261,10 @@ def test_raw_schema_is_versioned_recursive_and_rejects_unknown_or_nonfinite_valu
     raw["payload"]["metric_values"][0].append({"p_value": 0.01})
     with pytest.raises(IntegrityError, match="invalid"):
         execution._validate_raw_payload(raw["payload"])
+    raw = json.loads(execution._canonical_record(RawReplicateRecord("REG", 0, _payload())))
+    raw["payload"]["uncertainty"][0][1] = [False, True]
+    with pytest.raises(IntegrityError, match="interval"):
+        execution._validate_raw_payload(raw["payload"])
 
 
 def test_metric_key_grammar_and_state_associations_fail_closed():
@@ -292,6 +296,39 @@ def test_final_and_temporary_artifact_symlinks_fail_closed(tmp_path, manifest):
     temp_path.symlink_to(outside)
     with pytest.raises(IntegrityError, match="symlink"):
         write_smoke_shard(workspace, manifest, spec, _records(spec))
+
+
+def test_serialized_record_and_metadata_boolean_identities_fail_closed(
+    workspace, manifest
+):
+    spec = smoke_shards("REG", replicates=2, shard_size=2)[0]
+    write_smoke_shard(workspace, manifest, spec, _records(spec))
+    records_path = workspace.output_dir / "REG--00000.jsonl"
+    metadata_path = workspace.output_dir / "REG--00000.meta.json"
+
+    lines = records_path.read_text().splitlines()
+    record = json.loads(lines[0])
+    record["replicate_id"] = False
+    lines[0] = json.dumps(record, sort_keys=True, separators=(",", ":"))
+    tampered = ("\n".join(lines) + "\n").encode()
+    records_path.write_bytes(tampered)
+    metadata = json.loads(metadata_path.read_text())
+    metadata["records_sha256"] = hashlib.sha256(tampered).hexdigest()
+    metadata_path.write_text(
+        json.dumps(metadata, sort_keys=True, separators=(",", ":")) + "\n"
+    )
+    with pytest.raises(IntegrityError, match="exact integer"):
+        validate_shard(workspace, manifest, spec)
+
+    canonical = b"".join(execution._canonical_record(item) for item in _records(spec))
+    records_path.write_bytes(canonical)
+    metadata["records_sha256"] = hashlib.sha256(canonical).hexdigest()
+    metadata["shard_id"] = False
+    metadata_path.write_text(
+        json.dumps(metadata, sort_keys=True, separators=(",", ":")) + "\n"
+    )
+    with pytest.raises(IntegrityError, match="exact integers"):
+        validate_shard(workspace, manifest, spec)
 
 
 def test_external_execution_seal_binds_bytes_and_runtime_identity(tmp_path, manifest):

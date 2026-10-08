@@ -279,6 +279,12 @@ class RawReplicateRecord:
     replicate_id: int
     payload: "RawReplicatePayload"
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.scenario_id, str) or not self.scenario_id:
+            raise IntegrityError("Raw record scenario identity is invalid.")
+        if type(self.replicate_id) is not int or self.replicate_id < 0:
+            raise IntegrityError("Raw record replicate ID must be a non-negative exact integer.")
+
 
 @dataclass(frozen=True)
 class RawReplicatePayload:
@@ -321,7 +327,10 @@ class RawReplicatePayload:
         for _, interval in self.uncertainty:
             if interval is not None and (
                 len(interval) != 2
-                or not all(isfinite(value) for value in interval)
+                or not all(
+                    type(value) in {int, float} and not isinstance(value, bool) and isfinite(value)
+                    for value in interval
+                )
                 or interval[0] > interval[1]
             ):
                 raise IntegrityError("Raw uncertainty interval is invalid.")
@@ -382,6 +391,22 @@ class ShardMetadata:
     python_executable_sha256: str
     python_version: str
     status: str
+
+    def __post_init__(self) -> None:
+        integer_fields = (
+            self.shard_id,
+            self.start_replicate,
+            self.stop_replicate,
+            self.row_count,
+        )
+        if any(type(value) is not int or value < 0 for value in integer_fields):
+            raise IntegrityError("Shard metadata identities must be non-negative exact integers.")
+        if self.stop_replicate <= self.start_replicate:
+            raise IntegrityError("Shard metadata range must be increasing.")
+        if not isinstance(self.scenario_id, str) or not self.scenario_id:
+            raise IntegrityError("Shard metadata scenario identity is invalid.")
+        if self.status != "success":
+            raise IntegrityError("Shard metadata status is invalid.")
 
 
 @dataclass(frozen=True)
@@ -715,6 +740,8 @@ def _validate_raw_payload(raw: object) -> None:
             flags=tuple(tuple(item) for item in raw["flags"]),
             limitations=tuple(tuple(item) for item in raw["limitations"]),
         )
+    except IntegrityError:
+        raise
     except (TypeError, ValueError) as error:
         raise IntegrityError("Shard raw-record payload is invalid.") from error
 
@@ -830,6 +857,8 @@ def validate_shard(
             raise IntegrityError("Shard record fields are invalid.")
         if record["scenario_id"] != spec.scenario_id:
             raise IntegrityError("Shard record scenario mismatch.")
+        if type(record["replicate_id"]) is not int or record["replicate_id"] < 0:
+            raise IntegrityError("Shard record replicate ID must be an exact integer.")
         _validate_raw_payload(record["payload"])
         seen.append(record["replicate_id"])
     if seen != list(range(spec.start_replicate, spec.stop_replicate)):
