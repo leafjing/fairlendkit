@@ -13,3 +13,9 @@ fi
 
 ./scripts/verify_paper2_phase1.sh
 
+base_ref="main"
+if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
+  base_ref="origin/$GITHUB_BASE_REF"
+fi
+merge_base="$(git merge-base HEAD "$base_ref")"
+git diff --check "$merge_base"..HEAD

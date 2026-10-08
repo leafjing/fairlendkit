@@ -6,11 +6,13 @@ confirmatory matrix, public-data download, analysis, or result inspection.
 ## Frozen execution plan
 
 - Protocol/A1 commit: `865a2baf549d691d602334379ed03a7883989d6f`.
-- Code commit: the eventual execution-gate merge commit must be supplied as a
-  full 40-character SHA when sealing the run manifest. A dirty tree, branch
-  name, tag, or abbreviated SHA is not acceptable.
+- Implementation base: `main@1143d0e5795eefa1abb3de4bf52fdc9eaf8f9b91`.
+  The manifest verifies this commit is an ancestor of the real current HEAD.
+- Code commit is read directly from `git rev-parse HEAD`; callers cannot supply
+  it. A dirty tree, branch name, tag, or abbreviated SHA is rejected.
 - The manifest records SHA-256 values for `protocol.json`, the normative A1
-  fixture, and `requirements-release.txt`.
+  fixture, and the actual installed `pip freeze --all`. The installed freeze
+  must byte-match the checked-in environment lock.
 - The frozen scenario set is the union of C1/C3–C6 inputs and the 25 H2
   scenarios: 29 unique scenario IDs.
 - Each scenario has 50 immutable shards of 1,000 replicate IDs: `[0,1000)`,
@@ -28,6 +30,12 @@ Each shard writes one canonical JSONL file of raw replicate records and one
 canonical metadata file. Metadata contains scenario, shard ID, half-open
 replicate range, row count, records SHA-256, code/protocol/environment
 identities, Python version, and success status.
+
+The raw payload is a frozen allowlist schema: canonically sorted metric values,
+definedness, reliability states, uncertainty bounds, registered flag codes,
+and registered limitation codes. All four metric-key sections must contain the
+same unique registered metric keys. No opaque mapping or extra field is
+accepted, so an aggregate result cannot be hidden under a new key.
 
 Intermediate payloads must not contain estimates, standard errors, p-values,
 Holm outputs, figures, or plots. No code in this gate calculates those values.
@@ -51,4 +59,3 @@ Run the clean-environment preflight with:
 ```
 
 Passing this command is evidence only. It is not permission to run the matrix.
-

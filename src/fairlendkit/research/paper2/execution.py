@@ -6,9 +6,14 @@ import hashlib
 import json
 import platform
 import re
+import subprocess
+import sys
 from dataclasses import asdict, dataclass
+from math import isfinite
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Iterable
+
+from fairlendkit.metrics.contracts import LimitationCode, MetricNameV2
 
 from fairlendkit.research.paper2.protocol import (
     CONFIRMATORY_REPLICATES,
@@ -16,16 +21,22 @@ from fairlendkit.research.paper2.protocol import (
     ProductionRunLockedError,
     load_protocol,
 )
-from fairlendkit.research.paper2.registry import h2_scenario_units
+from fairlendkit.research.paper2.registry import h2_scenario_units, scenario_registry
 
 SHARD_SIZE = 1_000
 WORKER_COUNT = 4
 CPU_BUDGET = 4
 MEMORY_BUDGET_GIB = 16
 PROTOCOL_A1_COMMIT = "865a2baf549d691d602334379ed03a7883989d6f"
-FORBIDDEN_RESULT_KEYS = frozenset(
-    {"estimate", "standard_error", "se", "p_value", "holm", "figure", "plot"}
+IMPLEMENTATION_BASE_COMMIT = "1143d0e5795eefa1abb3de4bf52fdc9eaf8f9b91"
+PARALLEL_STRATEGY = "process-per-shard; deterministic shard queue"
+CHECKPOINT_POLICY = "immutable-success-or-retry-whole-shard"
+RELIABILITY_STATES = frozenset(
+    {"reliable", "unreliable", "undefined", "not_applicable"}
 )
+FLAG_CODES = frozenset({"air_below_threshold"})
+LIMITATION_CODES = frozenset(code.value for code in LimitationCode)
+METRIC_NAMES = tuple(metric.value for metric in MetricNameV2)
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 _COMMIT_RE = re.compile(r"[0-9a-f]{40}")
 
@@ -37,6 +48,7 @@ class IntegrityError(ValueError):
 @dataclass(frozen=True)
 class ExecutionManifest:
     code_commit: str
+    implementation_base_commit: str
     protocol_commit: str
     protocol_manifest_sha256: str
     rng_fixture_sha256: str
@@ -45,12 +57,14 @@ class ExecutionManifest:
     worker_count: int = WORKER_COUNT
     cpu_budget: int = CPU_BUDGET
     memory_budget_gib: int = MEMORY_BUDGET_GIB
-    parallel_strategy: str = "process-per-shard; deterministic shard queue"
-    checkpoint_policy: str = "immutable-success-or-retry-whole-shard"
+    parallel_strategy: str = PARALLEL_STRATEGY
+    checkpoint_policy: str = CHECKPOINT_POLICY
 
     def __post_init__(self) -> None:
         if not _COMMIT_RE.fullmatch(self.code_commit):
             raise IntegrityError("Code commit must be a full lowercase Git SHA.")
+        if self.implementation_base_commit != IMPLEMENTATION_BASE_COMMIT:
+            raise IntegrityError("Implementation base commit is not frozen.")
         if self.protocol_commit != PROTOCOL_A1_COMMIT:
             raise IntegrityError("Protocol/A1 commit does not match the frozen amendment.")
         for value in (
@@ -65,16 +79,46 @@ class ExecutionManifest:
             or self.worker_count != WORKER_COUNT
             or self.cpu_budget != CPU_BUDGET
             or self.memory_budget_gib != MEMORY_BUDGET_GIB
+            or self.parallel_strategy != PARALLEL_STRATEGY
+            or self.checkpoint_policy != CHECKPOINT_POLICY
         ):
             raise IntegrityError("Execution resource and shard settings are frozen.")
 
 
 @dataclass(frozen=True, order=True)
 class ShardSpec:
+    namespace: str
     scenario_id: str
     shard_id: int
     start_replicate: int
     stop_replicate: int
+
+    def __post_init__(self) -> None:
+        if self.namespace not in {"confirmatory", "smoke"}:
+            raise IntegrityError("Shard namespace must be confirmatory or smoke.")
+        if not re.fullmatch(r"[A-Z0-9-]+", self.scenario_id):
+            raise IntegrityError("Scenario ID is not path-safe.")
+        allowed_scenarios = (
+            frozen_execution_scenario_ids()
+            if self.namespace == "confirmatory"
+            else tuple(scenario_registry())
+        )
+        if self.scenario_id not in allowed_scenarios:
+            raise IntegrityError("Shard scenario is not registered for its namespace.")
+        if self.shard_id < 0 or self.start_replicate < 0:
+            raise IntegrityError("Shard IDs and ranges cannot be negative.")
+        if self.stop_replicate <= self.start_replicate:
+            raise IntegrityError("Shard range must be non-empty and increasing.")
+        if self.namespace == "confirmatory":
+            if (
+                self.shard_id >= CONFIRMATORY_REPLICATES // SHARD_SIZE
+                or self.start_replicate != self.shard_id * SHARD_SIZE
+                or self.stop_replicate != self.start_replicate + SHARD_SIZE
+                or self.stop_replicate > CONFIRMATORY_REPLICATES
+            ):
+                raise IntegrityError("Confirmatory shard boundaries are frozen.")
+        elif self.stop_replicate > 100:
+            raise IntegrityError("Smoke shard range must remain within 0..99.")
 
     @property
     def expected_rows(self) -> int:
@@ -85,7 +129,50 @@ class ShardSpec:
 class RawReplicateRecord:
     scenario_id: str
     replicate_id: int
-    payload: Mapping[str, object]
+    payload: "RawReplicatePayload"
+
+
+@dataclass(frozen=True)
+class RawReplicatePayload:
+    metric_values: tuple[tuple[str, float | None], ...]
+    metric_defined: tuple[tuple[str, bool], ...]
+    reliability: tuple[tuple[str, str], ...]
+    uncertainty: tuple[tuple[str, tuple[float, float] | None], ...]
+    flags: tuple[str, ...]
+    limitations: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        keyed = (self.metric_values, self.metric_defined, self.reliability, self.uncertainty)
+        key_sets: list[tuple[str, ...]] = []
+        for entries in keyed:
+            keys = tuple(key for key, _ in entries)
+            if keys != tuple(sorted(set(keys))):
+                raise IntegrityError("Raw metric keys must be unique and canonically sorted.")
+            if any(not any(key.endswith(f".{metric}") for metric in METRIC_NAMES) for key in keys):
+                raise IntegrityError("Raw payload contains an unknown metric key.")
+            key_sets.append(keys)
+        if len(set(key_sets)) != 1:
+            raise IntegrityError("Raw payload metric sections must use identical keys.")
+        if any(value is not None and not isfinite(value) for _, value in self.metric_values):
+            raise IntegrityError("Raw metric values must be finite or None.")
+        if any(not isinstance(value, bool) for _, value in self.metric_defined):
+            raise IntegrityError("Raw definedness values must be booleans.")
+        if any(value not in RELIABILITY_STATES for _, value in self.reliability):
+            raise IntegrityError("Raw reliability state is invalid.")
+        for _, interval in self.uncertainty:
+            if interval is not None and (
+                len(interval) != 2
+                or not all(isfinite(value) for value in interval)
+                or interval[0] > interval[1]
+            ):
+                raise IntegrityError("Raw uncertainty interval is invalid.")
+        if tuple(sorted(set(self.flags))) != self.flags or not set(self.flags) <= FLAG_CODES:
+            raise IntegrityError("Raw flags must be unique, sorted, and registered.")
+        if (
+            tuple(sorted(set(self.limitations))) != self.limitations
+            or not set(self.limitations) <= LIMITATION_CODES
+        ):
+            raise IntegrityError("Raw limitations must be unique, sorted, and registered.")
 
 
 @dataclass(frozen=True)
@@ -97,6 +184,7 @@ class ShardMetadata:
     row_count: int
     records_sha256: str
     code_commit: str
+    implementation_base_commit: str
     protocol_commit: str
     protocol_manifest_sha256: str
     rng_fixture_sha256: str
@@ -113,19 +201,73 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def build_manifest(repo_root: Path, *, code_commit: str) -> ExecutionManifest:
+def _git_identity(repo_root: Path) -> tuple[str, bool]:
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    dirty = bool(
+        subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    )
+    return commit, dirty
+
+
+def _git_has_frozen_base(repo_root: Path) -> bool:
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", IMPLEMENTATION_BASE_COMMIT, "HEAD"],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
+def _installed_environment() -> bytes:
+    result = subprocess.run(
+        [sys.executable, "-m", "pip", "freeze", "--all"],
+        check=True,
+        capture_output=True,
+    )
+    lines = result.stdout.decode("utf-8").splitlines()
+    normalized = (
+        "fairlendkit==0.1.0.dev0" if line.startswith("fairlendkit @ ") else line
+        for line in lines
+    )
+    return ("\n".join(normalized) + "\n").encode("utf-8")
+
+
+def build_manifest(repo_root: Path) -> ExecutionManifest:
     protocol = load_protocol()
+    code_commit, dirty = _git_identity(repo_root)
+    if dirty:
+        raise IntegrityError("Execution manifest requires a clean Git worktree.")
+    if not _git_has_frozen_base(repo_root):
+        raise IntegrityError("Execution code is not based on the approved phase-one merge.")
     fixture_sha256 = sha256_file(repo_root / "docs/fixtures/paper2-rng-a1-golden.json")
     if fixture_sha256 != protocol.rng_fixture_sha256:
         raise IntegrityError("Normative A1 fixture hash does not match the protocol manifest.")
+    expected_environment = (repo_root / "docs/milestone-3-release-pip-freeze.txt").read_bytes()
+    actual_environment = _installed_environment()
+    if actual_environment != expected_environment:
+        raise IntegrityError("Installed environment does not match the frozen pip lock.")
     return ExecutionManifest(
         code_commit=code_commit,
+        implementation_base_commit=IMPLEMENTATION_BASE_COMMIT,
         protocol_commit=PROTOCOL_A1_COMMIT,
         protocol_manifest_sha256=sha256_file(
             repo_root / "src/fairlendkit/research/paper2/protocol.json"
         ),
         rng_fixture_sha256=fixture_sha256,
-        environment_lock_sha256=sha256_file(repo_root / "requirements-release.txt"),
+        environment_lock_sha256=hashlib.sha256(actual_environment).hexdigest(),
     )
 
 
@@ -134,7 +276,13 @@ def confirmatory_shards(scenario_ids: Iterable[str]) -> tuple[ShardSpec, ...]:
     if not unique or any(not value for value in unique):
         raise IntegrityError("At least one non-empty scenario ID is required.")
     return tuple(
-        ShardSpec(scenario_id, shard_id, start, min(start + SHARD_SIZE, CONFIRMATORY_REPLICATES))
+        ShardSpec(
+            "confirmatory",
+            scenario_id,
+            shard_id,
+            start,
+            min(start + SHARD_SIZE, CONFIRMATORY_REPLICATES),
+        )
         for scenario_id in unique
         for shard_id, start in enumerate(range(0, CONFIRMATORY_REPLICATES, SHARD_SIZE))
     )
@@ -167,7 +315,7 @@ def smoke_shards(scenario_id: str, *, replicates: int = 6, shard_size: int = 2) 
     if shard_size <= 0 or replicates % shard_size:
         raise IntegrityError("Smoke shard size must divide the replicate count.")
     return tuple(
-        ShardSpec(scenario_id, shard_id, start, start + shard_size)
+        ShardSpec("smoke", scenario_id, shard_id, start, start + shard_size)
         for shard_id, start in enumerate(range(0, replicates, shard_size))
     )
 
@@ -178,10 +326,35 @@ def _paths(output_dir: Path, spec: ShardSpec) -> tuple[Path, Path]:
 
 
 def _canonical_record(record: RawReplicateRecord) -> bytes:
-    forbidden = FORBIDDEN_RESULT_KEYS.intersection(record.payload)
-    if forbidden:
-        raise IntegrityError(f"Derived-result fields are forbidden: {sorted(forbidden)}")
+    if not isinstance(record.payload, RawReplicatePayload):
+        raise IntegrityError("Record payload must use the frozen raw-record schema.")
     return (json.dumps(asdict(record), sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def _validate_raw_payload(raw: object) -> None:
+    if not isinstance(raw, dict) or set(raw) != {
+        "metric_values",
+        "metric_defined",
+        "reliability",
+        "uncertainty",
+        "flags",
+        "limitations",
+    }:
+        raise IntegrityError("Shard payload does not match the frozen raw-record schema.")
+    try:
+        RawReplicatePayload(
+            metric_values=tuple((key, value) for key, value in raw["metric_values"]),
+            metric_defined=tuple((key, value) for key, value in raw["metric_defined"]),
+            reliability=tuple((key, value) for key, value in raw["reliability"]),
+            uncertainty=tuple(
+                (key, None if value is None else tuple(value))
+                for key, value in raw["uncertainty"]
+            ),
+            flags=tuple(raw["flags"]),
+            limitations=tuple(raw["limitations"]),
+        )
+    except (TypeError, ValueError) as error:
+        raise IntegrityError("Shard raw-record payload is invalid.") from error
 
 
 def write_smoke_shard(
@@ -190,7 +363,7 @@ def write_smoke_shard(
     spec: ShardSpec,
     records: Iterable[RawReplicateRecord],
 ) -> ShardMetadata:
-    if spec.stop_replicate > 100:
+    if spec.namespace != "smoke":
         raise ProductionRunLockedError("Only isolated smoke replicate IDs may be written.")
     output_dir.mkdir(parents=True, exist_ok=True)
     records_path, metadata_path = _paths(output_dir, spec)
@@ -221,6 +394,7 @@ def write_smoke_shard(
         row_count=len(ordered),
         records_sha256=hashlib.sha256(payload).hexdigest(),
         code_commit=manifest.code_commit,
+        implementation_base_commit=manifest.implementation_base_commit,
         protocol_commit=manifest.protocol_commit,
         protocol_manifest_sha256=manifest.protocol_manifest_sha256,
         rng_fixture_sha256=manifest.rng_fixture_sha256,
@@ -255,6 +429,7 @@ def validate_shard(
         "stop_replicate": spec.stop_replicate,
         "row_count": spec.expected_rows,
         "code_commit": manifest.code_commit,
+        "implementation_base_commit": manifest.implementation_base_commit,
         "protocol_commit": manifest.protocol_commit,
         "protocol_manifest_sha256": manifest.protocol_manifest_sha256,
         "rng_fixture_sha256": manifest.rng_fixture_sha256,
@@ -281,8 +456,7 @@ def validate_shard(
             raise IntegrityError("Shard record fields are invalid.")
         if record["scenario_id"] != spec.scenario_id:
             raise IntegrityError("Shard record scenario mismatch.")
-        if FORBIDDEN_RESULT_KEYS.intersection(record["payload"]):
-            raise IntegrityError("Shard contains a forbidden derived result.")
+        _validate_raw_payload(record["payload"])
         seen.append(record["replicate_id"])
     if seen != list(range(spec.start_replicate, spec.stop_replicate)):
         raise IntegrityError("Shard has duplicate, missing, or out-of-order replicate IDs.")
