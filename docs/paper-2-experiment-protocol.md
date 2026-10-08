@@ -273,28 +273,34 @@ Modulo without rejection is forbidden. Bounds `n<=0` are errors. Uniform and
 distribution transforms are:
 
 ```text
-uniform_closed_open(x) = x / 2**64
-uniform_open(x) = (x + 0.5) / 2**64
+q53 = x >> 11
+q52 = x >> 12
+uniform_closed_open(x) = q53 * 2**-53
+uniform_open(x) = (q52 + 0.5) * 2**-52
 Bernoulli(p, x) = 1 if uniform_closed_open(x) < p else 0
 Normal(x) = scipy.special.ndtri(uniform_open(x))
 ```
 
-All arithmetic is IEEE-754 binary64; `p` must be finite in `[0,1]`. The A1
+The shifts are unsigned-integer operations performed before conversion to
+binary64. Multiplication by the stated powers of two and addition of `0.5` are
+then IEEE-754 binary64 operations. Thus `uniform_closed_open` is exactly in
+`[0,1)`, while `uniform_open` is exactly in `[2**-53, 1-2**-53]`; endpoint
+replacement or clipping is forbidden. `p` must be finite in `[0,1]`. The A1
 fixture freezes `scipy==1.17.1` for `ndtri`; the final research lock must retain
-that version. Implementations must
-match the checked-in normal-output binary64 fixture, not merely a decimal
-tolerance.
+that version. Implementations must match the checked-in normal-output binary64
+fixture, not merely a decimal tolerance.
 
 ### Exact-stream fixtures and acceptance
 
 [`fixtures/paper2-rng-a1-golden.json`](fixtures/paper2-rng-a1-golden.json) is
 normative. Its amendment-review SHA-256 is
-`34009037e6f9b1edc9d7c3f03622df29e0d72f49678910adef2d3c0ff434602a`.
+`6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905`.
 It fixes:
 
 - seed bytes, counter-zero digest, uint64 word order, uniform bytes, and
   Bernoulli outputs for a shared C1 stream;
-- scenario-specific standard-normal binary64 bytes;
+- scenario-specific standard-normal binary64 bytes and the exact uniform and
+  normal outputs for uint64 endpoints `0` and `2**64-1`;
 - exact H2 and summary-bootstrap indices; and
 - a high-rejection bounded-integer case that distinguishes rejection sampling
   from naive modulo.
@@ -320,11 +326,11 @@ reference implementation that share no RNG helper code. Updating a fixture to
 make a failing implementation pass is prohibited unless a separately reviewed
 protocol amendment changes the normative algorithm.
 
-Bernoulli draws use `U < p`, where `U` is a candidate uint64 divided by
-`2**64`. Standard normals use the inverse standard-normal CDF
-`scipy.special.ndtri(U)` under a pinned SciPy version; exact endpoint uniforms
-are replaced by the nearest interior binary64 value. The research seed manifest
-and pinned environment are checked in before the first production run.
+Bernoulli draws use `U < p`, where `U=uniform_closed_open(x)`. Standard normals
+use `scipy.special.ndtri(uniform_open(x))` under the pinned SciPy version. The
+bit-truncated formulas above are the only permitted uniform transforms. The
+research seed manifest and pinned environment are checked in before the first
+production run.
 
 ### Core DGP
 
@@ -703,6 +709,7 @@ This study does not claim that:
 | H2 scenario set expressed by brace grammar and aliases | The normative section lists all 25 unique IDs explicitly; aliases are excluded. |
 | 10,000-pair power bound (`0.0317` SD; `0.0159` worst-case proportion) | 50,000-pair bound (`0.0142` SD; `0.0071` worst-case proportion) at conservative one-sided planning level `0.01` and 80% power. |
 | Generator seed included `scenario_id` while prose claimed different scenarios shared row streams; separate summary/H2 formats created multiple roots | One seven-field root format covers all purposes. A routing table maps every random variable, shape, scope, role, consumption order, transform, and bounded-integer rule. The pair table freezes shared streams and deterministic transforms. |
+| Direct binary64 midpoint `(x+0.5)/2**64` and a separate endpoint-replacement rule could round the largest uint64 to `1.0` and make `ndtri` infinite | The only normal input is `(q52+0.5)*2**-52`, where `q52=x>>12`; the only closed-open uniform is `(x>>11)*2**-53`. Endpoint clipping/replacement is forbidden, and exact fixtures freeze both uint64 endpoints. |
 
 ## Protocol amendment log
 
@@ -715,8 +722,9 @@ This study does not claim that:
   paired streams reproducible across independent implementations.
 - **Change:** one seven-field root; closed routing table; exact array shapes and
   consumption order; SHA digest/uint64 ordering; unbiased rejection sampling;
-  binary64 transforms; pair/shared/scenario rules; normative golden fixture;
-  and byte/index acceptance requirements.
+  endpoint-safe bit-truncated binary64 transforms; pair/shared/scenario rules;
+  normative golden fixture including both uint64 endpoints; and byte/index
+  acceptance requirements.
 - **Affected registered analyses:** C1, C3, C4, C5, C6, H2, every simulated DGP
   using random rows, and secondary summaries using bootstrap indices.
 - **Unchanged:** research questions, hypotheses, DGP probability parameters,
