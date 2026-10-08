@@ -109,7 +109,7 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
 
 
 def _validate_benchmark_coverage(registry, scenario_ids: tuple[str, ...]) -> None:
-    """Fail closed unless representatives dominate every frozen workload axis."""
+    """Fail closed unless every frozen scenario has a measured cost dominator."""
     frozen = tuple(registry[item] for item in frozen_execution_scenario_ids())
     representatives = tuple(registry[item] for item in scenario_ids)
     if {item.family for item in representatives} != {item.family for item in frozen}:
@@ -128,6 +128,39 @@ def _validate_benchmark_coverage(registry, scenario_ids: tuple[str, ...]) -> Non
     for value, label in maxima:
         if max(map(value, representatives)) < max(map(value, frozen)):
             raise IntegrityError(f"Resource benchmark does not cover the maximum {label} workload.")
+
+    coverage = _benchmark_coverage_matrix(registry, scenario_ids)
+    if set(coverage) != set(frozen_execution_scenario_ids()):
+        raise IntegrityError("Resource benchmark cost coverage matrix is incomplete.")
+
+
+def _benchmark_coverage_matrix(
+    registry, scenario_ids: tuple[str, ...]
+) -> dict[str, str]:
+    """Map every execution scenario to a measured scenario that dominates its cost axes."""
+    representatives = tuple(registry[item] for item in scenario_ids)
+    coverage: dict[str, str] = {}
+    for frozen_id in frozen_execution_scenario_ids():
+        frozen = registry[frozen_id]
+        candidates = tuple(
+            representative
+            for representative in representatives
+            if representative.family == frozen.family
+            and representative.missingness == frozen.missingness
+            and representative.calibration == frozen.calibration
+            and representative.comparison_n + representative.reference_n
+            >= frozen.comparison_n + frozen.reference_n
+            and representative.missing_fraction >= frozen.missing_fraction
+            and representative.bootstrap_resamples >= frozen.bootstrap_resamples
+            and representative.minimum_valid_resamples
+            >= frozen.minimum_valid_resamples
+        )
+        if not candidates:
+            raise IntegrityError(
+                f"Resource benchmark has no measured cost dominator for {frozen_id}."
+            )
+        coverage[frozen_id] = min(item.scenario_id for item in candidates)
+    return coverage
 
 
 def _audit_config(scenario) -> AuditConfig:

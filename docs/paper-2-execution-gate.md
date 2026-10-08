@@ -31,7 +31,10 @@ confirmatory matrix, public-data download, analysis, or result inspection.
 
 The resource benchmark runs one replicate each of `REG`,
 `SEL-AIR081-N1000`, `MISS-MCAR30`, and `MISS-MNAR30` in the isolated smoke
-namespace. An executable coverage check proves these representatives cover
+namespace. An executable 29-row cost coverage matrix maps every frozen execution
+scenario to a measured representative with the same family, missingness, and
+calibration path and no smaller sample, missingness, bootstrap, or valid-resample
+workload. The coverage check also proves these representatives cover
 every frozen scenario family and missingness path and dominate the frozen
 matrix on total sample size, missing fraction, bootstrap resamples, and the
 minimum-valid-resamples threshold. The benchmark also fails unless the actual

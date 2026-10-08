@@ -11,6 +11,7 @@ import pytest
 import fairlendkit.research.paper2.execution as execution
 from fairlendkit.research.paper2.resource_benchmark import (
     BENCHMARK_SCENARIO_IDS,
+    _benchmark_coverage_matrix,
     _validate_benchmark_coverage,
 )
 from fairlendkit.research.paper2.registry import scenario_registry
@@ -439,6 +440,14 @@ def test_smoke_benchmark_is_raw_only_and_resource_preflight_fails_closed(
 def test_full_chain_benchmark_representatives_cover_frozen_workload_axes():
     registry = scenario_registry()
     _validate_benchmark_coverage(registry, BENCHMARK_SCENARIO_IDS)
+    coverage = _benchmark_coverage_matrix(registry, BENCHMARK_SCENARIO_IDS)
+
+    assert len(coverage) == 29
+    assert coverage["PERF-DEC001"] == "REG"
+    assert coverage["MISS-MCAR30"] == "MISS-MCAR30"
+    assert coverage["MISS-MNAR30"] == "MISS-MNAR30"
+    assert coverage["SEL-AIR060-N025"] == "SEL-AIR081-N1000"
+    assert coverage["SEL-AIR100-N1000"] == "SEL-AIR081-N1000"
 
     without_mcar = tuple(
         item for item in BENCHMARK_SCENARIO_IDS if item != "MISS-MCAR30"
@@ -452,3 +461,9 @@ def test_full_chain_benchmark_representatives_cover_frozen_workload_axes():
     )
     with pytest.raises(IntegrityError, match="sample-size"):
         _validate_benchmark_coverage(registry, without_maximum_sample)
+
+    without_performance = tuple(
+        item for item in BENCHMARK_SCENARIO_IDS if item != "REG"
+    )
+    with pytest.raises(IntegrityError, match="family|dominator"):
+        _validate_benchmark_coverage(registry, without_performance)
