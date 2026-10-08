@@ -1,5 +1,6 @@
 import runpy
 import hashlib
+from pathlib import Path
 
 from fairlendkit import AuditResult
 
@@ -13,6 +14,5 @@ def test_synthetic_schema_v2_example_is_executable_and_deterministic(capsys):
     result = AuditResult.model_validate_json(first)
     assert result.schema_version == "2.0"
     assert first == second
-    assert hashlib.sha256(first.encode("utf-8")).hexdigest() == (
-        "3b5c7166ed4893d808dacb2bb731e2a86ae59f5706e9ac6ec6dd58a03eca823c"
-    )
+    expected = Path("examples/synthetic/audit-result-v2.sha256").read_text().strip()
+    assert hashlib.sha256(first.encode("utf-8")).hexdigest() == expected

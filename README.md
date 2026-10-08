@@ -38,14 +38,14 @@ python examples/synthetic/run_audit.py > audit-result-v2.json
 
 The script uses a fixed execution timestamp, bootstrap seed, configuration, and
 synthetic rows. Repeated runs in the same supported environment produce the same
-canonical JSON. The result fingerprint intentionally includes dataframe row
+compact canonical JSON. The result fingerprint intentionally includes dataframe row
 order, index, columns, and dtypes.
 
 The release-gate SHA-256 of the exact example stdout, including its final
 newline, is:
 
 ```text
-3b5c7166ed4893d808dacb2bb731e2a86ae59f5706e9ac6ec6dd58a03eca823c
+0f6e4daac8592661eaf32a5ccb4f5d445de568596521a81b843cc2a3f49668c3
 ```
 
 From a clean checkout, this one command creates an isolated environment,
@@ -57,11 +57,12 @@ python -m venv .venv && .venv/bin/python -m pip install -e '.[test]' && \
   .venv/bin/python -m pytest -q && \
   .venv/bin/python -m pytest -q tests/test_architecture.py && \
   git diff --check && \
-  .venv/bin/python examples/synthetic/run_audit.py | sha256sum
+  test "$(.venv/bin/python examples/synthetic/run_audit.py | sha256sum | cut -d' ' -f1)" = \
+    "$(tr -d '\n' < examples/synthetic/audit-result-v2.sha256)"
 ```
 
-The final line must equal the digest above followed by `  -`. CI runs the full
-suite on Python 3.11 and 3.12.
+The command exits non-zero if generation differs from the checked-in digest.
+CI runs the full suite on Python 3.11 and 3.12.
 
 Programmatic use starts with:
 

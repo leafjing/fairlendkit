@@ -37,4 +37,4 @@ config = AuditConfig(
     minimum_valid_resamples=50,
 )
 
-print(run_audit(data, config).model_dump_json(indent=2))
+print(run_audit(data, config).model_dump_json())
