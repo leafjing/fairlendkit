@@ -11,6 +11,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 from fairlendkit.config import AuditConfig
 from fairlendkit.config.models import Label
+from fairlendkit.metrics.contracts import MetricNameV2
 from fairlendkit.data.contracts import (
     APPLICABILITY_STATEMENT,
     BaselineComparisonResult,
@@ -45,25 +46,6 @@ class MetricName(StrEnum):
     ADVERSE_IMPACT_RATIO = "adverse_impact_ratio"
     DEMOGRAPHIC_PARITY_DIFFERENCE = "demographic_parity_difference"
     EQUAL_OPPORTUNITY_DIFFERENCE = "equal_opportunity_difference"
-
-
-class MetricNameV2(StrEnum):
-    """Schema 2.0 metric names, isolated from the strict 1.0 contract."""
-
-    SELECTION_RATE = "selection_rate"
-    DENIAL_RATE = "denial_rate"
-    ACCURACY = "accuracy"
-    PRECISION = "precision"
-    TRUE_POSITIVE_RATE = "true_positive_rate"
-    FALSE_POSITIVE_RATE = "false_positive_rate"
-    FALSE_NEGATIVE_RATE = "false_negative_rate"
-    BRIER_SCORE = "brier_score"
-    ROC_AUC = "roc_auc"
-    SELECTION_RATE_DIFFERENCE = "selection_rate_difference"
-    ADVERSE_IMPACT_RATIO = "adverse_impact_ratio"
-    DEMOGRAPHIC_PARITY_DIFFERENCE = "demographic_parity_difference"
-    EQUAL_OPPORTUNITY_DIFFERENCE = "equal_opportunity_difference"
-    EQUALIZED_ODDS_GAP = "equalized_odds_gap"
 
 
 class UncertaintyMethod(StrEnum):

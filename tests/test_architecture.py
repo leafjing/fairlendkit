@@ -49,7 +49,7 @@ def test_group_orchestration_is_dataframe_and_io_independent():
         for name in node.names
     )
 
-    forbidden = {"pandas", "numpy", "fairlendkit.cli"}
+    forbidden = {"pandas", "numpy", "fairlendkit.cli", "fairlendkit.report"}
     assert not any(
         module == root or module.startswith(f"{root}.")
         for module in imported_modules

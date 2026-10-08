@@ -1,5 +1,6 @@
 """Metric contracts for normalized favorable-outcome and decision indicators."""
 
+from fairlendkit.metrics.contracts import MetricNameV2
 from fairlendkit.metrics.core import (
     MetricValue,
     accuracy,
@@ -30,6 +31,7 @@ from fairlendkit.metrics.group import (
 
 __all__ = [
     "MetricValue",
+    "MetricNameV2",
     "accuracy",
     "adverse_impact_ratio",
     "brier_score",

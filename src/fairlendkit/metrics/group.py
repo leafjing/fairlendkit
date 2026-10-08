@@ -26,7 +26,7 @@ from fairlendkit.metrics.core import (
     selection_rate_difference,
     true_positive_rate,
 )
-from fairlendkit.report import MetricNameV2
+from fairlendkit.metrics.contracts import MetricNameV2
 
 
 SCOPE_METRIC_ORDER = (
@@ -49,7 +49,7 @@ COMPARISON_METRIC_ORDER = (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class AuditScope:
     """Immutable, type-preserving group identity."""
 
@@ -60,6 +60,17 @@ class AuditScope:
             raise ValueError("audit scope must contain at least one attribute")
         if len({name for name, _ in self.attributes}) != len(self.attributes):
             raise ValueError("audit scope attributes must be unique")
+
+    def _typed_identity(self) -> tuple[tuple[str, str], ...]:
+        return tuple(
+            (name, canonical_typed_token(value)) for name, value in self.attributes
+        )
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, AuditScope) and self._typed_identity() == other._typed_identity()
+
+    def __hash__(self) -> int:
+        return hash(self._typed_identity())
 
     @classmethod
     def overall(cls) -> "AuditScope":
@@ -189,7 +200,7 @@ def calculate_group_metrics(
             raise ValueError("protected values must belong to configured allowed groups")
 
     output: list[CalculatedMetric] = []
-    scope_results: dict[tuple[str, tuple[tuple[str, str | int | bool], ...]], CalculatedMetric] = {}
+    scope_results: dict[tuple[str, AuditScope], CalculatedMetric] = {}
     overall = AuditScope.overall()
     output.extend(_calculate_scope(data, config, overall, tuple(range(len(data.favorable_outcome)))))
 
@@ -205,7 +216,7 @@ def calculate_group_metrics(
             metrics = _calculate_scope(data, config, scope, indices)
             output.extend(metrics)
             for item in metrics:
-                scope_results[(item.metric.value, scope.attributes)] = item
+                scope_results[(item.metric.value, scope)] = item
 
         reference_value = config.reference_groups[attribute]
         reference_scope = AuditScope(((attribute, reference_value),))
@@ -258,13 +269,13 @@ def _calculate_scope(
 
 def _calculate_comparison(
     scope_results: Mapping[
-        tuple[str, tuple[tuple[str, str | int | bool], ...]], CalculatedMetric
+        tuple[str, AuditScope], CalculatedMetric
     ],
     comparison_scope: AuditScope,
     reference_scope: AuditScope,
 ) -> tuple[CalculatedMetric, ...]:
     def source(metric: MetricNameV2, scope: AuditScope) -> CalculatedMetric:
-        return scope_results[(metric.value, scope.attributes)]
+        return scope_results[(metric.value, scope)]
 
     comparison_selection = source(MetricNameV2.SELECTION_RATE, comparison_scope)
     reference_selection = source(MetricNameV2.SELECTION_RATE, reference_scope)

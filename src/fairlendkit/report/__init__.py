@@ -1,5 +1,6 @@
 """Canonical report contract consumed by every output renderer."""
 
+from fairlendkit.metrics.contracts import MetricNameV2
 from fairlendkit.report.models import (
     AUDIT_RESULT_SCHEMA_VERSION,
     CANONICAL_UNDEFINED_MESSAGES_V2,
@@ -8,7 +9,6 @@ from fairlendkit.report.models import (
     ExclusionRecord,
     Limitation,
     MetricName,
-    MetricNameV2,
     ObservedMetric,
     PractitionerReviewNote,
     ReportedMetricValue,

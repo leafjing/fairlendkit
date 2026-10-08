@@ -52,6 +52,16 @@ def test_canonical_typed_tokens_are_collision_free_and_match_contract_example():
     assert canonical_typed_token(1) != canonical_typed_token(True)
 
 
+def test_audit_scope_equality_and_hash_are_type_sensitive():
+    scopes = {
+        AuditScope((("group", True),)),
+        AuditScope((("group", 1),)),
+        AuditScope((("group", "1"),)),
+    }
+
+    assert len(scopes) == 3
+
+
 def test_canonical_metric_keys_cover_overall_group_and_comparison():
     group_a = AuditScope((("group", "A"),))
     group_b = AuditScope((("group", "B"),))
@@ -186,3 +196,27 @@ def test_group_orchestration_rejects_unknown_typed_group_values():
             ),
             config(),
         )
+
+
+def test_boolean_and_integer_groups_do_not_overwrite_comparison_sources():
+    cfg = config(
+        allowed_groups={"group": (True, 1)},
+        reference_groups={"group": True},
+    )
+    normalized = NormalizedAuditData(
+        favorable_outcome=(True, False),
+        favorable_decision=(True, False),
+        favorable_score=(0.9, 0.1),
+        protected_values={"group": (True, 1)},
+    )
+
+    results = calculate_group_metrics(normalized, cfg)
+    difference = next(
+        item
+        for item in results
+        if item.metric == MetricNameV2.SELECTION_RATE_DIFFERENCE
+    )
+
+    assert difference.value.value == -1.0
+    assert difference.comparison_group == AuditScope((("group", 1),))
+    assert difference.reference_group == AuditScope((("group", True),))
