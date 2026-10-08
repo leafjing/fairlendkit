@@ -24,6 +24,11 @@ venv_python="$release_tmp/venv/bin/python"
 cmp "$repo_root/docs/milestone-3-release-pip-freeze.txt" \
   "$release_tmp/pip-freeze.txt"
 
+"$venv_python" "$repo_root/scripts/verify_paper2_runtime_identity.py" \
+  > "$release_tmp/paper2-runtime-manifest.json"
+"$venv_python" "$repo_root/scripts/benchmark_paper2_execution_gate.py" \
+  > "$release_tmp/paper2-resource-evidence.json"
+
 "$venv_python" "$repo_root/examples/synthetic/run_audit.py" \
   > "$release_tmp/audit-result-v2.json"
 cmp "$repo_root/examples/synthetic/audit-result-v2.json" \

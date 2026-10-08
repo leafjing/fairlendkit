@@ -22,6 +22,22 @@ from fairlendkit.metrics.group import (
     NormalizedAuditData,
     calculate_group_metrics,
 )
+from fairlendkit.metrics.core import (
+    accuracy,
+    adverse_impact_ratio,
+    brier_score,
+    demographic_parity_difference,
+    denial_rate,
+    equalized_odds_gap,
+    equal_opportunity_difference,
+    false_negative_rate,
+    false_positive_rate,
+    precision,
+    roc_auc,
+    selection_rate,
+    selection_rate_difference,
+    true_positive_rate,
+)
 from fairlendkit.metrics.reliability import (
     AssessedMetric,
     MetricLimitation,
@@ -178,17 +194,89 @@ def _uncertainty_requests(assessed: tuple[AssessedMetric, ...], data: Normalized
 def _scope_evaluator(metric: CalculatedMetric, data: NormalizedAuditData, config: AuditConfig, source: tuple[int, ...]):
     def evaluate(draw: tuple[int, ...]) -> float | None:
         sampled = _take(data, tuple(source[index] for index in draw))
-        found = calculate_group_metrics(sampled, config)
-        return next(item.value.value for item in found if item.group is not None and item.group.attributes == (("__scope__", "overall"),) and item.metric == metric.metric)
+        return _scope_metric_value(metric.metric, sampled, config)
     return evaluate
 
 
 def _comparison_evaluator(metric: CalculatedMetric, data: NormalizedAuditData, config: AuditConfig, left: tuple[int, ...], right: tuple[int, ...]):
     def evaluate(left_draw: tuple[int, ...], right_draw: tuple[int, ...]) -> float | None:
-        sampled = _take(data, tuple(left[index] for index in left_draw) + tuple(right[index] for index in right_draw))
-        found = calculate_group_metrics(sampled, config)
-        return next(item.value.value for item in found if item.metric == metric.metric and item.comparison_group is not None and item.reference_group is not None and item.comparison_group.attributes == metric.comparison_group.attributes and item.reference_group.attributes == metric.reference_group.attributes)
+        comparison = _take(data, tuple(left[index] for index in left_draw))
+        reference = _take(data, tuple(right[index] for index in right_draw))
+        return _comparison_metric_value(metric.metric, comparison, reference)
     return evaluate
+
+
+def _scope_metric_value(
+    metric: MetricNameV2, data: NormalizedAuditData, config: AuditConfig
+) -> float | None:
+    """Evaluate only the requested scope primitive for one bootstrap draw."""
+    outcomes = data.favorable_outcome
+    decisions = data.favorable_decision
+    scores = data.favorable_score
+    weights = data.weights
+    evaluators = {
+        MetricNameV2.SELECTION_RATE: lambda: selection_rate(decisions, weights),
+        MetricNameV2.DENIAL_RATE: lambda: denial_rate(decisions, weights),
+        MetricNameV2.ACCURACY: lambda: accuracy(outcomes, decisions, weights),
+        MetricNameV2.PRECISION: lambda: precision(outcomes, decisions, weights),
+        MetricNameV2.TRUE_POSITIVE_RATE: lambda: true_positive_rate(outcomes, decisions, weights),
+        MetricNameV2.FALSE_POSITIVE_RATE: lambda: false_positive_rate(outcomes, decisions, weights),
+        MetricNameV2.FALSE_NEGATIVE_RATE: lambda: false_negative_rate(outcomes, decisions, weights),
+        MetricNameV2.BRIER_SCORE: lambda: brier_score(outcomes, scores, weights),
+        MetricNameV2.ROC_AUC: lambda: roc_auc(outcomes, scores, weights),
+    }
+    if metric is MetricNameV2.BRIER_SCORE and config.score_type.value != "probability":
+        return None
+    return evaluators[metric]().value
+
+
+def _comparison_metric_value(
+    metric: MetricNameV2,
+    comparison: NormalizedAuditData,
+    reference: NormalizedAuditData,
+) -> float | None:
+    """Evaluate only the requested directed comparison primitive."""
+    comparison_selection = selection_rate(
+        comparison.favorable_decision, comparison.weights
+    )
+    reference_selection = selection_rate(reference.favorable_decision, reference.weights)
+    if metric is MetricNameV2.SELECTION_RATE_DIFFERENCE:
+        return selection_rate_difference(
+            comparison_selection, reference_selection
+        ).value
+    if metric is MetricNameV2.ADVERSE_IMPACT_RATIO:
+        return adverse_impact_ratio(comparison_selection, reference_selection).value
+    if metric is MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE:
+        return demographic_parity_difference(
+            comparison_selection, reference_selection
+        ).value
+    comparison_tpr = true_positive_rate(
+        comparison.favorable_outcome,
+        comparison.favorable_decision,
+        comparison.weights,
+    )
+    reference_tpr = true_positive_rate(
+        reference.favorable_outcome,
+        reference.favorable_decision,
+        reference.weights,
+    )
+    if metric is MetricNameV2.EQUAL_OPPORTUNITY_DIFFERENCE:
+        return equal_opportunity_difference(comparison_tpr, reference_tpr).value
+    comparison_fpr = false_positive_rate(
+        comparison.favorable_outcome,
+        comparison.favorable_decision,
+        comparison.weights,
+    )
+    reference_fpr = false_positive_rate(
+        reference.favorable_outcome,
+        reference.favorable_decision,
+        reference.weights,
+    )
+    if metric is MetricNameV2.EQUALIZED_ODDS_GAP:
+        return equalized_odds_gap(
+            comparison_tpr, reference_tpr, comparison_fpr, reference_fpr
+        ).value
+    raise ValueError(f"Unsupported comparison metric: {metric.value}")
 
 
 def _take(data: NormalizedAuditData, indices: tuple[int, ...]) -> NormalizedAuditData:

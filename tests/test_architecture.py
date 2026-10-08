@@ -111,3 +111,10 @@ def test_product_packages_do_not_depend_on_research_artifacts():
             or module.startswith("fairlendkit.research.")
             for module in imported_modules
         ), f"{source_path} imports research-only code"
+
+
+def test_paper2_execution_gate_cannot_compute_dgp_or_statistics():
+    source = Path("src/fairlendkit/research/paper2/execution.py").read_text()
+
+    assert "paper2.dgp" not in source
+    assert "paper2.statistics" not in source

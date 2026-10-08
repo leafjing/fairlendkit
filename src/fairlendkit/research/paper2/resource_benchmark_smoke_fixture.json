@@ -1,0 +1,11 @@
+{
+  "schema_version": "paper2-resource-smoke-labels-v1",
+  "smoke_seed_domain": "fairlendkit-paper2-smoke-v1",
+  "replicate_id": 0,
+  "scenarios": {
+    "MISS-MCAR30": {"eligible_rows": 337, "outcome_0": 269, "outcome_1": 68},
+    "MISS-MNAR30": {"eligible_rows": 340, "outcome_0": 254, "outcome_1": 86},
+    "REG": {"eligible_rows": 500, "outcome_0": 404, "outcome_1": 96},
+    "SEL-AIR081-N1000": {"eligible_rows": 2000, "outcome_0": 1617, "outcome_1": 383}
+  }
+}

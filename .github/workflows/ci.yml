@@ -16,9 +16,11 @@ jobs:
         python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Run the current fail-closed verification gate
-        run: ./scripts/verify_paper2_phase1.sh
+        run: ./scripts/verify_paper2_execution_gate.sh
