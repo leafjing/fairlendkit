@@ -10,12 +10,15 @@ from fairlendkit.metrics import (
     NormalizedAuditData,
     RNG_NAME,
     ReliabilityState,
+    UncertaintyEstimate,
+    UncertaintyRequest,
     assess_reliability,
     bootstrap_index_draws,
     bootstrap_interval,
     comparison_bootstrap_interval,
     calculate_group_metrics,
     collect_uncertainty,
+    estimate_uncertainty,
     make_air_flags,
     type7_quantile,
 )
@@ -194,3 +197,32 @@ def test_insufficient_resamples_add_limitation_without_changing_point_reliabilit
     assert selection.reliability == ReliabilityState.RELIABLE
     assert limitations[0].code == "insufficient_valid_resamples"
     assert limitations[0].affected_metric_keys == ("overall.selection_rate",)
+
+
+def test_uncertainty_estimator_is_replaceable_through_inner_protocol():
+    class FakeEstimator:
+        def __init__(self):
+            self.requests = []
+
+        def estimate(self, request):
+            self.requests.append(request)
+            return UncertaintyEstimate(interval=None)
+
+    cfg = config(minimum_group_size=1)
+    assessed, _ = assess_reliability(calculate_group_metrics(data(), cfg), data(), cfg)
+    request = UncertaintyRequest(
+        metric_key="overall.selection_rate",
+        population_size=4,
+        evaluator=lambda indices: 0.5,
+        seed=0,
+        resamples=2,
+        minimum_valid_resamples=2,
+        confidence_level=0.95,
+    )
+    fake = FakeEstimator()
+
+    intervals, limitations = estimate_uncertainty(assessed, (request,), fake)
+
+    assert fake.requests == [request]
+    assert intervals == ()
+    assert limitations[0].code == "insufficient_valid_resamples"

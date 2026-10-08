@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Callable, Protocol
 
 
 class MetricNameV2(StrEnum):
@@ -102,3 +103,26 @@ class BootstrapInterval:
     lower: float
     upper: float
     valid_resamples: int
+
+
+@dataclass(frozen=True)
+class UncertaintyRequest:
+    metric_key: str
+    population_size: int
+    evaluator: Callable[[tuple[int, ...]], float | None]
+    seed: int
+    resamples: int
+    minimum_valid_resamples: int
+    confidence_level: float
+    stream_role: str = "scope"
+
+
+@dataclass(frozen=True)
+class UncertaintyEstimate:
+    interval: BootstrapInterval | None
+
+
+class UncertaintyEstimator(Protocol):
+    """Replaceable uncertainty implementation owned by the inner contract."""
+
+    def estimate(self, request: UncertaintyRequest) -> UncertaintyEstimate: ...

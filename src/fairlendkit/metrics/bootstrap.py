@@ -6,12 +6,34 @@ import hashlib
 import math
 from typing import Callable
 
-from fairlendkit.metrics.contracts import BootstrapInterval
+from fairlendkit.metrics.contracts import (
+    BootstrapInterval,
+    UncertaintyEstimate,
+    UncertaintyRequest,
+)
 
 
 RNG_NAME = "fairlendkit-sha256-counter-v1"
 _DOMAIN_TAG = b"fairlendkit-bootstrap-v1\0"
 _MAX_UINT64 = 2**64
+
+
+class Sha256PercentileBootstrap:
+    """Concrete adapter implementing the inner uncertainty protocol."""
+
+    def estimate(self, request: UncertaintyRequest) -> UncertaintyEstimate:
+        return UncertaintyEstimate(
+            bootstrap_interval(
+                request.population_size,
+                request.evaluator,
+                seed=request.seed,
+                metric_key=request.metric_key,
+                resamples=request.resamples,
+                minimum_valid_resamples=request.minimum_valid_resamples,
+                confidence_level=request.confidence_level,
+                stream_role=request.stream_role,
+            )
+        )
 
 
 class Sha256CounterSampler:

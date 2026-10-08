@@ -10,6 +10,8 @@ from fairlendkit.metrics.contracts import (
     BootstrapInterval,
     LimitationCode,
     MetricNameV2,
+    UncertaintyEstimator,
+    UncertaintyRequest,
 )
 from fairlendkit.metrics.group import (
     AuditScope,
@@ -163,6 +165,22 @@ def collect_uncertainty(
         for scope_id, keys in failed_by_scope.items()
     )
     return tuple(intervals), limitations
+
+
+def estimate_uncertainty(
+    assessed: tuple[AssessedMetric, ...],
+    requests: tuple[UncertaintyRequest, ...],
+    estimator: UncertaintyEstimator,
+) -> tuple[tuple[BootstrapInterval, ...], tuple[MetricLimitation, ...]]:
+    """Run an injected estimator and apply the uncertainty-only gate."""
+
+    attempted = {
+        request.metric_key: estimator.estimate(request).interval
+        for request in requests
+    }
+    if len(attempted) != len(requests):
+        raise ValueError("uncertainty requests must use unique metric keys")
+    return collect_uncertainty(assessed, attempted)
 
 
 def _scope_gate_codes(

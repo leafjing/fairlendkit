@@ -6,6 +6,9 @@ from fairlendkit.metrics.contracts import (
     LimitationCode,
     MetricNameV2,
     UndefinedReasonCodeV2,
+    UncertaintyEstimate,
+    UncertaintyEstimator,
+    UncertaintyRequest,
 )
 from fairlendkit.metrics.core import (
     MetricValue,
@@ -39,6 +42,7 @@ from fairlendkit.metrics.group import (
 from fairlendkit.metrics.bootstrap import (
     RNG_NAME,
     Sha256CounterSampler,
+    Sha256PercentileBootstrap,
     bootstrap_index_draws,
     bootstrap_interval,
     comparison_bootstrap_interval,
@@ -52,6 +56,7 @@ from fairlendkit.metrics.reliability import (
     ReliabilityState,
     assess_reliability,
     collect_uncertainty,
+    estimate_uncertainty,
     make_air_flags,
 )
 
@@ -59,6 +64,9 @@ __all__ = [
     "MetricValue",
     "MetricNameV2",
     "LimitationCode",
+    "UncertaintyEstimate",
+    "UncertaintyEstimator",
+    "UncertaintyRequest",
     "UndefinedReasonCodeV2",
     "CANONICAL_UNDEFINED_MESSAGES_V2",
     "accuracy",
@@ -88,6 +96,7 @@ __all__ = [
     "RNG_NAME",
     "BootstrapInterval",
     "Sha256CounterSampler",
+    "Sha256PercentileBootstrap",
     "bootstrap_index_draws",
     "bootstrap_interval",
     "comparison_bootstrap_interval",
@@ -99,5 +108,6 @@ __all__ = [
     "ReliabilityState",
     "assess_reliability",
     "collect_uncertainty",
+    "estimate_uncertainty",
     "make_air_flags",
 ]
