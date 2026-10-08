@@ -19,6 +19,7 @@ VERIFY_MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFY_MODULE)
 verify_links = VERIFY_MODULE.verify_links
 verify_metadata = VERIFY_MODULE.verify_metadata
+verify_deferred_site_boundary = VERIFY_MODULE.verify_deferred_site_boundary
 
 
 def test_discoverability_metadata_and_links_are_consistent():
@@ -96,3 +97,15 @@ def test_metadata_cross_validation_fails_closed(relative, field, value, message,
 
     with pytest.raises(SystemExit, match=message):
         verify_metadata(tmp_path)
+
+
+def test_duplicate_canonical_links_fail_closed(tmp_path):
+    page = tmp_path / "site" / "index.html"
+    page.parent.mkdir()
+    page.write_text(
+        '<link rel="canonical" href="https://example.invalid/one">\n'
+        '<link rel="canonical" href="https://example.invalid/two">\n'
+    )
+
+    with pytest.raises(SystemExit, match="Duplicate canonical"):
+        verify_deferred_site_boundary(tmp_path)

@@ -179,9 +179,9 @@ def verify_metadata(root: Path = ROOT) -> None:
         fail("JSON-LD template must retain the unresolved canonical-origin token.")
 
 
-def verify_deferred_site_boundary() -> None:
+def verify_deferred_site_boundary(root: Path = ROOT) -> None:
     for relative in ("sitemap.xml", "robots.txt", "software-source-code.jsonld"):
-        if (ROOT / relative).exists() or (ROOT / "docs" / relative).exists():
+        if (root / relative).exists() or (root / "docs" / relative).exists():
             fail(f"{relative} requires an approved canonical documentation origin.")
     canonical_pattern = re.compile(
         r"<link\s+[^>]*rel=[\"']canonical[\"'][^>]*>", re.IGNORECASE
@@ -189,13 +189,13 @@ def verify_deferred_site_boundary() -> None:
     social_pattern = re.compile(
         r"<meta\s+[^>]*(?:property|name)=[\"'](?:og:|twitter:)", re.IGNORECASE
     )
-    for page in ROOT.rglob("*.html"):
+    for page in root.rglob("*.html"):
         text = page.read_text(encoding="utf-8")
         canonical_count = len(canonical_pattern.findall(text))
         if canonical_count > 1:
-            fail(f"Duplicate canonical links in {page.relative_to(ROOT)}")
+            fail(f"Duplicate canonical links in {page.relative_to(root)}")
         if canonical_count or social_pattern.search(text):
-            fail(f"Live site metadata requires an approved origin: {page.relative_to(ROOT)}")
+            fail(f"Live site metadata requires an approved origin: {page.relative_to(root)}")
 
 
 def verify_installed_package() -> None:
