@@ -131,7 +131,12 @@ def _measure_representative(
     receiver.close()
     if status != "ok":
         raise IntegrityError(f"Resource benchmark failed for {scenario_id}: {payload}")
-    return RepresentativeCost(**payload)
+    measurement = RepresentativeCost(**payload)
+    if type(process.pid) is not int or measurement.measurement_pid != process.pid:
+        raise IntegrityError(
+            f"Resource benchmark process identity mismatch for {scenario_id}."
+        )
+    return measurement
 
 
 def _representative_worker(connection, manifest: ExecutionManifest, scenario_id: str) -> None:

@@ -648,6 +648,7 @@ def test_representative_rss_uses_spawned_isolated_process(monkeypatch, manifest)
 
     class Process:
         exitcode = 0
+        pid = 12345
 
         def start(self):
             calls.append("start")
@@ -697,12 +698,23 @@ def test_representative_rss_uses_spawned_isolated_process(monkeypatch, manifest)
         ("missing", "subprocess failed"),
         ("worker-error", "benchmark failed"),
         ("no-rss", "finite and positive"),
+        ("pid-mismatch", "process identity mismatch"),
     ),
-    ids=("start-failure", "nonzero-exit", "timeout", "missing-result", "worker-error", "missing-rss"),
+    ids=(
+        "start-failure",
+        "nonzero-exit",
+        "timeout",
+        "missing-result",
+        "worker-error",
+        "missing-rss",
+        "pid-mismatch",
+    ),
 )
 def test_representative_rss_subprocess_failures_are_closed(
     monkeypatch, manifest, mode, message
 ):
+    lifecycle = []
+
     class Connection:
         def close(self):
             pass
@@ -729,19 +741,20 @@ def test_representative_rss_subprocess_failures_are_closed(
 
     class Process:
         exitcode = 1 if mode == "exit" else 0
+        pid = 54321 if mode == "pid-mismatch" else 12345
 
         def start(self):
             if mode == "start":
                 raise OSError("cannot spawn")
 
         def join(self, timeout=None):
-            pass
+            lifecycle.append(("join", timeout))
 
         def is_alive(self):
             return mode == "timeout"
 
         def terminate(self):
-            pass
+            lifecycle.append("terminate")
 
     class Context:
         def Pipe(self, duplex=False):
@@ -757,3 +770,5 @@ def test_representative_rss_subprocess_failures_are_closed(
 
     with pytest.raises(IntegrityError, match=message):
         _measure_representative(manifest, "REG")
+    if mode == "timeout":
+        assert lifecycle == [("join", 600), "terminate", ("join", None)]
