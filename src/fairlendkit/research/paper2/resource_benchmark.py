@@ -109,6 +109,8 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
     wall_seconds = max(wall_measurements.values())
     cpu_seconds = max(cpu_measurements.values())
     peak_rss_bytes = max(rss_measurements.values())
+    if peak_rss_bytes != _mapped_peak_rss(coverage, rss_measurements):
+        raise IntegrityError("Mapped representative RSS evidence is inconsistent.")
     projected_records = len(frozen_execution_scenario_ids()) * CONFIRMATORY_REPLICATES
     projected_cpu_hours, projected_wall_hours, projected_disk_bytes = (
         _project_benchmark_costs(
@@ -141,6 +143,8 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
                 wall_seconds=wall_measurements[scenario_id],
                 peak_rss_bytes=rss_measurements[scenario_id],
                 artifact_bytes=artifact_measurements[scenario_id],
+                metric_identities=tuple(sorted(expected_metric_names)),
+                artifact_schema="paper2-raw-replicate-v1",
             )
             for scenario_id in sorted(scenario_ids)
         ),
@@ -224,6 +228,20 @@ def _project_benchmark_costs(
         wall_total * RUNTIME_SAFETY_FACTOR / 3600 / WORKER_COUNT,
         int(disk_total * DISK_SAFETY_FACTOR),
     )
+
+
+def _mapped_peak_rss(
+    coverage: dict[str, str], rss_bytes: dict[str, int]
+) -> int:
+    """Return the conservative mapped memory upper bound for all scenarios."""
+    representatives = set(coverage.values())
+    if set(rss_bytes) != representatives:
+        raise IntegrityError(
+            "Resource benchmark RSS measurements do not match coverage representatives."
+        )
+    if any(type(value) is not int or value <= 0 for value in rss_bytes.values()):
+        raise IntegrityError("Resource benchmark RSS measurements must be positive integers.")
+    return max(rss_bytes[coverage[scenario_id]] for scenario_id in coverage)
 
 
 def _validate_representative_output(

@@ -53,6 +53,10 @@ safety factor.
 The evidence retains each representative's CPU seconds, wall seconds, peak RSS,
 and serialized artifact bytes under its scenario ID; aggregate maxima and totals
 must reconcile exactly with those sorted, unique measurements.
+Each representative also retains the complete frozen metric-identity set and
+raw-record schema version. The memory upper bound is recomputed through the
+same frozen 29-row mapping; missing, extra, non-integer, or underestimated RSS
+evidence fails closed.
 Required memory is the greater of 16 GiB and 4× measured peak RSS.
 Artifact bytes come from each complete `run_audit` result mapped into the
 strict raw-record schema, including all metric states, uncertainty references,
