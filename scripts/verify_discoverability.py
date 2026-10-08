@@ -13,7 +13,12 @@ from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
+NAME = "FairLendKit"
 DESCRIPTION = "Reproducible fair-lending audit toolkit for credit decisioning systems"
+POSITIONING = f"{NAME} is a {DESCRIPTION[0].lower()}{DESCRIPTION[1:]}"
+CODEMETA_CONTEXT = "https://doi.org/10.5063/schema/codemeta-2.0"
+SCHEMA_CONTEXT = "https://schema.org"
+SOFTWARE_TYPE = "SoftwareSourceCode"
 REPOSITORY = "https://github.com/leafjing/fairlendkit"
 ISSUES = f"{REPOSITORY}/issues"
 KEYWORDS = {
@@ -126,6 +131,15 @@ def _cff_author(text: str) -> dict[str, str]:
     return {"family": match.group(1), "given": match.group(2), "alias": match.group(3)}
 
 
+def _cff_folded(text: str, key: str) -> str:
+    match = re.search(
+        rf"^{re.escape(key)}:\s*>-\s*$\n((?:  .+\n?)+)", text, re.MULTILINE
+    )
+    if not match:
+        fail(f"CITATION.cff is missing folded field: {key}")
+    return " ".join(line.strip() for line in match.group(1).splitlines())
+
+
 def verify_metadata(root: Path = ROOT) -> None:
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     codemeta = json.loads((root / "codemeta.json").read_text(encoding="utf-8"))
@@ -133,6 +147,20 @@ def verify_metadata(root: Path = ROOT) -> None:
         (root / "docs/software-source-code.template.jsonld").read_text(encoding="utf-8")
     )
     cff = (root / "CITATION.cff").read_text(encoding="utf-8")
+    readme = (root / "README.md").read_text(encoding="utf-8")
+
+    if (
+        project["name"] != NAME.lower()
+        or codemeta.get("name") != NAME
+        or jsonld.get("name") != NAME
+        or _cff_scalar(cff, "title") != NAME
+        or not readme.startswith(f"# {NAME}\n")
+    ):
+        fail("Software names are inconsistent.")
+    normalized_readme = " ".join(readme.replace("**", "").split())
+    cff_abstract = _cff_folded(cff, "abstract")
+    if POSITIONING not in normalized_readme or not cff_abstract.startswith(POSITIONING):
+        fail("README and CITATION.cff descriptions are inconsistent.")
 
     if project["description"] != DESCRIPTION or codemeta["description"] != DESCRIPTION or jsonld["description"] != DESCRIPTION:
         fail("Core software descriptions are inconsistent.")
@@ -152,7 +180,7 @@ def verify_metadata(root: Path = ROOT) -> None:
         or cff_author != {"family": AUTHOR_FAMILY, "given": AUTHOR_GIVEN, "alias": "leafjing"}
     ):
         fail("Software authors are inconsistent.")
-    if _cff_scalar(cff, "title") != "FairLendKit" or _cff_scalar(cff, "repository-code") != REPOSITORY:
+    if _cff_scalar(cff, "repository-code") != REPOSITORY or _cff_scalar(cff, "url") != REPOSITORY:
         fail("CITATION.cff identity is inconsistent.")
     if set(_cff_list(cff, "keywords")) != KEYWORDS:
         fail("CITATION.cff keywords are inconsistent.")
@@ -173,7 +201,19 @@ def verify_metadata(root: Path = ROOT) -> None:
         fail("Supported Python runtimes are inconsistent.")
     if codemeta.get("developmentStatus") != "pre-alpha":
         fail("CodeMeta development status is inconsistent with classifiers.")
-    if jsonld.get("@context") != "https://schema.org" or jsonld.get("@type") != "SoftwareSourceCode":
+    expected_person = {
+        "@type": "Person",
+        "givenName": AUTHOR_GIVEN,
+        "familyName": AUTHOR_FAMILY,
+        "identifier": AUTHOR_URL,
+    }
+    if (
+        codemeta.get("@context") != CODEMETA_CONTEXT
+        or codemeta.get("@type") != SOFTWARE_TYPE
+        or codemeta.get("maintainer") != expected_person
+    ):
+        fail("CodeMeta identity or maintainer is inconsistent.")
+    if jsonld.get("@context") != SCHEMA_CONTEXT or jsonld.get("@type") != SOFTWARE_TYPE:
         fail("Schema.org structured data has an invalid context or type.")
     if jsonld.get("url") != "${CANONICAL_DOCS_URL}":
         fail("JSON-LD template must retain the unresolved canonical-origin token.")
@@ -198,8 +238,10 @@ def verify_deferred_site_boundary(root: Path = ROOT) -> None:
             fail(f"Live site metadata requires an approved origin: {page.relative_to(root)}")
 
 
-def verify_installed_package() -> None:
-    metadata = importlib.metadata.metadata("fairlendkit")
+def verify_installed_package(metadata=None) -> None:
+    metadata = metadata or importlib.metadata.metadata("fairlendkit")
+    if metadata["Name"] != NAME:
+        fail("Installed wheel name does not match source metadata.")
     if metadata["Summary"] != DESCRIPTION or metadata["Version"] != VERSION:
         fail("Installed wheel summary or version does not match source metadata.")
     if metadata["Author"] != AUTHOR:
