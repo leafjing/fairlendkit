@@ -547,6 +547,12 @@ class ObservedMetricV2(ResultModel):
         return self
 
 
+class RunMetadataV2(RunMetadata):
+    """Schema 2.0 metadata with an explicit, non-inferable migration marker."""
+
+    migrated_from_schema_version: Literal["1.0"] | None
+
+
 class LimitationV2(ResultModel):
     code: LimitationCode | Identifier
     detail: Annotated[str, Field(min_length=1)]
@@ -562,7 +568,7 @@ class LimitationV2(ResultModel):
 
 class AuditResultV2(ResultModel):
     schema_version: Literal["2.0"]
-    metadata: RunMetadata
+    metadata: RunMetadataV2
     validation: ValidationEvidence
     observed_metrics: tuple[ObservedMetricV2, ...]
     screening_flags: tuple[ScreeningFlag, ...]
@@ -585,9 +591,11 @@ class AuditResultV2(ResultModel):
             raise ValueError("uncertainty metric references must be unique")
         positions = {key: index for index, key in enumerate(keys)}
         not_assessed_count = sum(item.reliability == ReliabilityStateV2.NOT_ASSESSED for item in self.observed_metrics)
-        if not_assessed_count not in {0, len(self.observed_metrics)}:
-            raise ValueError("native and migrated reliability states cannot be mixed")
-        migrated = bool(self.observed_metrics) and not_assessed_count == len(self.observed_metrics)
+        migrated = self.metadata.migrated_from_schema_version == "1.0"
+        if migrated and not_assessed_count != len(self.observed_metrics):
+            raise ValueError("migrated results require not_assessed on every metric")
+        if not migrated and not_assessed_count:
+            raise ValueError("native results cannot contain not_assessed reliability")
         if migrated:
             if any(item.metric.value not in {metric.value for metric in MetricName} for item in self.observed_metrics):
                 raise ValueError("migrated results may contain only Schema 1.0 metric names")
@@ -684,6 +692,7 @@ def migrate_audit_result_v1_0(payload: object) -> AuditResultV2:
     legacy = AuditResultV1_0.model_validate(payload)
     data = legacy.model_dump(mode="json")
     data["schema_version"] = AUDIT_RESULT_SCHEMA_VERSION_V2
+    data["metadata"]["migrated_from_schema_version"] = "1.0"
     for metric in data["observed_metrics"]:
         metric["reliability"] = ReliabilityStateV2.NOT_ASSESSED
     for limitation in data["limitations"]:

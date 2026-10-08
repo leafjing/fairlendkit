@@ -62,8 +62,10 @@ def test_migration_rejects_non_v1_and_adds_absent_evidence_markers():
     assert all(item.affected_metric_keys == () for item in migrated.limitations)
     legacy_dump = legacy.model_dump(mode="json")
     migrated_dump = migrated.model_dump(mode="json")
-    for section in ("metadata", "validation", "screening_flags", "uncertainty", "practitioner_review_notes"):
+    for section in ("validation", "screening_flags", "uncertainty", "practitioner_review_notes"):
         assert migrated_dump[section] == legacy_dump[section]
+    assert {key: value for key, value in migrated_dump["metadata"].items() if key != "migrated_from_schema_version"} == legacy_dump["metadata"]
+    assert migrated_dump["metadata"]["migrated_from_schema_version"] == "1.0"
     assert [item["value"] for item in migrated_dump["observed_metrics"]] == [item["value"] for item in legacy_dump["observed_metrics"]]
     assert [(item["code"], item["detail"]) for item in migrated_dump["limitations"]] == [(item["code"], item["detail"]) for item in legacy_dump["limitations"]]
     assert AuditResultV2.model_validate_json(migrated.model_dump_json()) == migrated
@@ -97,15 +99,27 @@ def test_native_not_assessed_with_uncertainty_and_partial_mode_spoofing_fail():
     payload = run_audit(frame(), config()).model_dump(mode="json")
     for metric in payload["observed_metrics"]:
         metric["reliability"] = "not_assessed"
-    with pytest.raises(ValidationError, match="Schema 1.0 metric names"):
+    with pytest.raises(ValidationError, match="native results cannot contain"):
         AuditResultV2.model_validate(payload)
 
     payload = migrate_audit_result_v1_0(
         AuditResultV1_0.model_validate_json((Path(__file__).parents[1] / "examples" / "synthetic" / "audit-result.json").read_text()).model_dump(mode="json")
     ).model_dump(mode="json")
     payload["observed_metrics"][0]["reliability"] = "reliable"
-    with pytest.raises(ValidationError, match="cannot be mixed"):
+    with pytest.raises(ValidationError, match="migrated results require"):
         AuditResultV2.model_validate(payload)
+
+    native = run_audit(frame(), config()).model_dump(mode="json")
+    native["metadata"]["migrated_from_schema_version"] = "1.0"
+    with pytest.raises(ValidationError, match="migrated results require"):
+        AuditResultV2.model_validate(native)
+
+    migrated = migrate_audit_result_v1_0(
+        AuditResultV1_0.model_validate_json((Path(__file__).parents[1] / "examples" / "synthetic" / "audit-result.json").read_text()).model_dump(mode="json")
+    ).model_dump(mode="json")
+    migrated["metadata"]["migrated_from_schema_version"] = None
+    with pytest.raises(ValidationError, match="native results cannot contain"):
+        AuditResultV2.model_validate(migrated)
 
 
 def test_v2_requires_new_fields_and_enforces_metric_invariants():
@@ -135,7 +149,7 @@ def test_v2_enforces_uncertainty_alias_and_canonical_order():
 def test_v2_closes_native_state_uncertainty_and_air_flag_links():
     payload = run_audit(frame(), config()).model_dump(mode="json")
     payload["observed_metrics"][0]["reliability"] = "not_assessed"
-    with pytest.raises(ValidationError, match="cannot be mixed"):
+    with pytest.raises(ValidationError, match="native results cannot contain"):
         AuditResultV2.model_validate(payload)
 
     payload = run_audit(frame(), config()).model_dump(mode="json")
@@ -164,7 +178,7 @@ def test_v2_closes_native_state_uncertainty_and_air_flag_links():
     payload = run_audit(frame(), config()).model_dump(mode="json")
     for metric in payload["observed_metrics"]:
         metric["reliability"] = "not_assessed"
-    with pytest.raises(ValidationError, match="Schema 1.0 metric names"):
+    with pytest.raises(ValidationError, match="native results cannot contain"):
         AuditResultV2.model_validate(payload)
 
     payload = run_audit(frame(), config()).model_dump(mode="json")
