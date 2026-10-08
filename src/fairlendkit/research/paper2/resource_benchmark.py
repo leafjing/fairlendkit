@@ -40,15 +40,29 @@ BENCHMARK_SCENARIO_IDS = (
     "MISS-MCAR30",
     "MISS-MNAR30",
 )
+BENCHMARK_COST_COVERAGE = (
+    ("MISS-MCAR30", "MISS-MCAR30"),
+    ("MISS-MNAR30", "MISS-MNAR30"),
+    ("PERF-DEC001", "REG"),
+    ("PERF-DEC050", "REG"),
+    *((scenario_id, "SEL-AIR081-N1000") for scenario_id in (
+        "SEL-AIR060-N025", "SEL-AIR060-N050", "SEL-AIR060-N100", "SEL-AIR060-N1000", "SEL-AIR060-N250",
+        "SEL-AIR079-N025", "SEL-AIR079-N050", "SEL-AIR079-N100", "SEL-AIR079-N1000", "SEL-AIR079-N250",
+        "SEL-AIR080-N025", "SEL-AIR080-N050", "SEL-AIR080-N100", "SEL-AIR080-N1000", "SEL-AIR080-N250",
+        "SEL-AIR081-N025", "SEL-AIR081-N050", "SEL-AIR081-N100", "SEL-AIR081-N1000", "SEL-AIR081-N250",
+        "SEL-AIR100-N025", "SEL-AIR100-N050", "SEL-AIR100-N100", "SEL-AIR100-N1000", "SEL-AIR100-N250",
+    )),
+)
 
 
 def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmarkEvidence:
     """Measure representative DGP→audit/reliability smoke replicates conservatively."""
     scenario_ids = BENCHMARK_SCENARIO_IDS
     registry = scenario_registry()
-    _validate_benchmark_coverage(registry, scenario_ids)
-    wall_measurements: list[float] = []
-    cpu_measurements: list[float] = []
+    coverage = _validate_benchmark_coverage(registry, scenario_ids)
+    wall_measurements: dict[str, float] = {}
+    cpu_measurements: dict[str, float] = {}
+    artifact_measurements: dict[str, int] = {}
     observed_metric_names: set[str] = set()
     with tempfile.TemporaryDirectory(prefix="paper2-full-smoke-") as directory:
         workspace = ExecutionWorkspace(Path(directory).resolve(), "smoke")
@@ -78,17 +92,29 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
                 (RawReplicateRecord(scenario_id, 0, _raw_payload(result)),),
             )
             validate_shard(workspace, manifest, spec)
-            wall_measurements.append(time.perf_counter() - wall_start)
-            cpu_measurements.append(time.process_time() - cpu_start)
+            wall_measurements[scenario_id] = time.perf_counter() - wall_start
+            cpu_measurements[scenario_id] = time.process_time() - cpu_start
+            artifact_measurements[scenario_id] = sum(
+                path.stat().st_size
+                for path in workspace.output_dir.glob(f"{scenario_id}--00000*")
+            )
         expected_metric_names = {item.value for item in MetricNameV2}
         if observed_metric_names != expected_metric_names:
             raise IntegrityError("Resource benchmark does not cover every frozen metric path.")
         artifact_bytes = sum(path.stat().st_size for path in workspace.output_dir.iterdir())
-    wall_seconds = max(wall_measurements)
-    cpu_seconds = max(cpu_measurements)
+    wall_seconds = max(wall_measurements.values())
+    cpu_seconds = max(cpu_measurements.values())
     peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     peak_rss_bytes = peak_rss if sys.platform == "darwin" else peak_rss * 1024
     projected_records = len(frozen_execution_scenario_ids()) * CONFIRMATORY_REPLICATES
+    projected_cpu_hours, projected_wall_hours, projected_disk_bytes = (
+        _project_benchmark_costs(
+            coverage,
+            cpu_measurements,
+            wall_measurements,
+            artifact_measurements,
+        )
+    )
     return SmokeBenchmarkEvidence(
         schema_version="paper2-resource-benchmark-v1",
         smoke_records=len(scenario_ids),
@@ -97,9 +123,9 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
         peak_rss_bytes=peak_rss_bytes,
         artifact_bytes=artifact_bytes,
         projected_records=projected_records,
-        projected_cpu_hours=cpu_seconds * projected_records * RUNTIME_SAFETY_FACTOR / 3600,
-        projected_wall_hours=wall_seconds * projected_records * RUNTIME_SAFETY_FACTOR / 3600 / WORKER_COUNT,
-        projected_disk_bytes=int(artifact_bytes / len(scenario_ids) * projected_records * DISK_SAFETY_FACTOR),
+        projected_cpu_hours=projected_cpu_hours,
+        projected_wall_hours=projected_wall_hours,
+        projected_disk_bytes=projected_disk_bytes,
         required_memory_bytes=max(
             MEMORY_BUDGET_GIB * 1024**3,
             int(peak_rss_bytes * MEMORY_SAFETY_FACTOR),
@@ -108,7 +134,7 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
     )
 
 
-def _validate_benchmark_coverage(registry, scenario_ids: tuple[str, ...]) -> None:
+def _validate_benchmark_coverage(registry, scenario_ids: tuple[str, ...]) -> dict[str, str]:
     """Fail closed unless every frozen scenario has a measured cost dominator."""
     frozen = tuple(registry[item] for item in frozen_execution_scenario_ids())
     representatives = tuple(registry[item] for item in scenario_ids)
@@ -129,38 +155,62 @@ def _validate_benchmark_coverage(registry, scenario_ids: tuple[str, ...]) -> Non
         if max(map(value, representatives)) < max(map(value, frozen)):
             raise IntegrityError(f"Resource benchmark does not cover the maximum {label} workload.")
 
-    coverage = _benchmark_coverage_matrix(registry, scenario_ids)
-    if set(coverage) != set(frozen_execution_scenario_ids()):
-        raise IntegrityError("Resource benchmark cost coverage matrix is incomplete.")
+    return _benchmark_coverage_matrix(registry, scenario_ids)
 
 
 def _benchmark_coverage_matrix(
-    registry, scenario_ids: tuple[str, ...]
+    registry,
+    scenario_ids: tuple[str, ...],
+    entries: tuple[tuple[str, str], ...] = BENCHMARK_COST_COVERAGE,
 ) -> dict[str, str]:
-    """Map every execution scenario to a measured scenario that dominates its cost axes."""
-    representatives = tuple(registry[item] for item in scenario_ids)
-    coverage: dict[str, str] = {}
-    for frozen_id in frozen_execution_scenario_ids():
+    """Validate the frozen scenario-to-measurement cost coverage matrix."""
+    if len({item[0] for item in entries}) != len(entries):
+        raise IntegrityError("Resource benchmark cost coverage matrix has duplicate scenarios.")
+    coverage = dict(entries)
+    if set(coverage) != set(frozen_execution_scenario_ids()):
+        raise IntegrityError("Resource benchmark cost coverage matrix is incomplete or unknown.")
+    if not set(coverage.values()).issubset(set(scenario_ids)):
+        raise IntegrityError("Resource benchmark cost coverage matrix names an unmeasured representative.")
+    for frozen_id, representative_id in coverage.items():
         frozen = registry[frozen_id]
-        candidates = tuple(
-            representative
-            for representative in representatives
-            if representative.family == frozen.family
+        representative = registry[representative_id]
+        dominates = (
+            representative.family == frozen.family
             and representative.missingness == frozen.missingness
             and representative.calibration == frozen.calibration
             and representative.comparison_n + representative.reference_n
             >= frozen.comparison_n + frozen.reference_n
             and representative.missing_fraction >= frozen.missing_fraction
             and representative.bootstrap_resamples >= frozen.bootstrap_resamples
-            and representative.minimum_valid_resamples
-            >= frozen.minimum_valid_resamples
+            and representative.minimum_valid_resamples >= frozen.minimum_valid_resamples
         )
-        if not candidates:
+        if not dominates:
             raise IntegrityError(
-                f"Resource benchmark has no measured cost dominator for {frozen_id}."
+                f"Resource benchmark representative does not dominate {frozen_id}."
             )
-        coverage[frozen_id] = min(item.scenario_id for item in candidates)
     return coverage
+
+
+def _project_benchmark_costs(
+    coverage: dict[str, str],
+    cpu_seconds: dict[str, float],
+    wall_seconds: dict[str, float],
+    artifact_bytes: dict[str, int],
+) -> tuple[float, float, int]:
+    """Sum measured representative costs per frozen scenario without averaging."""
+    representatives = set(coverage.values())
+    for measurements in (cpu_seconds, wall_seconds, artifact_bytes):
+        if set(measurements) != representatives:
+            raise IntegrityError("Resource benchmark measurements do not match coverage representatives.")
+    multiplier = CONFIRMATORY_REPLICATES
+    cpu_total = sum(cpu_seconds[coverage[item]] * multiplier for item in coverage)
+    wall_total = sum(wall_seconds[coverage[item]] * multiplier for item in coverage)
+    disk_total = sum(artifact_bytes[coverage[item]] * multiplier for item in coverage)
+    return (
+        cpu_total * RUNTIME_SAFETY_FACTOR / 3600,
+        wall_total * RUNTIME_SAFETY_FACTOR / 3600 / WORKER_COUNT,
+        int(disk_total * DISK_SAFETY_FACTOR),
+    )
 
 
 def _audit_config(scenario) -> AuditConfig:

@@ -10,8 +10,10 @@ import pytest
 
 import fairlendkit.research.paper2.execution as execution
 from fairlendkit.research.paper2.resource_benchmark import (
+    BENCHMARK_COST_COVERAGE,
     BENCHMARK_SCENARIO_IDS,
     _benchmark_coverage_matrix,
+    _project_benchmark_costs,
     _validate_benchmark_coverage,
 )
 from fairlendkit.research.paper2.registry import scenario_registry
@@ -465,5 +467,50 @@ def test_full_chain_benchmark_representatives_cover_frozen_workload_axes():
     without_performance = tuple(
         item for item in BENCHMARK_SCENARIO_IDS if item != "REG"
     )
-    with pytest.raises(IntegrityError, match="family|dominator"):
+    with pytest.raises(IntegrityError, match="family|representative"):
         _validate_benchmark_coverage(registry, without_performance)
+
+
+def test_cost_coverage_matrix_rejects_missing_duplicate_unknown_and_nondominating_entries():
+    registry = scenario_registry()
+    entries = BENCHMARK_COST_COVERAGE
+
+    with pytest.raises(IntegrityError, match="incomplete"):
+        _benchmark_coverage_matrix(registry, BENCHMARK_SCENARIO_IDS, entries[:-1])
+    with pytest.raises(IntegrityError, match="duplicate"):
+        _benchmark_coverage_matrix(
+            registry, BENCHMARK_SCENARIO_IDS, (*entries, entries[0])
+        )
+    unknown = tuple(
+        ("UNKNOWN", representative) if frozen == "PERF-DEC001" else (frozen, representative)
+        for frozen, representative in entries
+    )
+    with pytest.raises(IntegrityError, match="unknown"):
+        _benchmark_coverage_matrix(registry, BENCHMARK_SCENARIO_IDS, unknown)
+    nondominating = tuple(
+        (frozen, "SEL-AIR081-N025") if frozen == "SEL-AIR100-N1000" else (frozen, representative)
+        for frozen, representative in entries
+    )
+    with pytest.raises(IntegrityError, match="unmeasured|dominate"):
+        _benchmark_coverage_matrix(
+            registry,
+            (*BENCHMARK_SCENARIO_IDS, "SEL-AIR081-N025"),
+            nondominating,
+        )
+
+
+def test_cost_projection_sums_mapped_artifact_bytes_without_average_underestimate():
+    coverage = {"scenario-a": "small", "scenario-b": "large", "scenario-c": "large"}
+    cpu = {"small": 1.0, "large": 3.0}
+    wall = {"small": 2.0, "large": 4.0}
+    artifacts = {"small": 100, "large": 1_000}
+
+    projected_cpu, projected_wall, projected_disk = _project_benchmark_costs(
+        coverage, cpu, wall, artifacts
+    )
+
+    expected_raw_disk = (100 + 1_000 + 1_000) * 50_000
+    assert projected_disk == expected_raw_disk * 2
+    assert projected_disk > int(sum(artifacts.values()) / 2 * 3 * 50_000 * 2)
+    assert projected_cpu > 0
+    assert projected_wall > 0

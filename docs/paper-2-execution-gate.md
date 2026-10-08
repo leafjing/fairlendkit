@@ -34,8 +34,8 @@ The resource benchmark runs one replicate each of `REG`,
 namespace. An executable 29-row cost coverage matrix maps every frozen execution
 scenario to a measured representative with the same family, missingness, and
 calibration path and no smaller sample, missingness, bootstrap, or valid-resample
-workload. The coverage check also proves these representatives cover
-every frozen scenario family and missingness path and dominate the frozen
+workload. The coverage check also proves these representatives cover every
+frozen scenario family and missingness path and dominate the frozen
 matrix on total sample size, missing fraction, bootstrap resamples, and the
 minimum-valid-resamples threshold. The benchmark also fails unless the actual
 audit results collectively contain every Schema 2.0 metric identity. This
@@ -43,9 +43,11 @@ covers performance, selection, and expensive missingness paths through DGP,
 public `run_audit` metrics/reliability/1,000-resample uncertainty, raw-record
 writing, and shard validation. It measures elapsed time, process CPU time,
 peak RSS, and canonical artifact bytes but never serializes or reports a smoke
-audit result. Projection uses the slowest measured scenario, not their mean.
-CPU-hours, wall time, and disk are extrapolated to 29 × 50,000 replicates with
-a frozen 2× safety factor.
+audit result. Projection applies the frozen mapping to every one of the 29
+scenarios and sums the mapped CPU, wall, and serialized artifact costs; disk
+cost is never derived from an average of the measured artifacts. CPU-hours,
+wall time, and disk are extrapolated to 29 × 50,000 replicates with a frozen 2×
+safety factor.
 Required memory is the greater of 16 GiB and 4× measured peak RSS.
 Artifact bytes come from each complete `run_audit` result mapped into the
 strict raw-record schema, including all metric states, uncertainty references,
