@@ -202,4 +202,3 @@ def test_v2_enums_expose_milestone_3_1_additions_with_canonical_messages():
         UndefinedReasonCodeV2.NO_FAVORABLE_DECISIONS
     ] == "No favorable decisions are available for this metric."
     assert set(CANONICAL_UNDEFINED_MESSAGES_V2) == set(UndefinedReasonCodeV2)
-    MetricNameV2,

@@ -17,6 +17,16 @@ from fairlendkit.metrics.core import (
     selection_rate_difference,
     true_positive_rate,
 )
+from fairlendkit.metrics.group import (
+    COMPARISON_METRIC_ORDER,
+    SCOPE_METRIC_ORDER,
+    AuditScope,
+    CalculatedMetric,
+    NormalizedAuditData,
+    calculate_group_metrics,
+    canonical_metric_key,
+    canonical_typed_token,
+)
 
 __all__ = [
     "MetricValue",
@@ -34,4 +44,12 @@ __all__ = [
     "selection_rate",
     "selection_rate_difference",
     "true_positive_rate",
+    "COMPARISON_METRIC_ORDER",
+    "SCOPE_METRIC_ORDER",
+    "AuditScope",
+    "CalculatedMetric",
+    "NormalizedAuditData",
+    "calculate_group_metrics",
+    "canonical_metric_key",
+    "canonical_typed_token",
 ]

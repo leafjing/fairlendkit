@@ -32,3 +32,26 @@ def test_domain_contracts_do_not_import_outer_layers():
         for imported in qualified_imports
         for forbidden in forbidden_roots
     )
+
+
+def test_group_orchestration_is_dataframe_and_io_independent():
+    source = Path("src/fairlendkit/metrics/group.py").read_text()
+    tree = ast.parse(source)
+    imported_modules = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module
+    }
+    imported_modules.update(
+        name.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for name in node.names
+    )
+
+    forbidden = {"pandas", "numpy", "fairlendkit.cli"}
+    assert not any(
+        module == root or module.startswith(f"{root}.")
+        for module in imported_modules
+        for root in forbidden
+    )
