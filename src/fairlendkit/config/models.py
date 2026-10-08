@@ -91,6 +91,10 @@ class AuditConfig(BaseModel):
     candidate_proxy_features: tuple[ColumnName, ...] = ()
     minimum_group_size: int = Field(default=30, ge=1)
     confidence_level: float = Field(default=0.95, gt=0.0, lt=1.0)
+    bootstrap_seed: int = Field(default=0, ge=0, le=2**64 - 1)
+    bootstrap_resamples: int = Field(default=1000, ge=1)
+    minimum_valid_resamples: int = Field(default=800, ge=1)
+    air_screening_threshold: float = Field(default=0.8, gt=0.0)
     missing_value_policy: Literal["exclude", "error"] = "error"
     unknown_group_policy: Literal["exclude", "error"] = "error"
     duplicate_policy: DuplicatePolicy = DuplicatePolicy.ERROR
@@ -99,6 +103,12 @@ class AuditConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_semantics(self) -> "AuditConfig":
+        if self.minimum_valid_resamples > self.bootstrap_resamples:
+            raise ValueError(
+                "minimum_valid_resamples cannot exceed bootstrap_resamples"
+            )
+        if not math.isfinite(self.air_screening_threshold):
+            raise ValueError("air_screening_threshold must be finite")
         protected = set(self.protected_attributes)
         references = set(self.reference_groups)
         allowed = set(self.allowed_groups)

@@ -59,6 +59,13 @@ confidential data and artifacts must not be committed to the repository.
 - `minimum_group_size` (default `30`, minimum `1`): groups below this size are
   returned as warnings in the validation summary; they are not silently removed.
 - `confidence_level` (default `0.95`, exclusive range 0 to 1).
+- `bootstrap_seed` (default `0`, unsigned 64-bit integer): deterministic seed
+  for the project-owned SHA-256 counter sampler.
+- `bootstrap_resamples` (default `1000`, minimum `1`) and
+  `minimum_valid_resamples` (default `800`, minimum `1` and no greater than
+  `bootstrap_resamples`).
+- `air_screening_threshold` (default `0.8`, finite and greater than `0`):
+  screening threshold applied only after the reliability gate.
 - `missing_value_policy`: `error` (default) or `exclude`, governing null/NA values
   in required analysis columns.
 - `unknown_group_policy`: `error` (default) or `exclude`, governing non-null
