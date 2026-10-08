@@ -10,10 +10,17 @@ def config_values(**overrides):
     values = {
         "outcome_column": "outcome",
         "score_column": "score",
+        "population_definition": "All applications in the review period",
+        "score_type": "ranking",
+        "dataset_version": None,
+        "model_version": None,
+        "data_as_of": None,
         "favorable_label": 1,
         "score_direction": ScoreDirection.HIGHER_IS_MORE_FAVORABLE,
         "protected_attributes": ("group",),
         "reference_groups": {"group": "A"},
+        "allowed_groups": {"group": ("A", "B")},
+        "unknown_group_policy": "error",
         "favorable_decision_label": 1,
         "decision_threshold": 0.5,
         "threshold_operator": "ge",
@@ -34,6 +41,36 @@ def test_score_direction_is_explicit_and_reversible():
     assert higher.score_direction != lower.score_direction
 
 
+@pytest.mark.parametrize(
+    "field",
+    [
+        "population_definition",
+        "score_type",
+        "dataset_version",
+        "model_version",
+        "data_as_of",
+    ],
+)
+def test_run_context_fields_must_be_explicit(field):
+    values = config_values()
+    values.pop(field)
+
+    with pytest.raises(ValidationError, match=field):
+        AuditConfig(**values)
+
+
+def test_population_definition_cannot_be_blank():
+    with pytest.raises(ValidationError, match="must not be blank"):
+        AuditConfig(**config_values(population_definition="   "))
+
+
+def test_probability_and_ranking_scores_are_distinguished():
+    probability = AuditConfig(**config_values(score_type="probability"))
+    ranking = AuditConfig(**config_values(score_type="ranking"))
+
+    assert probability.score_type != ranking.score_type
+
+
 @pytest.mark.parametrize("threshold", [math.inf, -math.inf, math.nan])
 def test_non_finite_threshold_is_invalid(threshold):
     with pytest.raises(ValidationError, match="decision_threshold must be finite"):
@@ -46,8 +83,29 @@ def test_reference_group_required_for_every_protected_attribute():
             **config_values(
                 protected_attributes=("group", "region"),
                 reference_groups={"group": "A"},
+                allowed_groups={"group": ("A", "B"), "region": ("north",)},
             )
         )
+
+
+def test_allowed_values_required_for_every_protected_attribute():
+    with pytest.raises(ValidationError, match="allowed_groups"):
+        AuditConfig(**config_values(allowed_groups={"other": ("A",)}))
+
+
+def test_reference_group_must_be_allowed_with_exact_type():
+    with pytest.raises(ValidationError, match="must be one of its allowed values"):
+        AuditConfig(
+            **config_values(
+                reference_groups={"group": True},
+                allowed_groups={"group": (1, 2)},
+            )
+        )
+
+
+def test_allowed_values_cannot_have_typed_duplicates():
+    with pytest.raises(ValidationError, match="must not contain duplicates"):
+        AuditConfig(**config_values(allowed_groups={"group": ("A", "A")}))
 
 
 def test_observed_and_threshold_decisions_are_mutually_exclusive():
@@ -103,10 +161,11 @@ def test_threshold_schema_records_inclusive_boundary_semantics():
     [
         ({"score_column": "outcome"}, "outcome_column, score_column"),
         (
-            {
-                "protected_attributes": ("score",),
-                "reference_groups": {"score": "A"},
-            },
+                {
+                    "protected_attributes": ("score",),
+                    "reference_groups": {"score": "A"},
+                    "allowed_groups": {"score": ("A",)},
+                },
             "score_column, protected_attributes[0]",
         ),
         ({"sample_weight_column": "outcome"}, "outcome_column, sample_weight_column"),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Literal
 
@@ -19,11 +20,25 @@ class ScoreDirection(StrEnum):
     LOWER_IS_MORE_FAVORABLE = "lower_is_more_favorable"
 
 
+class ScoreType(StrEnum):
+    """Declared interpretation of model scores."""
+
+    PROBABILITY = "probability"
+    RANKING = "ranking"
+
+
 class ThresholdOperator(StrEnum):
     """Comparison used to derive the configured favorable decision."""
 
     GREATER_THAN_OR_EQUAL = "ge"
     LESS_THAN_OR_EQUAL = "le"
+
+
+class UnknownGroupPolicy(StrEnum):
+    """Treatment of non-missing group values outside the declared vocabulary."""
+
+    ERROR = "error"
+    EXCLUDE = "exclude"
 
 
 class AuditConfig(BaseModel):
@@ -33,14 +48,21 @@ class AuditConfig(BaseModel):
     silently ignored.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, protected_namespaces=())
 
     outcome_column: ColumnName
     score_column: ColumnName
+    population_definition: Annotated[str, Field(min_length=1)]
+    score_type: ScoreType
+    dataset_version: Annotated[str, Field(min_length=1)] | None
+    model_version: Annotated[str, Field(min_length=1)] | None
+    data_as_of: datetime | None
     favorable_label: Label
     score_direction: ScoreDirection
     protected_attributes: tuple[ColumnName, ...] = Field(min_length=1)
     reference_groups: dict[ColumnName, Label] = Field(min_length=1)
+    allowed_groups: dict[ColumnName, tuple[Label, ...]] = Field(min_length=1)
+    unknown_group_policy: UnknownGroupPolicy = UnknownGroupPolicy.ERROR
     favorable_decision_label: Label = Field(
         description=(
             "Value representing the beneficial decision. For a derived decision, "
@@ -67,8 +89,11 @@ class AuditConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_semantics(self) -> "AuditConfig":
+        if not self.population_definition.strip():
+            raise ValueError("population_definition must not be blank")
         protected = set(self.protected_attributes)
         references = set(self.reference_groups)
+        allowed_attributes = set(self.allowed_groups)
         if len(protected) != len(self.protected_attributes):
             raise ValueError("protected_attributes must not contain duplicates")
         if protected != references:
@@ -76,6 +101,24 @@ class AuditConfig(BaseModel):
                 "reference_groups must contain exactly one explicit value for "
                 "each protected attribute"
             )
+        if protected != allowed_attributes:
+            raise ValueError(
+                "allowed_groups must contain exactly one non-empty vocabulary "
+                "for each protected attribute"
+            )
+        for attribute, allowed_values in self.allowed_groups.items():
+            if not allowed_values:
+                raise ValueError(f"allowed_groups[{attribute!r}] must not be empty")
+            if _has_typed_duplicates(allowed_values):
+                raise ValueError(
+                    f"allowed_groups[{attribute!r}] must not contain duplicates"
+                )
+            if not _contains_typed_label(
+                allowed_values, self.reference_groups[attribute]
+            ):
+                raise ValueError(
+                    f"reference group for {attribute!r} must be one of its allowed values"
+                )
         column_roles: list[tuple[str, str]] = [
             (self.outcome_column, "outcome_column"),
             (self.score_column, "score_column"),
@@ -146,3 +189,15 @@ class AuditConfig(BaseModel):
         if self.threshold_operator == ThresholdOperator.GREATER_THAN_OR_EQUAL:
             return numeric_score >= self.decision_threshold
         return numeric_score <= self.decision_threshold
+
+
+def _contains_typed_label(values: tuple[Label, ...], expected: Label) -> bool:
+    return any(type(value) is type(expected) and value == expected for value in values)
+
+
+def _has_typed_duplicates(values: tuple[Label, ...]) -> bool:
+    return any(
+        type(value) is type(previous) and value == previous
+        for index, value in enumerate(values)
+        for previous in values[:index]
+    )
