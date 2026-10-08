@@ -94,6 +94,36 @@ def test_v2_enforces_uncertainty_alias_and_canonical_order():
     with pytest.raises(ValidationError, match="metric range"):
         AuditResultV2.model_validate(payload)
 
+
+def test_v2_closes_native_state_uncertainty_and_air_flag_links():
+    payload = run_audit(frame(), config()).model_dump(mode="json")
+    payload["observed_metrics"][0]["reliability"] = "not_assessed"
+    with pytest.raises(ValidationError, match="cannot be mixed"):
+        AuditResultV2.model_validate(payload)
+
+    payload = run_audit(frame(), config()).model_dump(mode="json")
+    uncertainty_key = payload["uncertainty"][0]["metric_key"]
+    next(item for item in payload["observed_metrics"] if item["key"] == uncertainty_key)["reliability"] = "unreliable"
+    with pytest.raises(ValidationError, match="only reliable metrics"):
+        AuditResultV2.model_validate(payload)
+
+    payload = run_audit(frame(), config()).model_dump(mode="json")
+    accuracy = next(item for item in payload["observed_metrics"] if item["metric"] == "accuracy" and item["group"]["attributes"] == {"__scope__": "overall"})
+    payload["screening_flags"][0]["related_metric_key"] = accuracy["key"]
+    payload["screening_flags"][0]["observed_value"] = accuracy["value"]["value"]
+    with pytest.raises(ValidationError, match="adverse-impact ratio"):
+        AuditResultV2.model_validate(payload)
+
+    payload = run_audit(frame(), config()).model_dump(mode="json")
+    air_key = payload["screening_flags"][0]["related_metric_key"]
+    air = next(item for item in payload["observed_metrics"] if item["key"] == air_key)
+    comparison_group = air["comparison_group"]
+    source = next(item for item in payload["observed_metrics"] if item["metric"] == "selection_rate" and item["group"] == comparison_group)
+    payload["uncertainty"] = [item for item in payload["uncertainty"] if item["metric_key"] != source["key"]]
+    source["reliability"] = "unreliable"
+    with pytest.raises(ValidationError, match="reliable comparison and reference"):
+        AuditResultV2.model_validate(payload)
+
     payload = run_audit(frame(), config()).model_dump(mode="json")
     alias = next(item for item in payload["observed_metrics"] if item["metric"] == "demographic_parity_difference")
     alias["value"]["value"] += 0.1
