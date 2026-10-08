@@ -70,7 +70,7 @@ class AuditScope:
 class ScopeKey:
     """Canonical typed identity used for lookup, sorting, and de-duplication."""
 
-    attributes: tuple[tuple[str, str], ...]
+    attributes: tuple[tuple[str, str, str], ...]
 
 
 def scope_key(scope: AuditScope) -> ScopeKey:
@@ -80,7 +80,7 @@ def scope_key(scope: AuditScope) -> ScopeKey:
         raise TypeError("scope must be AuditScope")
     return ScopeKey(
         tuple(
-            (canonical_typed_token(name), canonical_typed_token(value))
+            (name, *_canonical_typed_parts(value))
             for name, value in scope.attributes
         )
     )
@@ -142,6 +142,11 @@ class NormalizedAuditData:
 def canonical_typed_token(value: str | int | bool | float) -> str:
     """Encode a typed value for collision-free metric keys and ordering."""
 
+    type_name, payload = _canonical_typed_parts(value)
+    return f"{type_name}-{payload.encode('utf-8').hex()}"
+
+
+def _canonical_typed_parts(value: str | int | bool | float) -> tuple[str, str]:
     if isinstance(value, bool):
         type_name = "bool"
     elif isinstance(value, int):
@@ -155,7 +160,7 @@ def canonical_typed_token(value: str | int | bool | float) -> str:
     else:
         raise TypeError("canonical key values must be strings, integers, booleans, or floats")
     payload = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-    return f"{type_name}-{payload.encode('utf-8').hex()}"
+    return type_name, payload
 
 
 def canonical_metric_key(
@@ -214,7 +219,10 @@ def calculate_group_metrics(
     output.extend(_calculate_scope(data, config, overall, tuple(range(len(data.favorable_outcome)))))
 
     for attribute in sorted(config.protected_attributes):
-        values = sorted(config.allowed_groups[attribute], key=canonical_typed_token)
+        values = sorted(
+            config.allowed_groups[attribute],
+            key=lambda value: scope_key(AuditScope(((attribute, value),))),
+        )
         for value in values:
             scope = AuditScope(((attribute, value),))
             indices = tuple(

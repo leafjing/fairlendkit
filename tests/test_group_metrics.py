@@ -61,6 +61,15 @@ def test_scope_key_equality_and_hash_are_type_sensitive():
     }
 
     assert len(scopes) == 3
+    assert scope_key(AuditScope((("group", True),))).attributes == (
+        ("group", "bool", "true"),
+    )
+    assert scope_key(AuditScope((("group", 1),))).attributes == (
+        ("group", "int", "1"),
+    )
+    assert scope_key(AuditScope((("group", "1"),))).attributes == (
+        ("group", "str", '"1"'),
+    )
 
 
 def test_canonical_metric_keys_cover_overall_group_and_comparison():
@@ -244,6 +253,20 @@ def test_boolean_and_integer_groups_do_not_overwrite_comparison_sources():
     assert len(group_selection_rates) == 3
     assert len({scope_key(item.group) for item in group_selection_rates}) == 3
     assert len({item.key for item in group_selection_rates}) == 3
+    assert {item.key for item in group_selection_rates} == {
+        "group.str-2267726f757022.bool-74727565.selection_rate",
+        "group.str-2267726f757022.int-31.selection_rate",
+        "group.str-2267726f757022.str-223122.selection_rate",
+    }
+    comparison_values = {
+        scope_key(item.comparison_group): item.value.value
+        for item in differences
+        if item.comparison_group is not None
+    }
+    assert comparison_values == {
+        scope_key(AuditScope((("group", 1),))): -1.0,
+        scope_key(AuditScope((("group", "1"),))): 0.0,
+    }
     assert difference.value.value == -1.0
     assert difference.comparison_group is not None
     assert difference.reference_group is not None
