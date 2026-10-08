@@ -39,7 +39,9 @@ from fairlendkit.data import (
     attach_baseline_comparison,
     compare_profiles,
 )
-from fairlendkit.report import AuditResult, to_validation_evidence
+from fairlendkit.api import run_audit
+from fairlendkit.application import RunAudit
+from fairlendkit.report import AuditResult, AuditResultV2, migrate_audit_result_v1_0, to_validation_evidence
 
 __all__ = [
     "APPLICABILITY_STATEMENT",
@@ -52,6 +54,7 @@ __all__ = [
     "AnomalyProfile",
     "AuditConfig",
     "AuditResult",
+    "AuditResultV2",
     "CategoryCount",
     "DataValidationError",
     "DuplicatePolicy",
@@ -79,4 +82,7 @@ __all__ = [
     "attach_baseline_comparison",
     "compare_profiles",
     "to_validation_evidence",
+    "RunAudit",
+    "run_audit",
+    "migrate_audit_result_v1_0",
 ]

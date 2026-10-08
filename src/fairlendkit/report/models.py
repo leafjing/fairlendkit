@@ -11,6 +11,12 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 from fairlendkit.config import AuditConfig
 from fairlendkit.config.models import Label
+from fairlendkit.metrics.contracts import (
+    CANONICAL_UNDEFINED_MESSAGES_V2,
+    LimitationCode,
+    MetricNameV2,
+    UndefinedReasonCodeV2,
+)
 from fairlendkit.data.contracts import (
     APPLICABILITY_STATEMENT,
     BaselineComparisonResult,
@@ -25,7 +31,9 @@ from fairlendkit.data.contracts import (
     make_issue,
 )
 
-AUDIT_RESULT_SCHEMA_VERSION = "1.0"
+AUDIT_RESULT_SCHEMA_VERSION_V1_0 = "1.0"
+AUDIT_RESULT_SCHEMA_VERSION_V2 = "2.0"
+AUDIT_RESULT_SCHEMA_VERSION = AUDIT_RESULT_SCHEMA_VERSION_V2
 Identifier = Annotated[str, Field(min_length=1, pattern=r"^[a-z][a-z0-9_.-]*$")]
 
 
@@ -426,7 +434,7 @@ class RunMetadata(ResultModel):
     configuration: AuditConfig
 
 
-class AuditResult(ResultModel):
+class AuditResultV1_0(ResultModel):
     """The only supported input contract for report renderers."""
 
     schema_version: Literal["1.0"]
@@ -459,6 +467,264 @@ class AuditResult(ResultModel):
                     f"{flag.related_metric_key!r}"
                 )
         return self
+
+
+class ReliabilityStateV2(StrEnum):
+    RELIABLE = "reliable"
+    UNRELIABLE = "unreliable"
+    UNDEFINED = "undefined"
+    NOT_APPLICABLE = "not_applicable"
+    NOT_ASSESSED = "not_assessed"
+
+
+class UndefinedReasonV2(ResultModel):
+    code: UndefinedReasonCodeV2
+    message: Annotated[str, Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def validate_canonical_message(self) -> "UndefinedReasonV2":
+        if self.message != CANONICAL_UNDEFINED_MESSAGES_V2[self.code]:
+            raise ValueError(f"message must match canonical text for {self.code.value!r}")
+        return self
+
+
+class ReportedMetricValueV2(ResultModel):
+    value: float | None
+    numerator: float | None
+    denominator: float | None
+    undefined_reason: UndefinedReasonV2 | None
+
+    @model_validator(mode="after")
+    def validate_state(self) -> "ReportedMetricValueV2":
+        if any(value is not None and not math.isfinite(value) for value in (self.value, self.numerator, self.denominator)):
+            raise ValueError("metric values and evidence must be finite or null")
+        if (self.value is None) == (self.undefined_reason is None):
+            raise ValueError("exactly one of value and undefined_reason is required")
+        return self
+
+    @property
+    def is_defined(self) -> bool:
+        return self.value is not None
+
+
+class ObservedMetricV2(ResultModel):
+    key: Identifier
+    metric: MetricNameV2
+    value: ReportedMetricValueV2
+    sample_count: int = Field(ge=0)
+    reliability: ReliabilityStateV2
+    group: AuditGroup | None = None
+    comparison_group: AuditGroup | None = None
+    reference_group: AuditGroup | None = None
+
+    @model_validator(mode="after")
+    def validate_contract(self) -> "ObservedMetricV2":
+        comparison = self.metric in {
+            MetricNameV2.SELECTION_RATE_DIFFERENCE,
+            MetricNameV2.ADVERSE_IMPACT_RATIO,
+            MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE,
+            MetricNameV2.EQUAL_OPPORTUNITY_DIFFERENCE,
+            MetricNameV2.EQUALIZED_ODDS_GAP,
+        }
+        if comparison != (self.comparison_group is not None and self.reference_group is not None):
+            raise ValueError("metric direction does not match metric kind")
+        if comparison and self.group is not None:
+            raise ValueError("comparison metrics cannot set group")
+        if not comparison and (self.group is None or self.comparison_group is not None or self.reference_group is not None):
+            raise ValueError("scope metrics require only group")
+        if self.value.is_defined and self.reliability not in {ReliabilityStateV2.RELIABLE, ReliabilityStateV2.UNRELIABLE, ReliabilityStateV2.NOT_ASSESSED}:
+            raise ValueError("defined metric has contradictory reliability")
+        if not self.value.is_defined:
+            expected = ReliabilityStateV2.NOT_APPLICABLE if self.value.undefined_reason.code == UndefinedReasonCodeV2.METRIC_NOT_APPLICABLE else ReliabilityStateV2.UNDEFINED
+            if self.reliability not in {expected, ReliabilityStateV2.NOT_ASSESSED}:
+                raise ValueError("undefined metric has contradictory reliability")
+        if self.value.is_defined and self.sample_count == 0:
+            raise ValueError("a defined metric requires a positive sample_count")
+        if self.value.value is not None:
+            lower, upper = _metric_range_v2(self.metric)
+            if not lower <= self.value.value <= upper:
+                raise ValueError(f"{self.metric.value} must be within [{lower}, {upper}]")
+        return self
+
+
+class LimitationV2(ResultModel):
+    code: LimitationCode | Identifier
+    detail: Annotated[str, Field(min_length=1)]
+    affected_metric_keys: tuple[Identifier, ...]
+
+    @model_validator(mode="after")
+    def validate_keys(self) -> "LimitationV2":
+        if len(self.affected_metric_keys) != len(set(self.affected_metric_keys)):
+            raise ValueError("affected_metric_keys must be unique")
+        _reject_automated_verdict(self.detail)
+        return self
+
+
+class AuditResultV2(ResultModel):
+    schema_version: Literal["2.0"]
+    metadata: RunMetadata
+    validation: ValidationEvidence
+    observed_metrics: tuple[ObservedMetricV2, ...]
+    screening_flags: tuple[ScreeningFlag, ...]
+    uncertainty: tuple[StatisticalUncertainty, ...]
+    limitations: tuple[LimitationV2, ...]
+    practitioner_review_notes: tuple[PractitionerReviewNote, ...]
+
+    @model_validator(mode="after")
+    def validate_references(self) -> "AuditResultV2":
+        keys = tuple(item.key for item in self.observed_metrics)
+        if len(keys) != len(set(keys)):
+            raise ValueError("observed metric keys must be unique")
+        known = set(keys)
+        references = [item.metric_key for item in self.uncertainty]
+        references.extend(flag.related_metric_key for flag in self.screening_flags if flag.related_metric_key)
+        references.extend(key for item in self.limitations for key in item.affected_metric_keys)
+        if any(key not in known for key in references):
+            raise ValueError("result contains an unknown metric reference")
+        if len([item.metric_key for item in self.uncertainty]) != len(set(item.metric_key for item in self.uncertainty)):
+            raise ValueError("uncertainty metric references must be unique")
+        positions = {key: index for index, key in enumerate(keys)}
+        not_assessed_count = sum(item.reliability == ReliabilityStateV2.NOT_ASSESSED for item in self.observed_metrics)
+        if not_assessed_count not in {0, len(self.observed_metrics)}:
+            raise ValueError("native and migrated reliability states cannot be mixed")
+        migrated = bool(self.observed_metrics) and not_assessed_count == len(self.observed_metrics)
+        if migrated:
+            if any(item.metric.value not in {metric.value for metric in MetricName} for item in self.observed_metrics):
+                raise ValueError("migrated results may contain only Schema 1.0 metric names")
+            v1_reason_codes = {code.value for code in UndefinedReasonCode}
+            if any(
+                item.value.undefined_reason is not None
+                and item.value.undefined_reason.code.value not in v1_reason_codes
+                for item in self.observed_metrics
+            ):
+                raise ValueError("migrated results may contain only Schema 1.0 undefined reasons")
+            if any(item.affected_metric_keys for item in self.limitations):
+                raise ValueError("migrated limitations must use empty affected_metric_keys")
+        if not migrated and tuple(self.observed_metrics) != tuple(sorted(self.observed_metrics, key=_observed_metric_sort_key)):
+            raise ValueError("observed_metrics must use canonical order")
+        for item in self.limitations:
+            if tuple(item.affected_metric_keys) != tuple(sorted(item.affected_metric_keys, key=positions.__getitem__)):
+                raise ValueError("affected_metric_keys must use observed metric order")
+        limitation_order = {
+            LimitationCode.SMALL_GROUP: 0,
+            LimitationCode.SEVERE_OUTCOME_IMBALANCE: 1,
+            LimitationCode.SPARSE_DECISION_SUPPORT: 2,
+            LimitationCode.INSUFFICIENT_VALID_RESAMPLES: 3,
+        }
+        native = [item for item in self.limitations if isinstance(item.code, LimitationCode) and item.affected_metric_keys]
+        if native != sorted(native, key=lambda item: (min(positions[key] for key in item.affected_metric_keys), limitation_order[item.code])):
+            raise ValueError("limitations must use canonical scope and gate order")
+        by_key = {item.key: item for item in self.observed_metrics}
+        for interval in self.uncertainty:
+            if not migrated and not by_key[interval.metric_key].value.is_defined:
+                raise ValueError("uncertainty may reference only defined metrics")
+            if not migrated and by_key[interval.metric_key].metric == MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE:
+                raise ValueError("demographic-parity alias cannot own uncertainty")
+            if not migrated and by_key[interval.metric_key].reliability != ReliabilityStateV2.RELIABLE:
+                raise ValueError("uncertainty may reference only reliable metrics")
+            lower, upper = _metric_range_v2(by_key[interval.metric_key].metric)
+            if not lower <= interval.lower <= interval.upper <= upper:
+                raise ValueError("uncertainty bounds must respect the metric range")
+        aliases: dict[tuple[tuple[tuple[str, Label], ...], tuple[tuple[str, Label], ...]], dict[MetricNameV2, ObservedMetricV2]] = {}
+        for item in self.observed_metrics:
+            if item.metric in {MetricNameV2.SELECTION_RATE_DIFFERENCE, MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE}:
+                assert item.comparison_group is not None and item.reference_group is not None
+                direction = (tuple(item.comparison_group.attributes.items()), tuple(item.reference_group.attributes.items()))
+                aliases.setdefault(direction, {})[item.metric] = item
+        for pair in (() if migrated else aliases.values()):
+            if set(pair) != {MetricNameV2.SELECTION_RATE_DIFFERENCE, MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE}:
+                raise ValueError("selection-rate difference aliases must occur together")
+            canonical = pair[MetricNameV2.SELECTION_RATE_DIFFERENCE]
+            alias = pair[MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE]
+            if (canonical.value, canonical.sample_count, canonical.reliability) != (alias.value, alias.sample_count, alias.reliability):
+                raise ValueError("selection-rate difference aliases must have identical evidence")
+        if not migrated:
+            expected_air_keys: set[str] = set()
+            seen_air_keys: set[str] = set()
+            for flag in self.screening_flags:
+                if flag.code != "air_below_threshold" or flag.related_metric_key is None:
+                    raise ValueError("native results support only metric-linked AIR flags")
+                air = by_key[flag.related_metric_key]
+                if air.metric != MetricNameV2.ADVERSE_IMPACT_RATIO or air.reliability != ReliabilityStateV2.RELIABLE:
+                    raise ValueError("AIR flags must reference a reliable adverse-impact ratio")
+                if air.value.value != flag.observed_value:
+                    raise ValueError("AIR flag observed_value must equal its metric value")
+                if flag.threshold != self.metadata.configuration.air_screening_threshold or flag.condition != "below":
+                    raise ValueError("AIR flag threshold and condition must match configuration")
+                if flag.observed_value >= flag.threshold:
+                    raise ValueError("AIR flags require a strictly below-threshold value")
+                assert air.comparison_group is not None and air.reference_group is not None
+                sources = [
+                    metric for metric in self.observed_metrics
+                    if metric.metric == MetricNameV2.SELECTION_RATE
+                    and metric.group is not None
+                    and metric.group.attributes in (air.comparison_group.attributes, air.reference_group.attributes)
+                ]
+                if len(sources) != 2 or any(source.reliability != ReliabilityStateV2.RELIABLE for source in sources):
+                    raise ValueError("AIR flags require reliable comparison and reference selection rates")
+                if flag.related_metric_key in seen_air_keys:
+                    raise ValueError("AIR flags must be unique per metric")
+                seen_air_keys.add(flag.related_metric_key)
+            for metric in self.observed_metrics:
+                if metric.metric != MetricNameV2.ADVERSE_IMPACT_RATIO or metric.reliability != ReliabilityStateV2.RELIABLE or metric.value.value is None:
+                    continue
+                assert metric.comparison_group is not None and metric.reference_group is not None
+                sources = [
+                    source for source in self.observed_metrics
+                    if source.metric == MetricNameV2.SELECTION_RATE
+                    and source.group is not None
+                    and source.group.attributes in (metric.comparison_group.attributes, metric.reference_group.attributes)
+                ]
+                if len(sources) == 2 and all(source.reliability == ReliabilityStateV2.RELIABLE for source in sources) and metric.value.value < self.metadata.configuration.air_screening_threshold:
+                    expected_air_keys.add(metric.key)
+            if seen_air_keys != expected_air_keys:
+                raise ValueError("AIR flag set must exactly match eligible below-threshold AIR metrics")
+        return self
+
+
+AuditResult = AuditResultV2
+
+
+def migrate_audit_result_v1_0(payload: object) -> AuditResultV2:
+    """Strictly parse one 1.0 payload and preserve its recorded evidence in 2.0."""
+
+    legacy = AuditResultV1_0.model_validate(payload)
+    data = legacy.model_dump(mode="json")
+    data["schema_version"] = AUDIT_RESULT_SCHEMA_VERSION_V2
+    for metric in data["observed_metrics"]:
+        metric["reliability"] = ReliabilityStateV2.NOT_ASSESSED
+    for limitation in data["limitations"]:
+        limitation["affected_metric_keys"] = ()
+    return AuditResultV2.model_validate(data)
+
+
+def _metric_range_v2(metric: MetricNameV2) -> tuple[float, float]:
+    if metric in {MetricNameV2.SELECTION_RATE_DIFFERENCE, MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE, MetricNameV2.EQUAL_OPPORTUNITY_DIFFERENCE}:
+        return -1.0, 1.0
+    if metric == MetricNameV2.ADVERSE_IMPACT_RATIO:
+        return 0.0, math.inf
+    return 0.0, 1.0
+
+
+def _observed_metric_sort_key(item: ObservedMetricV2) -> tuple[object, ...]:
+    metric_order = {metric: index for index, metric in enumerate(MetricNameV2)}
+    if item.group is not None and item.group.attributes == {"__scope__": "overall"}:
+        return (0, metric_order[item.metric])
+    if item.group is not None:
+        attribute, type_name, value = _group_sort_key(item.group)
+        return (1, attribute, 0, type_name, value, metric_order[item.metric])
+    assert item.comparison_group is not None and item.reference_group is not None
+    attribute, type_name, value = _group_sort_key(item.comparison_group)
+    _, reference_type, reference_value = _group_sort_key(item.reference_group)
+    return (1, attribute, 1, type_name, value, reference_type, reference_value, metric_order[item.metric])
+
+
+def _group_sort_key(group: AuditGroup) -> tuple[str, str, str]:
+    if len(group.attributes) != 1:
+        raise ValueError("Milestone 3 groups must contain exactly one attribute")
+    name, value = next(iter(group.attributes.items()))
+    type_name = "bool" if isinstance(value, bool) else "int" if isinstance(value, int) else "str"
+    return name, type_name, repr(value)
 
 
 def _reject_automated_verdict(text: str) -> None:

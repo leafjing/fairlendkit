@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from fairlendkit import AuditConfig, LayeredValidationResult, SingleRunProfile, validate_audit_data
-from fairlendkit.report import AuditResult
+from fairlendkit.report import AuditResultV1_0 as AuditResult
 
 
 def config(**overrides):

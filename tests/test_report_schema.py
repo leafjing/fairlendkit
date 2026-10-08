@@ -5,9 +5,9 @@ import pytest
 from pydantic import ValidationError
 
 from fairlendkit.report import (
-    AUDIT_RESULT_SCHEMA_VERSION,
+    AUDIT_RESULT_SCHEMA_VERSION_V1_0 as AUDIT_RESULT_SCHEMA_VERSION,
     CANONICAL_UNDEFINED_MESSAGES_V2,
-    AuditResult,
+    AuditResultV1_0 as AuditResult,
     Limitation,
     MetricNameV2,
     PractitionerReviewNote,
