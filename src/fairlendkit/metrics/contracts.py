@@ -1,6 +1,8 @@
 """Stable inner contracts shared by metric calculation and outer reporting."""
 
+from dataclasses import dataclass
 from enum import StrEnum
+from typing import Callable, Protocol
 
 
 class MetricNameV2(StrEnum):
@@ -83,3 +85,58 @@ CANONICAL_UNDEFINED_MESSAGES_V2 = {
         "A required component metric is undefined."
     ),
 }
+
+
+class LimitationCode(StrEnum):
+    SMALL_GROUP = "small_group"
+    SEVERE_OUTCOME_IMBALANCE = "severe_outcome_imbalance"
+    SPARSE_DECISION_SUPPORT = "sparse_decision_support"
+    INSUFFICIENT_VALID_RESAMPLES = "insufficient_valid_resamples"
+
+
+@dataclass(frozen=True)
+class BootstrapInterval:
+    """Implementation-neutral percentile interval evidence."""
+
+    metric_key: str
+    confidence_level: float
+    lower: float
+    upper: float
+    valid_resamples: int
+
+
+@dataclass(frozen=True)
+class UncertaintyRequest:
+    metric_key: str
+    population_size: int
+    evaluator: Callable[[tuple[int, ...]], float | None]
+    seed: int
+    resamples: int
+    minimum_valid_resamples: int
+    confidence_level: float
+    stream_role: str = "scope"
+
+
+@dataclass(frozen=True)
+class ComparisonUncertaintyRequest:
+    metric_key: str
+    comparison_size: int
+    reference_size: int
+    evaluator: Callable[[tuple[int, ...], tuple[int, ...]], float | None]
+    seed: int
+    resamples: int
+    minimum_valid_resamples: int
+    confidence_level: float
+
+
+@dataclass(frozen=True)
+class UncertaintyEstimate:
+    interval: BootstrapInterval | None
+
+
+class UncertaintyEstimator(Protocol):
+    """Replaceable uncertainty implementation owned by the inner contract."""
+
+    def estimate(
+        self, request: UncertaintyRequest | ComparisonUncertaintyRequest
+    ) -> UncertaintyEstimate: ...
