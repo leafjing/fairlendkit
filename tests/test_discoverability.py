@@ -23,6 +23,14 @@ verify_deferred_site_boundary = VERIFY_MODULE.verify_deferred_site_boundary
 verify_installed_package = VERIFY_MODULE.verify_installed_package
 
 
+def test_discoverability_verification_matrix_is_complete():
+    matrix = (ROOT / "docs/discoverability-verification-matrix.md").read_text()
+    expected_ids = {f"DV-{index:02d}" for index in range(1, 18)}
+    observed_ids = set(__import__("re").findall(r"`(DV-\d{2})`", matrix))
+
+    assert observed_ids == expected_ids
+
+
 def test_discoverability_metadata_and_links_are_consistent():
     result = subprocess.run(
         [sys.executable, str(ROOT / "scripts/verify_discoverability.py")],

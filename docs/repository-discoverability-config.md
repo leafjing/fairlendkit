@@ -39,6 +39,10 @@ The automated discoverability verifier checks these surfaces for matching
 name, description, version, author, repository URL, issue URL, Python support,
 keywords, and resolvable internal links.
 
+The [discoverability verification matrix](discoverability-verification-matrix.md)
+maps every checked field and prohibited publication artifact to its verifier
+logic and fail-closed regression test.
+
 ## Deferred site metadata
 
 No canonical documentation origin is currently verified. Consequently the
