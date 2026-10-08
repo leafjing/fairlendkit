@@ -124,6 +124,10 @@ def _measure_representative(
     if process.is_alive():
         process.terminate()
         process.join()
+        if process.is_alive():
+            raise IntegrityError(
+                f"Resource benchmark subprocess failed to terminate for {scenario_id}."
+            )
         raise IntegrityError(f"Resource benchmark timed out for {scenario_id}.")
     if process.exitcode != 0 or not receiver.poll():
         raise IntegrityError(f"Resource benchmark subprocess failed for {scenario_id}.")

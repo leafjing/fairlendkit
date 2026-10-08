@@ -695,19 +695,25 @@ def test_representative_rss_uses_spawned_isolated_process(monkeypatch, manifest)
         ("start", "failed to start"),
         ("exit", "subprocess failed"),
         ("timeout", "timed out"),
+        ("timeout-stuck", "failed to terminate"),
         ("missing", "subprocess failed"),
         ("worker-error", "benchmark failed"),
         ("no-rss", "finite and positive"),
         ("pid-mismatch", "process identity mismatch"),
+        ("pid-bool", "process ID"),
+        ("pid-float", "process ID"),
     ),
     ids=(
         "start-failure",
         "nonzero-exit",
         "timeout",
+        "timeout-stuck",
         "missing-result",
         "worker-error",
         "missing-rss",
         "pid-mismatch",
+        "pid-bool",
+        "pid-float",
     ),
 )
 def test_representative_rss_subprocess_failures_are_closed(
@@ -725,11 +731,15 @@ def test_representative_rss_subprocess_failures_are_closed(
         def recv(self):
             if mode == "worker-error":
                 return "error", "boom"
+            measurement_pid = {
+                "pid-bool": True,
+                "pid-float": 12345.0,
+            }.get(mode, 12345)
             return (
                 "ok",
                 {
                     "scenario_id": "REG",
-                    "measurement_pid": 12345,
+                    "measurement_pid": measurement_pid,
                     "cpu_seconds": 1.0,
                     "wall_seconds": 2.0,
                     "peak_rss_bytes": 0 if mode == "no-rss" else 100,
@@ -743,6 +753,9 @@ def test_representative_rss_subprocess_failures_are_closed(
         exitcode = 1 if mode == "exit" else 0
         pid = 54321 if mode == "pid-mismatch" else 12345
 
+        def __init__(self):
+            self.terminated = False
+
         def start(self):
             if mode == "start":
                 raise OSError("cannot spawn")
@@ -751,10 +764,13 @@ def test_representative_rss_subprocess_failures_are_closed(
             lifecycle.append(("join", timeout))
 
         def is_alive(self):
-            return mode == "timeout"
+            if mode == "timeout-stuck":
+                return True
+            return mode == "timeout" and not self.terminated
 
         def terminate(self):
             lifecycle.append("terminate")
+            self.terminated = True
 
     class Context:
         def Pipe(self, duplex=False):
@@ -770,5 +786,5 @@ def test_representative_rss_subprocess_failures_are_closed(
 
     with pytest.raises(IntegrityError, match=message):
         _measure_representative(manifest, "REG")
-    if mode == "timeout":
+    if mode in {"timeout", "timeout-stuck"}:
         assert lifecycle == [("join", 600), "terminate", ("join", None)]
