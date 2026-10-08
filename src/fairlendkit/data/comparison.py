@@ -109,8 +109,6 @@ def _compatibility_reason(current: LayeredValidationResult, current_config: Audi
     semantic = (
         "outcome_column",
         "score_column",
-        "population_definition",
-        "sampling_definition",
         "favorable_label",
         "favorable_decision_label",
         "score_type",
@@ -120,7 +118,11 @@ def _compatibility_reason(current: LayeredValidationResult, current_config: Audi
         return "analysis_semantics_mismatch"
     if current_config.protected_attributes != baseline_config.protected_attributes or current_config.allowed_groups != baseline_config.allowed_groups or current_config.reference_groups != baseline_config.reference_groups:
         return "group_definition_mismatch"
-    if current.profile.score_distribution.method != baseline.profile.score_distribution.method:
+    profile_methods = ("population_definition", "sampling_definition")
+    if (
+        current.profile.score_distribution.method != baseline.profile.score_distribution.method
+        or any(getattr(current_config, name) != getattr(baseline_config, name) for name in profile_methods)
+    ):
         return "profile_method_mismatch"
     return None
 

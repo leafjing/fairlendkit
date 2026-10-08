@@ -109,7 +109,7 @@ def test_population_scope_mismatch_is_all_or_nothing_incompatible(field, baselin
 
     assert result.status == "incompatible"
     assert {check.status for check in result.checks} == {"incompatible"}
-    assert {check.reason_code for check in result.checks} == {"analysis_semantics_mismatch"}
+    assert {check.reason_code for check in result.checks} == {"profile_method_mismatch"}
     assert result.flags == ()
 
 
