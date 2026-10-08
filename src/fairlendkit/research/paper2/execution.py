@@ -53,6 +53,9 @@ class ExecutionManifest:
     protocol_manifest_sha256: str
     rng_fixture_sha256: str
     environment_lock_sha256: str
+    pip_freeze_sha256: str
+    python_executable_sha256: str
+    python_version: str
     shard_size: int = SHARD_SIZE
     worker_count: int = WORKER_COUNT
     cpu_budget: int = CPU_BUDGET
@@ -71,6 +74,8 @@ class ExecutionManifest:
             self.protocol_manifest_sha256,
             self.rng_fixture_sha256,
             self.environment_lock_sha256,
+            self.pip_freeze_sha256,
+            self.python_executable_sha256,
         ):
             if not _SHA256_RE.fullmatch(value):
                 raise IntegrityError("Manifest hashes must be lowercase SHA-256 values.")
@@ -134,6 +139,7 @@ class RawReplicateRecord:
 
 @dataclass(frozen=True)
 class RawReplicatePayload:
+    schema_version: str
     metric_values: tuple[tuple[str, float | None], ...]
     metric_defined: tuple[tuple[str, bool], ...]
     reliability: tuple[tuple[str, str], ...]
@@ -142,6 +148,8 @@ class RawReplicatePayload:
     limitations: tuple[str, ...]
 
     def __post_init__(self) -> None:
+        if self.schema_version != "paper2-raw-replicate-v1":
+            raise IntegrityError("Raw payload schema version is not frozen.")
         keyed = (self.metric_values, self.metric_defined, self.reliability, self.uncertainty)
         key_sets: list[tuple[str, ...]] = []
         for entries in keyed:
@@ -153,7 +161,15 @@ class RawReplicatePayload:
             key_sets.append(keys)
         if len(set(key_sets)) != 1:
             raise IntegrityError("Raw payload metric sections must use identical keys.")
-        if any(value is not None and not isfinite(value) for _, value in self.metric_values):
+        if any(
+            value is not None
+            and (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not isfinite(value)
+            )
+            for _, value in self.metric_values
+        ):
             raise IntegrityError("Raw metric values must be finite or None.")
         if any(not isinstance(value, bool) for _, value in self.metric_defined):
             raise IntegrityError("Raw definedness values must be booleans.")
@@ -189,8 +205,39 @@ class ShardMetadata:
     protocol_manifest_sha256: str
     rng_fixture_sha256: str
     environment_lock_sha256: str
+    pip_freeze_sha256: str
+    python_executable_sha256: str
     python_version: str
     status: str
+
+
+@dataclass(frozen=True)
+class ExecutionWorkspace:
+    root: Path
+    namespace: str
+
+    def __post_init__(self) -> None:
+        if self.namespace not in {"confirmatory", "smoke"}:
+            raise IntegrityError("Workspace namespace is invalid.")
+        if not self.root.is_absolute() or self.root != self.root.resolve():
+            raise IntegrityError("Workspace root must be an absolute resolved path.")
+        if self.root.is_symlink():
+            raise IntegrityError("Workspace root cannot be a symlink.")
+
+    @property
+    def output_dir(self) -> Path:
+        name = (
+            "paper2-confirmatory-raw-v1"
+            if self.namespace == "confirmatory"
+            else "paper2-smoke-raw-v1"
+        )
+        candidate = self.root / name
+        if candidate.exists() and candidate.is_symlink():
+            raise IntegrityError("Workspace output cannot be a symlink.")
+        resolved = candidate.resolve(strict=False)
+        if not resolved.is_relative_to(self.root):
+            raise IntegrityError("Workspace output escapes its fixed root.")
+        return resolved
 
 
 def sha256_file(path: Path) -> str:
@@ -267,7 +314,10 @@ def build_manifest(repo_root: Path) -> ExecutionManifest:
             repo_root / "src/fairlendkit/research/paper2/protocol.json"
         ),
         rng_fixture_sha256=fixture_sha256,
-        environment_lock_sha256=hashlib.sha256(actual_environment).hexdigest(),
+        environment_lock_sha256=sha256_file(repo_root / "requirements-release.txt"),
+        pip_freeze_sha256=hashlib.sha256(actual_environment).hexdigest(),
+        python_executable_sha256=sha256_file(Path(sys.executable).resolve()),
+        python_version=platform.python_version(),
     )
 
 
@@ -320,7 +370,10 @@ def smoke_shards(scenario_id: str, *, replicates: int = 6, shard_size: int = 2) 
     )
 
 
-def _paths(output_dir: Path, spec: ShardSpec) -> tuple[Path, Path]:
+def _paths(workspace: ExecutionWorkspace, spec: ShardSpec) -> tuple[Path, Path]:
+    if workspace.namespace != spec.namespace:
+        raise IntegrityError("Shard namespace does not match its workspace.")
+    output_dir = workspace.output_dir
     stem = f"{spec.scenario_id}--{spec.shard_id:05d}"
     return output_dir / f"{stem}.jsonl", output_dir / f"{stem}.meta.json"
 
@@ -339,10 +392,12 @@ def _validate_raw_payload(raw: object) -> None:
         "uncertainty",
         "flags",
         "limitations",
+        "schema_version",
     }:
         raise IntegrityError("Shard payload does not match the frozen raw-record schema.")
     try:
         RawReplicatePayload(
+            schema_version=raw["schema_version"],
             metric_values=tuple((key, value) for key, value in raw["metric_values"]),
             metric_defined=tuple((key, value) for key, value in raw["metric_defined"]),
             reliability=tuple((key, value) for key, value in raw["reliability"]),
@@ -358,17 +413,18 @@ def _validate_raw_payload(raw: object) -> None:
 
 
 def write_smoke_shard(
-    output_dir: Path,
+    workspace: ExecutionWorkspace,
     manifest: ExecutionManifest,
     spec: ShardSpec,
     records: Iterable[RawReplicateRecord],
 ) -> ShardMetadata:
     if spec.namespace != "smoke":
         raise ProductionRunLockedError("Only isolated smoke replicate IDs may be written.")
+    output_dir = workspace.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
-    records_path, metadata_path = _paths(output_dir, spec)
+    records_path, metadata_path = _paths(workspace, spec)
     if records_path.exists() and metadata_path.exists():
-        return validate_shard(output_dir, manifest, spec)
+        return validate_shard(workspace, manifest, spec)
     if records_path.exists() != metadata_path.exists():
         orphan = records_path if records_path.exists() else metadata_path
         orphan.unlink()
@@ -399,7 +455,9 @@ def write_smoke_shard(
         protocol_manifest_sha256=manifest.protocol_manifest_sha256,
         rng_fixture_sha256=manifest.rng_fixture_sha256,
         environment_lock_sha256=manifest.environment_lock_sha256,
-        python_version=platform.python_version(),
+        pip_freeze_sha256=manifest.pip_freeze_sha256,
+        python_executable_sha256=manifest.python_executable_sha256,
+        python_version=manifest.python_version,
         status="success",
     )
     metadata_tmp.write_text(
@@ -412,9 +470,9 @@ def write_smoke_shard(
 
 
 def validate_shard(
-    output_dir: Path, manifest: ExecutionManifest, spec: ShardSpec
+    workspace: ExecutionWorkspace, manifest: ExecutionManifest, spec: ShardSpec
 ) -> ShardMetadata:
-    records_path, metadata_path = _paths(output_dir, spec)
+    records_path, metadata_path = _paths(workspace, spec)
     if not records_path.is_file() or not metadata_path.is_file():
         raise IntegrityError("Shard records or metadata are missing.")
     try:
@@ -434,7 +492,9 @@ def validate_shard(
         "protocol_manifest_sha256": manifest.protocol_manifest_sha256,
         "rng_fixture_sha256": manifest.rng_fixture_sha256,
         "environment_lock_sha256": manifest.environment_lock_sha256,
-        "python_version": platform.python_version(),
+        "pip_freeze_sha256": manifest.pip_freeze_sha256,
+        "python_executable_sha256": manifest.python_executable_sha256,
+        "python_version": manifest.python_version,
         "status": "success",
     }
     for field, value in expected.items():
@@ -464,17 +524,25 @@ def validate_shard(
 
 
 def validate_complete_set(
-    output_dir: Path,
+    workspace: ExecutionWorkspace,
     manifest: ExecutionManifest,
     expected_specs: Iterable[ShardSpec],
 ) -> tuple[ShardMetadata, ...]:
     specs = tuple(expected_specs)
     if len(specs) != len(set(specs)):
         raise IntegrityError("Expected shard plan contains duplicates.")
-    metadata = tuple(validate_shard(output_dir, manifest, spec) for spec in specs)
-    expected_files = {
-        path.name for spec in specs for path in _paths(output_dir, spec)
+    identities = {(spec.namespace, spec.scenario_id, spec.shard_id) for spec in specs}
+    ranges = {
+        (spec.namespace, spec.scenario_id, spec.start_replicate, spec.stop_replicate)
+        for spec in specs
     }
+    if len(identities) != len(specs) or len(ranges) != len(specs):
+        raise IntegrityError("Expected shard identities or ranges overlap.")
+    metadata = tuple(validate_shard(workspace, manifest, spec) for spec in specs)
+    expected_files = {
+        path.name for spec in specs for path in _paths(workspace, spec)
+    }
+    output_dir = workspace.output_dir
     actual_files = {path.name for path in output_dir.iterdir() if path.is_file()}
     if actual_files != expected_files:
         raise IntegrityError("Output directory has missing or unexpected shard artifacts.")
@@ -482,7 +550,9 @@ def validate_complete_set(
 
 
 def validate_confirmatory_complete_set(
-    output_dir: Path, manifest: ExecutionManifest
+    workspace: ExecutionWorkspace, manifest: ExecutionManifest
 ) -> tuple[ShardMetadata, ...]:
     """Validate the entire frozen matrix without calculating any result."""
-    return validate_complete_set(output_dir, manifest, frozen_confirmatory_shards())
+    if workspace.namespace != "confirmatory":
+        raise IntegrityError("Confirmatory validation requires its fixed workspace.")
+    return validate_complete_set(workspace, manifest, frozen_confirmatory_shards())

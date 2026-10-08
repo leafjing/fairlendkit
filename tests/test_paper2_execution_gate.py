@@ -8,6 +8,7 @@ import pytest
 
 import fairlendkit.research.paper2.execution as execution
 from fairlendkit.research.paper2.execution import (
+    ExecutionWorkspace,
     IntegrityError,
     RawReplicatePayload,
     RawReplicateRecord,
@@ -36,9 +37,15 @@ def manifest(monkeypatch):
     return build_manifest(REPO_ROOT)
 
 
+@pytest.fixture
+def workspace(tmp_path):
+    return ExecutionWorkspace(tmp_path.resolve(), "smoke")
+
+
 def _payload(value: float = 0.0):
     key = "overall.selection_rate"
     return RawReplicatePayload(
+        schema_version="paper2-raw-replicate-v1",
         metric_values=((key, value),),
         metric_defined=((key, True),),
         reliability=((key, "reliable"),),
@@ -74,50 +81,55 @@ def test_frozen_plan_has_exact_ranges_without_overlap_or_gaps():
         assert ranges == [(start, start + 1_000) for start in range(0, 50_000, 1_000)]
 
 
-def test_smoke_resume_is_idempotent_and_recovers_interrupted_artifact(tmp_path, manifest):
+def test_smoke_resume_is_idempotent_and_recovers_interrupted_artifact(
+    workspace, manifest
+):
     spec = smoke_shards("SEL-AIR081-N025", replicates=2, shard_size=2)[0]
-    first = write_smoke_shard(tmp_path, manifest, spec, _records(spec))
-    second = write_smoke_shard(tmp_path, manifest, spec, _records(spec))
+    first = write_smoke_shard(workspace, manifest, spec, _records(spec))
+    second = write_smoke_shard(workspace, manifest, spec, _records(spec))
     assert first == second
 
-    records_path = tmp_path / "SEL-AIR081-N025--00000.jsonl"
-    metadata_path = tmp_path / "SEL-AIR081-N025--00000.meta.json"
+    records_path = workspace.output_dir / "SEL-AIR081-N025--00000.jsonl"
+    metadata_path = workspace.output_dir / "SEL-AIR081-N025--00000.meta.json"
     metadata_path.unlink()
     records_path.write_bytes(b"interrupted")
-    recovered = write_smoke_shard(tmp_path, manifest, spec, _records(spec))
+    recovered = write_smoke_shard(workspace, manifest, spec, _records(spec))
     assert recovered == first
-    assert validate_shard(tmp_path, manifest, spec) == first
+    assert validate_shard(workspace, manifest, spec) == first
 
 
 def test_complete_set_fails_closed_for_missing_duplicate_and_tampered_shards(
-    tmp_path, manifest
+    workspace, manifest
 ):
     specs = smoke_shards("SEL-AIR081-N025")
     for spec in specs:
-        write_smoke_shard(tmp_path, manifest, spec, _records(spec))
-    assert len(validate_complete_set(tmp_path, manifest, specs)) == 3
+        write_smoke_shard(workspace, manifest, spec, _records(spec))
+    assert len(validate_complete_set(workspace, manifest, specs)) == 3
 
     with pytest.raises(IntegrityError, match="duplicates"):
-        validate_complete_set(tmp_path, manifest, (*specs, specs[0]))
+        validate_complete_set(workspace, manifest, (*specs, specs[0]))
 
-    missing_path = tmp_path / "SEL-AIR081-N025--00001.meta.json"
+    missing_path = workspace.output_dir / "SEL-AIR081-N025--00001.meta.json"
     original_metadata = missing_path.read_bytes()
     missing_path.unlink()
     with pytest.raises(IntegrityError, match="missing"):
-        validate_complete_set(tmp_path, manifest, specs)
+        validate_complete_set(workspace, manifest, specs)
     missing_path.write_bytes(original_metadata)
 
-    records_path = tmp_path / "SEL-AIR081-N025--00002.jsonl"
+    records_path = workspace.output_dir / "SEL-AIR081-N025--00002.jsonl"
     original_records = records_path.read_bytes()
     records_path.write_bytes(original_records + b"tampered\n")
     with pytest.raises(IntegrityError, match="hash"):
-        validate_complete_set(tmp_path, manifest, specs)
+        validate_complete_set(workspace, manifest, specs)
 
 
-def test_metadata_identity_and_forbidden_derived_results_fail_closed(tmp_path, manifest):
+def test_metadata_identity_and_forbidden_derived_results_fail_closed(
+    workspace, manifest
+):
     spec = smoke_shards("REG", replicates=2, shard_size=2)[0]
     with pytest.raises(TypeError):
         RawReplicatePayload(
+            schema_version="paper2-raw-replicate-v1",
             metric_values=(("overall.selection_rate", 0.5),),
             metric_defined=(("overall.selection_rate", True),),
             reliability=(("overall.selection_rate", "reliable"),),
@@ -128,7 +140,7 @@ def test_metadata_identity_and_forbidden_derived_results_fail_closed(tmp_path, m
         )
     with pytest.raises(IntegrityError, match="frozen raw-record"):
         write_smoke_shard(
-            tmp_path,
+            workspace,
             manifest,
             spec,
             (
@@ -137,22 +149,22 @@ def test_metadata_identity_and_forbidden_derived_results_fail_closed(tmp_path, m
             ),
         )
 
-    write_smoke_shard(tmp_path, manifest, spec, _records(spec))
+    write_smoke_shard(workspace, manifest, spec, _records(spec))
     with pytest.raises(IntegrityError, match="code_commit"):
-        validate_shard(tmp_path, replace(manifest, code_commit="2" * 40), spec)
+        validate_shard(workspace, replace(manifest, code_commit="2" * 40), spec)
 
 
-def test_writer_cannot_accept_confirmatory_replicate_range(tmp_path, manifest):
+def test_writer_cannot_accept_confirmatory_replicate_range(workspace, manifest):
     spec = frozen_confirmatory_shards()[0]
     assert spec.stop_replicate == 1_000
     with pytest.raises(ProductionRunLockedError):
-        write_smoke_shard(tmp_path, manifest, spec, ())
+        write_smoke_shard(workspace, manifest, spec, ())
 
 
-def test_metadata_schema_is_raw_and_contains_environment_evidence(tmp_path, manifest):
+def test_metadata_schema_is_raw_and_contains_environment_evidence(workspace, manifest):
     spec = smoke_shards("REG", replicates=2, shard_size=2)[0]
-    write_smoke_shard(tmp_path, manifest, spec, _records(spec))
-    metadata = json.loads((tmp_path / "REG--00000.meta.json").read_text())
+    write_smoke_shard(workspace, manifest, spec, _records(spec))
+    metadata = json.loads((workspace.output_dir / "REG--00000.meta.json").read_text())
 
     assert metadata["row_count"] == 2
     assert metadata["start_replicate"] == 0
@@ -161,6 +173,8 @@ def test_metadata_schema_is_raw_and_contains_environment_evidence(tmp_path, mani
     assert metadata["python_version"]
     assert metadata["records_sha256"]
     assert metadata["environment_lock_sha256"] == manifest.environment_lock_sha256
+    assert metadata["pip_freeze_sha256"] == manifest.pip_freeze_sha256
+    assert metadata["python_executable_sha256"] == manifest.python_executable_sha256
 
 
 def test_manifest_requires_real_clean_head_environment_and_frozen_strategies(
@@ -181,6 +195,15 @@ def test_manifest_requires_real_clean_head_environment_and_frozen_strategies(
     with pytest.raises(IntegrityError, match="frozen"):
         replace(built, checkpoint_policy="partial")
 
+    monkeypatch.setattr(execution, "_git_has_frozen_base", lambda _: False)
+    with pytest.raises(IntegrityError, match="approved phase-one"):
+        build_manifest(REPO_ROOT)
+
+    monkeypatch.setattr(execution, "_git_has_frozen_base", lambda _: True)
+    monkeypatch.setattr(execution, "_installed_environment", lambda: b"not-the-lock\n")
+    with pytest.raises(IntegrityError, match="pip lock"):
+        build_manifest(REPO_ROOT)
+
 
 @pytest.mark.parametrize(
     "spec",
@@ -196,3 +219,53 @@ def test_manifest_requires_real_clean_head_environment_and_frozen_strategies(
 def test_invalid_shard_boundaries_and_paths_fail_closed(spec):
     with pytest.raises(IntegrityError):
         ShardSpec(*spec)
+
+
+def test_workspace_rejects_relative_root_namespace_mismatch_and_symlink_escape(
+    tmp_path, manifest
+):
+    with pytest.raises(IntegrityError, match="absolute resolved"):
+        ExecutionWorkspace(Path("relative"), "smoke")
+
+    workspace = ExecutionWorkspace(tmp_path.resolve(), "smoke")
+    confirmatory = frozen_confirmatory_shards()[0]
+    with pytest.raises(ProductionRunLockedError):
+        write_smoke_shard(workspace, manifest, confirmatory, ())
+
+    target = tmp_path / "outside"
+    target.mkdir()
+    workspace.output_dir.symlink_to(target, target_is_directory=True)
+    with pytest.raises(IntegrityError, match="symlink"):
+        _ = workspace.output_dir
+
+
+def test_raw_schema_is_versioned_recursive_and_rejects_unknown_or_nonfinite_values():
+    with pytest.raises(IntegrityError, match="schema version"):
+        replace(_payload(), schema_version="paper2-raw-replicate-v2")
+    with pytest.raises(IntegrityError, match="finite"):
+        replace(_payload(), metric_values=(("overall.selection_rate", float("nan")),))
+
+    raw = json.loads(execution._canonical_record(RawReplicateRecord("REG", 0, _payload())))
+    raw["payload"]["metric_values"][0].append({"p_value": 0.01})
+    with pytest.raises(IntegrityError, match="invalid"):
+        execution._validate_raw_payload(raw["payload"])
+    raw = json.loads(execution._canonical_record(RawReplicateRecord("REG", 0, _payload())))
+    raw["payload"]["nested_result"] = {"p_value": 0.01}
+    with pytest.raises(IntegrityError, match="frozen raw-record"):
+        execution._validate_raw_payload(raw["payload"])
+
+
+def test_complete_set_rejects_reused_identity_or_range(workspace, manifest):
+    reused_identity = (
+        ShardSpec("smoke", "REG", 0, 0, 2),
+        ShardSpec("smoke", "REG", 0, 2, 4),
+    )
+    with pytest.raises(IntegrityError, match="identities or ranges overlap"):
+        validate_complete_set(workspace, manifest, reused_identity)
+
+    reused_range = (
+        ShardSpec("smoke", "REG", 0, 0, 2),
+        ShardSpec("smoke", "REG", 1, 0, 2),
+    )
+    with pytest.raises(IntegrityError, match="identities or ranges overlap"):
+        validate_complete_set(workspace, manifest, reused_range)
