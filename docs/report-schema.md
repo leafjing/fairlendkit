@@ -62,9 +62,9 @@ the fixed order defined by the Milestone 3 reliability matrix.
 
 `StatisticalUncertainty` remains linked to one metric key. Its deterministic
 2.0 production is guarded by the Milestone 3 bootstrap golden fixture, which
-fixes the SHA-256 counter preimage and rejection sampler, stream names, the
-first three sampled index arrays, valid-resample counts, `linear` quantiles,
-and final bounds. The linear interpolation is the explicitly specified
+fixes the `fairlendkit-sha256-counter-v1` domain tag, SHA-256 counter preimage
+and rejection sampler, stream names, the first three sampled index arrays,
+valid-resample counts, `linear` quantiles, and final bounds. The linear interpolation is the explicitly specified
 Hyndman–Fan Type 7 method. A failed
 valid-resample gate emits a linked limitation instead of an interval.
 

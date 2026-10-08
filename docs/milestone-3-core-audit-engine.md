@@ -312,7 +312,7 @@ all text is UTF-8, and all unsigned integers use fixed-width big-endian encoding
   ambiguity;
 - for zero-based draw `d`, zero-based sampled position `p`, and zero-based
   rejection counter `r`, form
-  `b"fairlendkit-bootstrap-v1\x00" + seed_u64 + key_len_u32 + key_bytes +
+  `b"fairlendkit-sha256-counter-v1\x00" + seed_u64 + key_len_u32 + key_bytes +
   stream_len_u32 + stream_bytes + d_u64 + p_u64 + r_u32`;
 - hash that byte string and interpret the first eight digest bytes as unsigned
   integer `x`; for population size `n`, let `limit = floor(2**64 / n) * n`;
@@ -353,8 +353,9 @@ The test suite must include a checked-in golden bootstrap fixture containing
 the config seed, canonical metric keys, sampled row-index arrays for the first
 three draws of every stream kind, valid-resample counts, and final interval
 bounds. The fixture is the cross-implementation compatibility oracle; changing
-the hash preimage, integer widths/byte order, rejection rule, counter order, or
-quantile method is a versioned method change.
+the `fairlendkit-sha256-counter-v1` domain tag, hash preimage, integer
+widths/byte order, rejection rule, counter order, or quantile method is a
+versioned method change.
 
 ## Schema 2.0 and legacy migration
 
