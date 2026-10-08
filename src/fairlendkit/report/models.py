@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+import hashlib
 from enum import StrEnum
 from typing import Annotated, Literal
 
@@ -547,10 +548,15 @@ class ObservedMetricV2(ResultModel):
         return self
 
 
-class RunMetadataV2(RunMetadata):
-    """Schema 2.0 metadata with an explicit, non-inferable migration marker."""
+class MigrationProvenanceV2(ResultModel):
+    source_schema_version: Literal["1.0"]
+    source_payload_hash: Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
 
-    migrated_from_schema_version: Literal["1.0"] | None
+
+class RunMetadataV2(RunMetadata):
+    """Schema 2.0 metadata with cryptographically bound migration provenance."""
+
+    migration_provenance: MigrationProvenanceV2 | None
 
 
 class LimitationV2(ResultModel):
@@ -591,7 +597,7 @@ class AuditResultV2(ResultModel):
             raise ValueError("uncertainty metric references must be unique")
         positions = {key: index for index, key in enumerate(keys)}
         not_assessed_count = sum(item.reliability == ReliabilityStateV2.NOT_ASSESSED for item in self.observed_metrics)
-        migrated = self.metadata.migrated_from_schema_version == "1.0"
+        migrated = self.metadata.migration_provenance is not None
         if migrated and not_assessed_count != len(self.observed_metrics):
             raise ValueError("migrated results require not_assessed on every metric")
         if not migrated and not_assessed_count:
@@ -633,6 +639,18 @@ class AuditResultV2(ResultModel):
             lower, upper = _metric_range_v2(by_key[interval.metric_key].metric)
             if not lower <= interval.lower <= interval.upper <= upper:
                 raise ValueError("uncertainty bounds must respect the metric range")
+        if migrated:
+            source = self.model_dump(mode="json")
+            source["schema_version"] = AUDIT_RESULT_SCHEMA_VERSION_V1_0
+            source["metadata"].pop("migration_provenance")
+            for metric in source["observed_metrics"]:
+                metric.pop("reliability")
+            for limitation in source["limitations"]:
+                limitation.pop("affected_metric_keys")
+            legacy = AuditResultV1_0.model_validate(source)
+            canonical_hash = "sha256:" + hashlib.sha256(legacy.model_dump_json().encode("utf-8")).hexdigest()
+            if canonical_hash != self.metadata.migration_provenance.source_payload_hash:
+                raise ValueError("migration provenance hash does not match preserved V1 evidence")
         aliases: dict[tuple[tuple[tuple[str, Label], ...], tuple[tuple[str, Label], ...]], dict[MetricNameV2, ObservedMetricV2]] = {}
         for item in self.observed_metrics:
             if item.metric in {MetricNameV2.SELECTION_RATE_DIFFERENCE, MetricNameV2.DEMOGRAPHIC_PARITY_DIFFERENCE}:
@@ -698,8 +716,12 @@ def migrate_audit_result_v1_0(payload: object) -> AuditResultV2:
 
     legacy = AuditResultV1_0.model_validate(payload)
     data = legacy.model_dump(mode="json")
+    source_hash = "sha256:" + hashlib.sha256(legacy.model_dump_json().encode("utf-8")).hexdigest()
     data["schema_version"] = AUDIT_RESULT_SCHEMA_VERSION_V2
-    data["metadata"]["migrated_from_schema_version"] = "1.0"
+    data["metadata"]["migration_provenance"] = {
+        "source_schema_version": "1.0",
+        "source_payload_hash": source_hash,
+    }
     for metric in data["observed_metrics"]:
         metric["reliability"] = ReliabilityStateV2.NOT_ASSESSED
     for limitation in data["limitations"]:

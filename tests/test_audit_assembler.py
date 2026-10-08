@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 
 import pandas as pd
 import pytest
@@ -64,8 +65,10 @@ def test_migration_rejects_non_v1_and_adds_absent_evidence_markers():
     migrated_dump = migrated.model_dump(mode="json")
     for section in ("validation", "screening_flags", "uncertainty", "practitioner_review_notes"):
         assert migrated_dump[section] == legacy_dump[section]
-    assert {key: value for key, value in migrated_dump["metadata"].items() if key != "migrated_from_schema_version"} == legacy_dump["metadata"]
-    assert migrated_dump["metadata"]["migrated_from_schema_version"] == "1.0"
+    assert {key: value for key, value in migrated_dump["metadata"].items() if key != "migration_provenance"} == legacy_dump["metadata"]
+    provenance = migrated_dump["metadata"]["migration_provenance"]
+    assert provenance["source_schema_version"] == "1.0"
+    assert provenance["source_payload_hash"] == "sha256:" + hashlib.sha256(legacy.model_dump_json().encode("utf-8")).hexdigest()
     assert [item["value"] for item in migrated_dump["observed_metrics"]] == [item["value"] for item in legacy_dump["observed_metrics"]]
     assert [(item["code"], item["detail"]) for item in migrated_dump["limitations"]] == [(item["code"], item["detail"]) for item in legacy_dump["limitations"]]
     assert AuditResultV2.model_validate_json(migrated.model_dump_json()) == migrated
@@ -110,15 +113,25 @@ def test_native_not_assessed_with_uncertainty_and_partial_mode_spoofing_fail():
         AuditResultV2.model_validate(payload)
 
     native = run_audit(frame(), config()).model_dump(mode="json")
-    native["metadata"]["migrated_from_schema_version"] = "1.0"
+    native["metadata"]["migration_provenance"] = {
+        "source_schema_version": "1.0",
+        "source_payload_hash": "sha256:" + "0" * 64,
+    }
     with pytest.raises(ValidationError, match="migrated results require"):
         AuditResultV2.model_validate(native)
 
     migrated = migrate_audit_result_v1_0(
         AuditResultV1_0.model_validate_json((Path(__file__).parents[1] / "examples" / "synthetic" / "audit-result.json").read_text()).model_dump(mode="json")
     ).model_dump(mode="json")
-    migrated["metadata"]["migrated_from_schema_version"] = None
+    migrated["metadata"]["migration_provenance"] = None
     with pytest.raises(ValidationError, match="native results cannot contain"):
+        AuditResultV2.model_validate(migrated)
+
+    migrated = migrate_audit_result_v1_0(
+        AuditResultV1_0.model_validate_json((Path(__file__).parents[1] / "examples" / "synthetic" / "audit-result.json").read_text()).model_dump(mode="json")
+    ).model_dump(mode="json")
+    migrated["metadata"]["migration_provenance"]["source_payload_hash"] = "sha256:" + "0" * 64
+    with pytest.raises(ValidationError, match="provenance hash"):
         AuditResultV2.model_validate(migrated)
 
     migrated = migrate_audit_result_v1_0(

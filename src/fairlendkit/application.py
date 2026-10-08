@@ -80,7 +80,7 @@ class RunAudit:
                 package_version=_package_version(),
                 generated_at=config.execution_timestamp,
                 configuration=config,
-                migrated_from_schema_version=None,
+                migration_provenance=None,
             ),
             validation=to_validation_evidence(
                 validation,
