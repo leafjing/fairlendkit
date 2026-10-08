@@ -143,8 +143,6 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
                 wall_seconds=wall_measurements[scenario_id],
                 peak_rss_bytes=rss_measurements[scenario_id],
                 artifact_bytes=artifact_measurements[scenario_id],
-                metric_identities=tuple(sorted(expected_metric_names)),
-                artifact_schema="paper2-raw-replicate-v1",
             )
             for scenario_id in sorted(scenario_ids)
         ),

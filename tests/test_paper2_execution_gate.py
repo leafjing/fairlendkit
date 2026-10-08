@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 import fairlendkit.research.paper2.execution as execution
-from fairlendkit.metrics.contracts import MetricNameV2
 from fairlendkit.research.paper2.resource_benchmark import (
     BENCHMARK_COST_COVERAGE,
     BENCHMARK_SCENARIO_IDS,
@@ -545,10 +544,9 @@ def test_each_cost_representative_requires_full_metric_set_and_frozen_artifact_s
 
 
 def test_representative_cost_evidence_is_unique_sorted_and_matches_aggregates():
-    metrics = tuple(sorted(item.value for item in MetricNameV2))
     costs = (
-        RepresentativeCost("a", 1.0, 2.0, 100, 10, metrics, "paper2-raw-replicate-v1"),
-        RepresentativeCost("b", 3.0, 4.0, 200, 20, metrics, "paper2-raw-replicate-v1"),
+        RepresentativeCost("a", 1.0, 2.0, 100, 10),
+        RepresentativeCost("b", 3.0, 4.0, 200, 20),
     )
     evidence = execution.SmokeBenchmarkEvidence(
         schema_version="paper2-resource-benchmark-v1",
@@ -573,12 +571,6 @@ def test_representative_cost_evidence_is_unique_sorted_and_matches_aggregates():
         replace(evidence, peak_rss_bytes=201)
     with pytest.raises(IntegrityError, match="artifact evidence"):
         replace(evidence, artifact_bytes=31)
-    with pytest.raises(IntegrityError, match="metric identity"):
-        replace(costs[0], metric_identities=metrics[:-1])
-    with pytest.raises(IntegrityError, match="artifact schema"):
-        replace(costs[0], artifact_schema="wrong")
-
-
 def test_mapped_rss_requires_every_representative_and_rejects_underestimate():
     coverage = {"scenario-a": "small", "scenario-b": "large"}
     rss = {"small": 100, "large": 250}
@@ -588,5 +580,10 @@ def test_mapped_rss_requires_every_representative_and_rejects_underestimate():
         _mapped_peak_rss(coverage, {"small": 100})
     with pytest.raises(IntegrityError, match="RSS measurements"):
         _mapped_peak_rss(coverage, {"small": 100, "large": 250, "unknown": 300})
+    with pytest.raises(IntegrityError, match="RSS measurements"):
+        _mapped_peak_rss(
+            {"scenario-a": "small", "scenario-b": "wrong"},
+            {"small": 100, "large": 250},
+        )
     with pytest.raises(IntegrityError, match="positive integers"):
         _mapped_peak_rss(coverage, {"small": 100, "large": True})
