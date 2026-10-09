@@ -156,12 +156,13 @@ interpreter, and installed freeze.
 ## Post-merge execution seal
 
 The A2 implementation defines `paper2-execution-seal-v2`; it does not
-self-issue a seal. The seal binds both the A1 RNG commit and the A2 protocol
-merge commit. After
+self-issue a seal. The seal binds the A1 RNG commit, the A2 protocol merge
+commit, and the A2 clarification/specification merge commit. After
 merge, the reviewer must generate canonical seal bytes and publish their
 SHA-256 out of band. Runtime validation requires both the seal file and that
 external digest, then binds the seal to the actual clean merge HEAD, manifest
 hash, frozen 145-shard plan hash, protocol/A1 commit, A2 protocol commit,
-protocol manifest,
-normative RNG fixture, and environment lock. A missing, modified, symlinked,
-self-reported, pre-merge, or identity-mismatched seal fails closed.
+protocol manifest, normative RNG fixture, environment lock, canonical smoke
+benchmark evidence, and canonical capacity evidence (including the hashed host
+identity). A missing, modified, symlinked, self-reported, pre-merge,
+evidence-mismatched, host-mismatched, or identity-mismatched seal fails closed.

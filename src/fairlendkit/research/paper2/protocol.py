@@ -24,6 +24,7 @@ CONFIRMATORY_TEST_IDS = (
 RNG_SCHEMA_VERSION = "paper2-rng-a1-v1"
 RNG_FIXTURE_SHA256 = "6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905"
 A2_PROTOCOL_COMMIT = "4a83ff8872d3393fad4313927045777f65fd3da4"
+A2_SPECIFICATION_COMMIT = "9aa1afe0d48fedebdc5e9f26fecf31f68235838d"
 
 
 class ExecutionMode(StrEnum):
@@ -42,6 +43,7 @@ class Paper2Protocol:
     rng_schema_version: str
     rng_fixture_sha256: str
     a2_protocol_commit: str
+    a2_specification_commit: str
     master_seed: int
     confirmatory_replicates: int
     exploratory_replicates: int
@@ -68,6 +70,7 @@ def load_protocol(path: str | Path | None = None) -> Paper2Protocol:
         "rng_schema_version",
         "rng_fixture_sha256",
         "a2_protocol_commit",
+        "a2_specification_commit",
         "master_seed",
         "confirmatory_replicates",
         "exploratory_replicates",
@@ -83,6 +86,7 @@ def load_protocol(path: str | Path | None = None) -> Paper2Protocol:
         rng_schema_version=str(raw["rng_schema_version"]),
         rng_fixture_sha256=str(raw["rng_fixture_sha256"]),
         a2_protocol_commit=str(raw["a2_protocol_commit"]),
+        a2_specification_commit=str(raw["a2_specification_commit"]),
         master_seed=int(raw["master_seed"]),
         confirmatory_replicates=int(raw["confirmatory_replicates"]),
         exploratory_replicates=int(raw["exploratory_replicates"]),
@@ -96,6 +100,7 @@ def load_protocol(path: str | Path | None = None) -> Paper2Protocol:
         or protocol.rng_schema_version != RNG_SCHEMA_VERSION
         or protocol.rng_fixture_sha256 != RNG_FIXTURE_SHA256
         or protocol.a2_protocol_commit != A2_PROTOCOL_COMMIT
+        or protocol.a2_specification_commit != A2_SPECIFICATION_COMMIT
         or protocol.confirmatory_replicates != CONFIRMATORY_REPLICATES
         or protocol.exploratory_replicates != EXPLORATORY_REPLICATES
         or protocol.monitoring_checkpoints != MONITORING_CHECKPOINTS

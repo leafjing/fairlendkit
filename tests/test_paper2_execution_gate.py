@@ -261,6 +261,7 @@ def test_metadata_schema_is_raw_and_contains_environment_evidence(workspace, man
     assert metadata["records_sha256"]
     assert metadata["environment_lock_sha256"] == manifest.environment_lock_sha256
     assert metadata["a2_protocol_commit"] == manifest.a2_protocol_commit
+    assert metadata["a2_specification_commit"] == manifest.a2_specification_commit
     assert metadata["pip_freeze_sha256"] == manifest.pip_freeze_sha256
     assert metadata["python_executable_sha256"] == manifest.python_executable_sha256
 
@@ -284,15 +285,42 @@ def test_manifest_requires_real_clean_head_environment_and_frozen_strategies(
         replace(built, checkpoint_policy="partial")
     with pytest.raises(IntegrityError, match="A2"):
         replace(built, a2_protocol_commit="0" * 40)
+    with pytest.raises(IntegrityError, match="specification"):
+        replace(built, a2_specification_commit="0" * 40)
 
     monkeypatch.setattr(execution, "_git_has_frozen_base", lambda _: False)
-    with pytest.raises(IntegrityError, match="approved phase-one"):
+    with pytest.raises(IntegrityError, match="every approved protocol baseline"):
         build_manifest(REPO_ROOT)
 
     monkeypatch.setattr(execution, "_git_has_frozen_base", lambda _: True)
     monkeypatch.setattr(execution, "_installed_environment", lambda: b"not-the-lock\n")
     with pytest.raises(IntegrityError, match="pip lock"):
         build_manifest(REPO_ROOT)
+
+
+def test_git_ancestry_requires_every_frozen_protocol_baseline(monkeypatch):
+    observed = []
+
+    def fake_run(command, **kwargs):
+        observed.append(command[-2])
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(execution.subprocess, "run", fake_run)
+    assert execution._git_has_frozen_base(REPO_ROOT)
+    assert observed == [
+        execution.IMPLEMENTATION_BASE_COMMIT,
+        execution.PROTOCOL_A1_COMMIT,
+        execution.A2_PROTOCOL_COMMIT,
+        execution.A2_SPECIFICATION_COMMIT,
+    ]
+
+    def reject_specification(command, **kwargs):
+        return SimpleNamespace(
+            returncode=int(command[-2] == execution.A2_SPECIFICATION_COMMIT)
+        )
+
+    monkeypatch.setattr(execution.subprocess, "run", reject_specification)
+    assert not execution._git_has_frozen_base(REPO_ROOT)
 
 
 @pytest.mark.parametrize(
@@ -416,36 +444,119 @@ def test_serialized_record_and_metadata_boolean_identities_fail_closed(
 
 
 def test_external_execution_seal_binds_bytes_and_runtime_identity(tmp_path, manifest):
+    evidence = _resource_evidence()
+    capacity = ResourceCapacity(
+        cpu_count=4,
+        memory_bytes=evidence.required_memory_bytes,
+        disk_free_bytes=evidence.projected_disk_bytes,
+        host_identity_sha256="a" * 64,
+    )
     seal = {
         "schema_version": "paper2-execution-seal-v2",
         "code_commit": manifest.code_commit,
         "protocol_commit": manifest.protocol_commit,
         "a2_protocol_commit": manifest.a2_protocol_commit,
+        "a2_specification_commit": manifest.a2_specification_commit,
         "manifest_sha256": execution.manifest_sha256(manifest),
         "shard_plan_sha256": execution.shard_plan_sha256(),
         "protocol_manifest_sha256": manifest.protocol_manifest_sha256,
         "rng_fixture_sha256": manifest.rng_fixture_sha256,
         "environment_lock_sha256": manifest.environment_lock_sha256,
+        "benchmark_evidence_sha256": execution.benchmark_evidence_sha256(evidence),
+        "capacity_evidence_sha256": execution.capacity_evidence_sha256(capacity),
     }
     seal_path = tmp_path / "execution-seal.json"
     seal_bytes = (json.dumps(seal, sort_keys=True, separators=(",", ":")) + "\n").encode()
     seal_path.write_bytes(seal_bytes)
     seal_hash = hashlib.sha256(seal_bytes).hexdigest()
-    assert validate_execution_seal(seal_path, seal_hash, manifest).code_commit == CODE_COMMIT
+    assert validate_execution_seal(
+        seal_path, seal_hash, manifest, evidence, capacity
+    ).code_commit == CODE_COMMIT
     with pytest.raises(IntegrityError, match="external seal hash"):
-        validate_execution_seal(seal_path, "0" * 64, manifest)
+        validate_execution_seal(seal_path, "0" * 64, manifest, evidence, capacity)
     seal["code_commit"] = "2" * 40
     modified = (json.dumps(seal, sort_keys=True, separators=(",", ":")) + "\n").encode()
     seal_path.write_bytes(modified)
     with pytest.raises(IntegrityError, match="runtime identity"):
-        validate_execution_seal(seal_path, hashlib.sha256(modified).hexdigest(), manifest)
+        validate_execution_seal(
+            seal_path, hashlib.sha256(modified).hexdigest(), manifest, evidence, capacity
+        )
 
     seal["code_commit"] = manifest.code_commit
     seal["a2_protocol_commit"] = "0" * 40
     modified = (json.dumps(seal, sort_keys=True, separators=(",", ":")) + "\n").encode()
     seal_path.write_bytes(modified)
     with pytest.raises(IntegrityError, match="A2 protocol identity"):
-        validate_execution_seal(seal_path, hashlib.sha256(modified).hexdigest(), manifest)
+        validate_execution_seal(
+            seal_path, hashlib.sha256(modified).hexdigest(), manifest, evidence, capacity
+        )
+
+
+def test_execution_seal_rejects_legacy_missing_or_tampered_evidence(tmp_path, manifest):
+    evidence = _resource_evidence()
+    capacity = ResourceCapacity(
+        4, evidence.required_memory_bytes, evidence.projected_disk_bytes, "a" * 64
+    )
+    seal = {
+        "schema_version": "paper2-execution-seal-v2",
+        "code_commit": manifest.code_commit,
+        "protocol_commit": manifest.protocol_commit,
+        "a2_protocol_commit": manifest.a2_protocol_commit,
+        "a2_specification_commit": manifest.a2_specification_commit,
+        "manifest_sha256": execution.manifest_sha256(manifest),
+        "shard_plan_sha256": execution.shard_plan_sha256(),
+        "protocol_manifest_sha256": manifest.protocol_manifest_sha256,
+        "rng_fixture_sha256": manifest.rng_fixture_sha256,
+        "environment_lock_sha256": manifest.environment_lock_sha256,
+        "benchmark_evidence_sha256": execution.benchmark_evidence_sha256(evidence),
+        "capacity_evidence_sha256": execution.capacity_evidence_sha256(capacity),
+    }
+    seal_path = tmp_path / "execution-seal.json"
+
+    for change in (
+        {"schema_version": "paper2-execution-seal-v1"},
+        {"a2_protocol_commit": None},
+        {"a2_specification_commit": None},
+        {"benchmark_evidence_sha256": None},
+        {"capacity_evidence_sha256": None},
+    ):
+        changed = {**seal, **change}
+        if next(iter(change.values())) is None:
+            changed.pop(next(iter(change)))
+        payload = (json.dumps(changed, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        seal_path.write_bytes(payload)
+        with pytest.raises(IntegrityError):
+            validate_execution_seal(
+                seal_path, hashlib.sha256(payload).hexdigest(), manifest, evidence, capacity
+            )
+
+    payload = (json.dumps(seal, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    seal_path.write_bytes(payload)
+    seal_hash = hashlib.sha256(payload).hexdigest()
+    with pytest.raises(IntegrityError, match="runtime identity"):
+        validate_execution_seal(
+            seal_path,
+            seal_hash,
+            manifest,
+            replace(evidence, projected_cpu_hours=evidence.projected_cpu_hours + 0.1),
+            capacity,
+        )
+    with pytest.raises(IntegrityError, match="runtime identity"):
+        validate_execution_seal(
+            seal_path,
+            seal_hash,
+            manifest,
+            evidence,
+            replace(capacity, disk_free_bytes=capacity.disk_free_bytes + 1),
+        )
+    with pytest.raises(IntegrityError, match="runtime identity"):
+        validate_execution_seal(
+            seal_path,
+            seal_hash,
+            manifest,
+            evidence,
+            replace(capacity, host_identity_sha256="b" * 64),
+        )
     raw = json.loads(execution._canonical_record(RawReplicateRecord("REG", 0, _payload())))
     raw["payload"]["nested_result"] = {"p_value": 0.01}
     with pytest.raises(IntegrityError, match="frozen raw-record"):
@@ -486,6 +597,7 @@ def test_resource_preflight_fails_closed():
         cpu_count=4,
         memory_bytes=evidence.required_memory_bytes,
         disk_free_bytes=evidence.projected_disk_bytes,
+        host_identity_sha256="a" * 64,
     )
     validate_resource_preflight(sufficient, evidence)
     with pytest.raises(IntegrityError, match="CPU"):
