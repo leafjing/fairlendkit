@@ -11,6 +11,6 @@
   "bootstrap_index_bytes": {
     "encoding": "unsigned uint64 big-endian",
     "h2_2000_by_5_sha256": "23337d668651648aaa0df08a6939a0712a406dedecf78bee10cfc86f1af6ca0b",
-    "summary_2000_by_17_sha256": "b51192f1e0de447ef0ec2553104f725464142f7ec8ff9237a960e991b3126b00"
+    "summary_5000_2000_by_17_sha256": "b676d495d52369713423505ae140d4ded82bcc7feee9c32199cbb97c3f05cfe7"
   }
 }

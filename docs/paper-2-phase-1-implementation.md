@@ -34,7 +34,7 @@ estimates, standard errors, p-values, or Holm results.
 
 | Frozen protocol clause | Implementation | Mechanical evidence |
 | --- | --- | --- |
-| Strict protocol identity, `R=50,000`, checkpoints, and five confirmatory IDs | `research/paper2/protocol.py` and `protocol.json` | manifest contract test |
+| Strict A2 protocol identity, `R=5,000`, checkpoints, and five confirmatory IDs | `research/paper2/protocol.py` and `protocol.json` | manifest contract test |
 | Confirmation remains locked until a later approval | `Paper2Protocol.authorize` | confirmatory rejection and isolated smoke-ID tests; phase-gate artifact scan |
 | Exhaustive scenario registry and H2 paired units | `research/paper2/registry.py` | 124-entry registry contract and checked-in registry golden hash |
 | A1 seven-field root, counter word order, endpoint-safe transforms, and unbiased bounded integers | `research/paper2/rng.py` | normative A1 seed/digest/word/endpoint/rejection fixtures plus independent test-only implementation |
@@ -62,4 +62,5 @@ as required by A1.
   is checked in, before running any tests.
 - The phase-one code contains no confirmatory matrix runner or result writer.
 - Validation is limited to unit, golden, architecture, and isolated smoke
-  tests; replicate IDs `0..49999` have not been executed or summarized.
+  tests; A2 confirmatory replicate IDs `0..4999` have not been executed or
+  summarized.

@@ -20,16 +20,20 @@ def test_protocol_manifest_matches_frozen_contract():
     assert protocol.rng_fixture_sha256 == (
         "6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905"
     )
+    assert protocol.a2_protocol_commit == "4a83ff8872d3393fad4313927045777f65fd3da4"
+    assert protocol.a2_specification_commit == "9aa1afe0d48fedebdc5e9f26fecf31f68235838d"
     assert protocol.master_seed == 20261008
-    assert protocol.confirmatory_replicates == 50_000
-    assert protocol.monitoring_checkpoints == (10_000, 20_000, 30_000, 40_000)
+    assert protocol.confirmatory_replicates == 5_000
+    assert protocol.monitoring_checkpoints == (1_000, 2_000, 3_000, 4_000)
     assert len(protocol.confirmatory_test_ids) == 5
 
 
 @pytest.mark.parametrize(
     ("field", "replacement"),
     (
-        ("confirmatory_replicates", 10_000),
+        ("confirmatory_replicates", 50_000),
+        ("a2_protocol_commit", "0" * 40),
+        ("a2_specification_commit", "0" * 40),
         ("protocol_id", "forged-paper2"),
         ("smoke_seed_domain", "forged-smoke-domain"),
     ),
@@ -42,10 +46,12 @@ def test_protocol_parser_fails_closed_on_extra_or_changed_fields(
         "status": "frozen",
         "rng_schema_version": "paper2-rng-a1-v1",
         "rng_fixture_sha256": "6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905",
+        "a2_protocol_commit": "4a83ff8872d3393fad4313927045777f65fd3da4",
+        "a2_specification_commit": "9aa1afe0d48fedebdc5e9f26fecf31f68235838d",
         "master_seed": 20261008,
-        "confirmatory_replicates": 50_000,
+        "confirmatory_replicates": 5_000,
         "exploratory_replicates": 10_000,
-        "monitoring_checkpoints": [10_000, 20_000, 30_000, 40_000],
+        "monitoring_checkpoints": [1_000, 2_000, 3_000, 4_000],
         "confirmatory_test_ids": [
             "P2-C1-AIR-MAE-N",
             "P2-C3-PRECISION-DEFINED",

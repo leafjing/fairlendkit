@@ -88,7 +88,7 @@ def benchmark_full_smoke_pipeline(manifest: ExecutionManifest) -> SmokeBenchmark
         )
     )
     return SmokeBenchmarkEvidence(
-        schema_version="paper2-resource-benchmark-v1",
+        schema_version="paper2-resource-benchmark-v2",
         smoke_records=len(scenario_ids),
         wall_seconds=wall_seconds,
         cpu_seconds=cpu_seconds,
