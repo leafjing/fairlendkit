@@ -546,18 +546,20 @@ all additional scenario comparisons are descriptive or exploratory and do not
 enter this family.
 
 At 5,000 pairs, the conservative first-step Holm/Bonferroni planning level is
-`0.05/5=0.01`. With 80% power, the approximate minimum detectable paired mean
-is `(z_0.99 + z_0.80)/sqrt(5000) = 0.0448` paired standard deviations. For a
-worst-case Bernoulli endpoint with standard deviation `0.5`, the conservative
-absolute-proportion MDE is `0.0224`. The preregistered planning bounds are:
+`0.05/5=0.01`. Power is calculated directly for the registered one-sided
+studentized mean test, not by scaling an earlier design. With `df=4999`, the
+critical value is `t_0.99,4999=2.327094`. The standardized effect `delta` solves
+`Pr[T_4999(ncp=delta*sqrt(5000)) > 2.327094] = 0.80`, giving
+`delta=0.04481398`. For binary-endpoint planning at `s_d=0.5`, this is an
+absolute MDE of `0.02240699`. The preregistered planning bounds are:
 
-| `test_id` | Endpoint type | Conservative 80% MDE at one-sided `alpha=0.01` |
-| --- | --- | --- |
-| `P2-C1-AIR-MAE-N` | continuous paired absolute-error difference | `0.0448 s_d` |
-| `P2-C3-PRECISION-DEFINED` | paired binary definedness difference | `0.0448 s_d`; `0.0224` under worst-case `s_d=0.5` planning |
-| `P2-C4-AIR-FP-GATE` | paired binary false-flag difference | `0.0448 s_d`; `0.0224` under worst-case `s_d=0.5` planning |
-| `P2-C5-MISSINGNESS-MAE` | continuous paired absolute-error difference | `0.0448 s_d` |
-| `P2-C6-AIR-COVERAGE` | paired binary coverage difference | `0.0448 s_d`; `0.0224` under worst-case `s_d=0.5` planning |
+| `test_id` | Endpoint type | MCSE at final R | Conservative power and MDE at one-sided family-planning `alpha=0.01` |
+| --- | --- | --- | --- |
+| `P2-C1-AIR-MAE-N` | continuous paired absolute-error difference | `s_d/sqrt(5000) = 0.01414214 s_d` | 80% power at `0.04481398 s_d` |
+| `P2-C3-PRECISION-DEFINED` | paired binary definedness difference | `s_d/sqrt(5000)`; planning value `0.00707107` at `s_d=0.5` | 80% power at `0.04481398 s_d`; planning value `0.02240699` at `s_d=0.5` |
+| `P2-C4-AIR-FP-GATE` | paired binary false-flag difference | `s_d/sqrt(5000)`; planning value `0.00707107` at `s_d=0.5` | 80% power at `0.04481398 s_d`; planning value `0.02240699` at `s_d=0.5` |
+| `P2-C5-MISSINGNESS-MAE` | continuous paired absolute-error difference | `s_d/sqrt(5000) = 0.01414214 s_d` | 80% power at `0.04481398 s_d` |
+| `P2-C6-AIR-COVERAGE` | paired binary coverage difference | `s_d/sqrt(5000)`; planning value `0.00707107` at `s_d=0.5` | 80% power at `0.04481398 s_d`; planning value `0.02240699` at `s_d=0.5` |
 
 These are conservative planning bounds; the final studentized tests and
 observed paired variances are reported. The manuscript does not claim reliable
@@ -639,8 +641,9 @@ proportion MCSE `<=0.0071`, MAE half-width `<=0.032`, or the C6 denominator is
 reported as `precision_limited`. A precision-limited primary result is also
 `inconclusive` for confirmatory claims. A run is not extended beyond its fixed
 `R`, and the result is not replaced, hidden, or rerun to obtain a desired
-conclusion. The MAE boundary is the prior `0.01` half-width target scaled by
-`sqrt(50000/5000)=sqrt(10)` and rounded conservatively from `0.0316` to `0.032`.
+conclusion. The MAE boundary is the prior `0.01` half-width target scaled by the
+exact tenfold-reduction factor `sqrt(10)` and rounded conservatively from
+`0.03162278` to `0.032`.
 Summary-bootstrap draws remain fixed at 2,000. Structural zero denominators are
 valid results and are not rerun to force definedness.
 
@@ -764,7 +767,7 @@ This study does not claim that:
 - **Date:** 2026-10-09
 - **Base protocol and implementation:** `main@4ae71c4`
 - **Owner approval:** @custice approved reducing confirmatory/H2 replication to
-  `R=5,000` on 2026-10-09 before any confirmatory statistic was generated.
+  `R=5,000` on 2026-10-09 UTC before any confirmatory statistic was generated.
 - **Reason:** the independently reviewed execution gate projected that the
   50,000-replicate plan exceeded the frozen execution budget on the available
   host. The change makes the preregistered study executable without changing
@@ -785,20 +788,23 @@ This study does not claim that:
   and failure handling; studentized tests; Holm correction; public-data plan;
   and non-claims.
 - **Result exposure:** no confirmatory estimate, MCSE, confidence bound,
-  p-value, Holm result, table, or figure was generated or viewed before owner
-  approval of A2. Existing smoke, engineering-fixture, benchmark, and resource
-  evidence contains no confirmatory statistic.
+  p-value, Holm result, table, figure, or formal execution seal was generated
+  or viewed before owner approval of A2. Existing smoke, engineering-fixture,
+  benchmark, and resource evidence contains no confirmatory statistic.
 - **Random-stream compatibility:** the seed algorithm and existing replicate
   IDs are unchanged; A2 uses the deterministic prefix `0..4999` and authorizes
   no replacement or newly selected seeds.
 - **Activation:** pending. Until A2 is approved, merged, implemented, and bound
   into a newly reviewed execution seal, the prior protocol remains the active
   contract and all confirmatory execution remains frozen. Every pre-A2 seal and
-  resource projection is invalid for authorization.
+  resource projection is invalid for authorization; every pre-A2 manifest hash
+  and any future seal binding derived from it must be rejected.
 
 ## Required outputs before a paper release
 
 - approved protocol and amendment log;
+- A2-bound manifest, resource projection, and independently verified execution
+  seal generated only after the A2 implementation is merged;
 - machine-readable scenario and seed manifests;
 - data cards, source/license records, cohort rules, and SHA-256 manifests;
 - locked environment and one-command clean reproduction;
