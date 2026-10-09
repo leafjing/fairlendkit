@@ -564,6 +564,17 @@ half-widths, use `t_0.975,R_valid-1 * MCSE`. In the planning statements below,
 sample standard deviation used by the final test. The per-test power contracts
 are:
 
+| `test_id` | Range of `d_r` | Proven SD bound | Nominal / minimum valid pairs | Conservative MCSE at minimum | Standardized 80% MDE | Conservative absolute MDE | Strongest allowed claim |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `P2-C1-AIR-MAE-N` | `[-999.2,24.2]` | `sigma_d<=511.7` | 5,000 / 2,500 | `0.02000000 sigma_d`; at most `10.23400000` | `0.06339371 sigma_d` | `32.43856074` at the legal SD bound | positive moderate-or-larger standardized mean error reduction; no useful small absolute-AIR-effect power claim |
+| `P2-C3-PRECISION-DEFINED` | `{-1,0,1}` | `sigma_d<=1` | 5,000 / 5,000 | at most `0.01414214` | `0.04481398 sigma_d` | `0.04481398` | moderate-or-larger paired increase in precision definedness at decision prevalence `0.50` |
+| `P2-C4-AIR-FP-GATE` | `{-1,0,1}` | `sigma_d<=1` | 5,000 / 5,000 | at most `0.01414214` | `0.04481398 sigma_d` | `0.04481398` | moderate-or-larger paired reduction in false AIR flags under the frozen gated policy |
+| `P2-C5-MISSINGNESS-MAE` | `[-1,1]` | `sigma_d<=1` | 5,000 / 2,500 | at most `0.02000000` | `0.06339371 sigma_d` | `0.06339371` | moderate-or-larger increase in absolute selection-rate-difference error under frozen MNAR versus MCAR |
+| `P2-C6-AIR-COVERAGE` | `{-1,0,1}` | `sigma_d<=1` | 5,000 / 2,500 | at most `0.02000000` | `0.06339371 sigma_d` | `0.06339371` | moderate-or-larger increase in emitted-interval coverage at `N=1000`, conditional on the availability floor |
+
+The table is normative. The following derivations define the failure sources,
+half-widths, and inconclusive rules behind each row:
+
 - **`P2-C1-AIR-MAE-N`.** `d_r=AE_025-AE_1000`. Because population AIR is
   `0.8`, a defined equal-size empirical AIR is at most its reference-group
   count. Therefore `AE_025` is in `[0,24.2]`, `AE_1000` is in `[0,999.2]`, and
