@@ -19,6 +19,7 @@ from fairlendkit.metrics.contracts import LimitationCode, MetricNameV2
 from fairlendkit.metrics.group import canonical_typed_token
 
 from fairlendkit.research.paper2.protocol import (
+    A2_PROTOCOL_COMMIT,
     CONFIRMATORY_REPLICATES,
     ExecutionMode,
     ProductionRunLockedError,
@@ -133,7 +134,7 @@ class SmokeBenchmarkEvidence:
     wall_hours_limit: float = WALL_HOURS_LIMIT
 
     def __post_init__(self) -> None:
-        if self.schema_version != "paper2-resource-benchmark-v1":
+        if self.schema_version != "paper2-resource-benchmark-v2":
             raise IntegrityError("Resource benchmark schema is not frozen.")
         numeric = (
             self.smoke_records,
@@ -160,6 +161,9 @@ class SmokeBenchmarkEvidence:
             or self.wall_hours_limit != WALL_HOURS_LIMIT
         ):
             raise IntegrityError("Resource benchmark policy values are frozen.")
+        expected_records = len(frozen_execution_scenario_ids()) * CONFIRMATORY_REPLICATES
+        if self.projected_records != expected_records:
+            raise IntegrityError("Resource benchmark replicate projection is not canonical.")
         minimum_memory = max(
             MEMORY_BUDGET_GIB * 1024**3,
             int(self.peak_rss_bytes * MEMORY_SAFETY_FACTOR),
@@ -189,6 +193,7 @@ class ExecutionSeal:
     schema_version: str
     code_commit: str
     protocol_commit: str
+    a2_protocol_commit: str
     manifest_sha256: str
     shard_plan_sha256: str
     protocol_manifest_sha256: str
@@ -196,10 +201,12 @@ class ExecutionSeal:
     environment_lock_sha256: str
 
     def __post_init__(self) -> None:
-        if self.schema_version != "paper2-execution-seal-v1":
+        if self.schema_version != "paper2-execution-seal-v2":
             raise IntegrityError("Execution seal schema is not frozen.")
         if not _COMMIT_RE.fullmatch(self.code_commit) or self.protocol_commit != PROTOCOL_A1_COMMIT:
             raise IntegrityError("Execution seal commit identity is invalid.")
+        if self.a2_protocol_commit != A2_PROTOCOL_COMMIT:
+            raise IntegrityError("Execution seal A2 protocol identity is invalid.")
         for value in (
             self.manifest_sha256,
             self.shard_plan_sha256,
@@ -216,6 +223,7 @@ class ExecutionManifest:
     code_commit: str
     implementation_base_commit: str
     protocol_commit: str
+    a2_protocol_commit: str
     protocol_manifest_sha256: str
     rng_fixture_sha256: str
     environment_lock_sha256: str
@@ -236,6 +244,8 @@ class ExecutionManifest:
             raise IntegrityError("Implementation base commit is not frozen.")
         if self.protocol_commit != PROTOCOL_A1_COMMIT:
             raise IntegrityError("Protocol/A1 commit does not match the frozen amendment.")
+        if self.a2_protocol_commit != A2_PROTOCOL_COMMIT:
+            raise IntegrityError("Protocol/A2 commit does not match the frozen amendment.")
         for value in (
             self.protocol_manifest_sha256,
             self.rng_fixture_sha256,
@@ -450,6 +460,7 @@ class ShardMetadata:
     code_commit: str
     implementation_base_commit: str
     protocol_commit: str
+    a2_protocol_commit: str
     protocol_manifest_sha256: str
     rng_fixture_sha256: str
     environment_lock_sha256: str
@@ -574,6 +585,7 @@ def build_manifest(repo_root: Path) -> ExecutionManifest:
         code_commit=code_commit,
         implementation_base_commit=IMPLEMENTATION_BASE_COMMIT,
         protocol_commit=PROTOCOL_A1_COMMIT,
+        a2_protocol_commit=A2_PROTOCOL_COMMIT,
         protocol_manifest_sha256=sha256_file(
             repo_root / "src/fairlendkit/research/paper2/protocol.json"
         ),
@@ -620,9 +632,10 @@ def validate_execution_seal(
         raise IntegrityError("Execution seal fields are invalid.")
     seal = ExecutionSeal(**raw)
     expected = ExecutionSeal(
-        schema_version="paper2-execution-seal-v1",
+        schema_version="paper2-execution-seal-v2",
         code_commit=manifest.code_commit,
         protocol_commit=manifest.protocol_commit,
+        a2_protocol_commit=manifest.a2_protocol_commit,
         manifest_sha256=manifest_sha256(manifest),
         shard_plan_sha256=shard_plan_sha256(),
         protocol_manifest_sha256=manifest.protocol_manifest_sha256,
@@ -802,6 +815,7 @@ def write_smoke_shard(
         code_commit=manifest.code_commit,
         implementation_base_commit=manifest.implementation_base_commit,
         protocol_commit=manifest.protocol_commit,
+        a2_protocol_commit=manifest.a2_protocol_commit,
         protocol_manifest_sha256=manifest.protocol_manifest_sha256,
         rng_fixture_sha256=manifest.rng_fixture_sha256,
         environment_lock_sha256=manifest.environment_lock_sha256,
@@ -845,6 +859,7 @@ def validate_shard(
         "code_commit": manifest.code_commit,
         "implementation_base_commit": manifest.implementation_base_commit,
         "protocol_commit": manifest.protocol_commit,
+        "a2_protocol_commit": manifest.a2_protocol_commit,
         "protocol_manifest_sha256": manifest.protocol_manifest_sha256,
         "rng_fixture_sha256": manifest.rng_fixture_sha256,
         "environment_lock_sha256": manifest.environment_lock_sha256,

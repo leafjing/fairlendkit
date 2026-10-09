@@ -125,7 +125,6 @@ def test_a1_bounded_integer_indices_and_rejection_consumption_are_exact():
     expected = _a1_golden()
     for key, purpose, unit_id, role in (
         ("h2_exact_indices", "h2_bootstrap", "H2", "scenario_unit_index"),
-        ("summary_exact_indices", "summary_bootstrap", "REG:adverse_impact_ratio:50000", "replicate_index"),
         ("rejection_sampling_stress", "h2_bootstrap", "H2", "scenario_unit_index"),
     ):
         case = expected[key]
@@ -147,11 +146,11 @@ def test_a1_complete_h2_and_small_summary_index_bytes_match_checked_in_hashes():
         ("h2_bootstrap", "H2", "scenario_unit_index", 5, 5, "h2_2000_by_5_sha256"),
         (
             "summary_bootstrap",
-            "REG:adverse_impact_ratio:50000",
+            "REG:adverse_impact_ratio:5000",
             "replicate_index",
             17,
             17,
-            "summary_2000_by_17_sha256",
+            "summary_5000_2000_by_17_sha256",
         ),
     )
     for purpose, unit_id, role, bound, width, hash_key in cases:
@@ -172,6 +171,21 @@ def test_a1_complete_h2_and_small_summary_index_bytes_match_checked_in_hashes():
                 reference.extend(pack(">Q", index))
         assert bytes(payload) == bytes(reference)
         assert hashlib.sha256(payload).hexdigest() == expected[hash_key]
+
+
+def test_a2_final_summary_stream_indices_are_exact():
+    rng = rng_stream(
+        master_seed=20261008,
+        purpose="summary_bootstrap",
+        unit_id="REG:adverse_impact_ratio:5000",
+        draw_id=0,
+        scope="analysis",
+        role="replicate_index",
+    )
+    assert [rng.randbelow(17) for _ in range(17)] == [
+        7, 2, 13, 0, 7, 9, 8, 9, 9, 4, 0, 12, 6, 13, 12, 0, 0,
+    ]
+    assert rng.candidates_consumed == 17
 
 
 def test_a1_pair_routing_shares_only_registered_roles_without_collisions():

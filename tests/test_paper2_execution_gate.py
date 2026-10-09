@@ -134,13 +134,13 @@ def _resource_evidence():
         RepresentativeCost("SEL-AIR081-N1000", 104, 4.0, 5.0, 400, 40, metrics, "paper2-raw-replicate-v1"),
     )
     return execution.SmokeBenchmarkEvidence(
-        schema_version="paper2-resource-benchmark-v1",
+        schema_version="paper2-resource-benchmark-v2",
         smoke_records=4,
         wall_seconds=5.0,
         cpu_seconds=4.0,
         peak_rss_bytes=400,
         artifact_bytes=100,
-        projected_records=29 * 50_000,
+        projected_records=29 * 5_000,
         projected_cpu_hours=1.0,
         projected_wall_hours=1.0,
         projected_disk_bytes=1_000,
@@ -155,14 +155,17 @@ def test_frozen_plan_has_exact_ranges_without_overlap_or_gaps():
     specs = frozen_confirmatory_shards()
 
     assert len(scenario_ids) == 29
-    assert len(specs) == len(scenario_ids) * 50
+    assert len(specs) == len(scenario_ids) * 5
     for scenario_id in scenario_ids:
         ranges = [
             (spec.start_replicate, spec.stop_replicate)
             for spec in specs
             if spec.scenario_id == scenario_id
         ]
-        assert ranges == [(start, start + 1_000) for start in range(0, 50_000, 1_000)]
+        assert ranges == [(start, start + 1_000) for start in range(0, 5_000, 1_000)]
+    assert execution.shard_plan_sha256() == (
+        "82f34f150dd65ec19eb178debab43274f7567f4ac61edd3115b5ec1c5e475fc1"
+    )
 
 
 def test_smoke_resume_is_idempotent_and_recovers_interrupted_artifact(
@@ -257,6 +260,7 @@ def test_metadata_schema_is_raw_and_contains_environment_evidence(workspace, man
     assert metadata["python_version"]
     assert metadata["records_sha256"]
     assert metadata["environment_lock_sha256"] == manifest.environment_lock_sha256
+    assert metadata["a2_protocol_commit"] == manifest.a2_protocol_commit
     assert metadata["pip_freeze_sha256"] == manifest.pip_freeze_sha256
     assert metadata["python_executable_sha256"] == manifest.python_executable_sha256
 
@@ -278,6 +282,8 @@ def test_manifest_requires_real_clean_head_environment_and_frozen_strategies(
         replace(built, parallel_strategy="dynamic")
     with pytest.raises(IntegrityError, match="frozen"):
         replace(built, checkpoint_policy="partial")
+    with pytest.raises(IntegrityError, match="A2"):
+        replace(built, a2_protocol_commit="0" * 40)
 
     monkeypatch.setattr(execution, "_git_has_frozen_base", lambda _: False)
     with pytest.raises(IntegrityError, match="approved phase-one"):
@@ -295,7 +301,7 @@ def test_manifest_requires_real_clean_head_environment_and_frozen_strategies(
         ("confirmatory", "../REG", 0, 0, 1_000),
         ("confirmatory", "REG", -1, -1_000, 0),
         ("confirmatory", "REG", 0, 1, 1_001),
-        ("confirmatory", "REG", 50, 50_000, 51_000),
+        ("confirmatory", "REG", 5, 5_000, 6_000),
         ("smoke", "REG", 0, 0, 101),
         ("smoke", "UNKNOWN", 0, 0, 2),
     ),
@@ -411,9 +417,10 @@ def test_serialized_record_and_metadata_boolean_identities_fail_closed(
 
 def test_external_execution_seal_binds_bytes_and_runtime_identity(tmp_path, manifest):
     seal = {
-        "schema_version": "paper2-execution-seal-v1",
+        "schema_version": "paper2-execution-seal-v2",
         "code_commit": manifest.code_commit,
         "protocol_commit": manifest.protocol_commit,
+        "a2_protocol_commit": manifest.a2_protocol_commit,
         "manifest_sha256": execution.manifest_sha256(manifest),
         "shard_plan_sha256": execution.shard_plan_sha256(),
         "protocol_manifest_sha256": manifest.protocol_manifest_sha256,
@@ -431,6 +438,13 @@ def test_external_execution_seal_binds_bytes_and_runtime_identity(tmp_path, mani
     modified = (json.dumps(seal, sort_keys=True, separators=(",", ":")) + "\n").encode()
     seal_path.write_bytes(modified)
     with pytest.raises(IntegrityError, match="runtime identity"):
+        validate_execution_seal(seal_path, hashlib.sha256(modified).hexdigest(), manifest)
+
+    seal["code_commit"] = manifest.code_commit
+    seal["a2_protocol_commit"] = "0" * 40
+    modified = (json.dumps(seal, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    seal_path.write_bytes(modified)
+    with pytest.raises(IntegrityError, match="A2 protocol identity"):
         validate_execution_seal(seal_path, hashlib.sha256(modified).hexdigest(), manifest)
     raw = json.loads(execution._canonical_record(RawReplicateRecord("REG", 0, _payload())))
     raw["payload"]["nested_result"] = {"p_value": 0.01}
@@ -457,13 +471,17 @@ def test_complete_set_rejects_reused_identity_or_range(workspace, manifest):
 def test_resource_preflight_fails_closed():
     evidence = _resource_evidence()
 
-    assert evidence.schema_version == "paper2-resource-benchmark-v1"
+    assert evidence.schema_version == "paper2-resource-benchmark-v2"
     assert evidence.smoke_records == 4
-    assert evidence.projected_records == 29 * 50_000
+    assert evidence.projected_records == 29 * 5_000
     assert evidence.safety_factor == 2.0
     assert evidence.projected_cpu_hours > 0
     assert evidence.projected_wall_hours > 0
     assert evidence.projected_disk_bytes > 0
+    with pytest.raises(IntegrityError, match="schema"):
+        replace(evidence, schema_version="paper2-resource-benchmark-v1")
+    with pytest.raises(IntegrityError, match="replicate projection"):
+        replace(evidence, projected_records=29 * 50_000)
     sufficient = ResourceCapacity(
         cpu_count=4,
         memory_bytes=evidence.required_memory_bytes,
@@ -571,9 +589,9 @@ def test_cost_projection_sums_mapped_artifact_bytes_without_average_underestimat
         coverage, cpu, wall, artifacts
     )
 
-    expected_raw_disk = (100 + 1_000 + 1_000) * 50_000
+    expected_raw_disk = (100 + 1_000 + 1_000) * 5_000
     assert projected_disk == expected_raw_disk * 2
-    assert projected_disk > int(sum(artifacts.values()) / 2 * 3 * 50_000 * 2)
+    assert projected_disk > int(sum(artifacts.values()) / 2 * 3 * 5_000 * 2)
     assert projected_cpu > 0
     assert projected_wall > 0
 

@@ -11,9 +11,9 @@ from typing import Any
 MASTER_SEED = 20261008
 PROTOCOL_ID = "fairlendkit-paper2-v1"
 SMOKE_SEED_DOMAIN = "fairlendkit-paper2-smoke-v1"
-CONFIRMATORY_REPLICATES = 50_000
+CONFIRMATORY_REPLICATES = 5_000
 EXPLORATORY_REPLICATES = 10_000
-MONITORING_CHECKPOINTS = (10_000, 20_000, 30_000, 40_000)
+MONITORING_CHECKPOINTS = (1_000, 2_000, 3_000, 4_000)
 CONFIRMATORY_TEST_IDS = (
     "P2-C1-AIR-MAE-N",
     "P2-C3-PRECISION-DEFINED",
@@ -23,6 +23,7 @@ CONFIRMATORY_TEST_IDS = (
 )
 RNG_SCHEMA_VERSION = "paper2-rng-a1-v1"
 RNG_FIXTURE_SHA256 = "6e5d99c5531c03e3501dc0be16d68faf5338beb7b6246782f5a7623730577905"
+A2_PROTOCOL_COMMIT = "4a83ff8872d3393fad4313927045777f65fd3da4"
 
 
 class ExecutionMode(StrEnum):
@@ -40,6 +41,7 @@ class Paper2Protocol:
     status: str
     rng_schema_version: str
     rng_fixture_sha256: str
+    a2_protocol_commit: str
     master_seed: int
     confirmatory_replicates: int
     exploratory_replicates: int
@@ -65,6 +67,7 @@ def load_protocol(path: str | Path | None = None) -> Paper2Protocol:
         "status",
         "rng_schema_version",
         "rng_fixture_sha256",
+        "a2_protocol_commit",
         "master_seed",
         "confirmatory_replicates",
         "exploratory_replicates",
@@ -79,6 +82,7 @@ def load_protocol(path: str | Path | None = None) -> Paper2Protocol:
         status=str(raw["status"]),
         rng_schema_version=str(raw["rng_schema_version"]),
         rng_fixture_sha256=str(raw["rng_fixture_sha256"]),
+        a2_protocol_commit=str(raw["a2_protocol_commit"]),
         master_seed=int(raw["master_seed"]),
         confirmatory_replicates=int(raw["confirmatory_replicates"]),
         exploratory_replicates=int(raw["exploratory_replicates"]),
@@ -91,6 +95,7 @@ def load_protocol(path: str | Path | None = None) -> Paper2Protocol:
         or protocol.master_seed != MASTER_SEED
         or protocol.rng_schema_version != RNG_SCHEMA_VERSION
         or protocol.rng_fixture_sha256 != RNG_FIXTURE_SHA256
+        or protocol.a2_protocol_commit != A2_PROTOCOL_COMMIT
         or protocol.confirmatory_replicates != CONFIRMATORY_REPLICATES
         or protocol.exploratory_replicates != EXPLORATORY_REPLICATES
         or protocol.monitoring_checkpoints != MONITORING_CHECKPOINTS
