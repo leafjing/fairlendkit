@@ -558,26 +558,75 @@ minimum 2,500 valid pairs allowed for C1, C5, and C6, `df=2499`,
 
 A paired binary difference is in `{-1,0,1}`. Without a proven monotonic
 relationship its standard deviation can be as large as `1`; the single-
-Bernoulli `0.5` bound does not apply. The preregistered planning bounds are:
+Bernoulli `0.5` bound does not apply. For 95% two-sided simulation-error
+half-widths, use `t_0.975,R_valid-1 * MCSE`. In the planning statements below,
+`sigma_d=SD(d_r)` is the DGP standard deviation; `s_d` remains the observed
+sample standard deviation used by the final test. The per-test power contracts
+are:
 
-| `test_id` | Endpoint type | MCSE at final R | Conservative power and MDE at one-sided family-planning `alpha=0.01` |
-| --- | --- | --- | --- |
-| `P2-C1-AIR-MAE-N` | continuous paired absolute-error difference | minimum `R_valid=2,500`: `0.02000000 s_d` | 80% power at `0.06339371 s_d` |
-| `P2-C3-PRECISION-DEFINED` | paired binary definedness difference | required `R_valid=5,000`: at most `0.01414214` because `s_d<=1` | 80% power at standardized `0.04481398 s_d`; conservative absolute MDE `0.04481398` |
-| `P2-C4-AIR-FP-GATE` | paired binary false-flag difference | required `R_valid=5,000`: at most `0.01414214` because `s_d<=1` | 80% power at standardized `0.04481398 s_d`; conservative absolute MDE `0.04481398` |
-| `P2-C5-MISSINGNESS-MAE` | continuous paired absolute-error difference | minimum `R_valid=2,500`: `0.02000000 s_d` | 80% power at `0.06339371 s_d` |
-| `P2-C6-AIR-COVERAGE` | paired binary coverage difference | minimum `R_valid=2,500`: at most `0.02000000` because `s_d<=1` | 80% power at standardized `0.06339371 s_d`; conservative absolute MDE `0.06339371` |
+- **`P2-C1-AIR-MAE-N`.** `d_r=AE_025-AE_1000`. Because population AIR is
+  `0.8`, a defined equal-size empirical AIR is at most its reference-group
+  count. Therefore `AE_025` is in `[0,24.2]`, `AE_1000` is in `[0,999.2]`, and
+  `d_r` is in `[-999.2,24.2]`. Popoviciu's inequality proves only the
+  conservative `sigma_d<=511.7`; no `sigma_d<=1` claim is made. There are 5,000 nominal
+  pairs; either AIR being undefined because its reference selection rate is
+  zero removes that pair. A confirmatory conclusion requires
+  `R_valid>=2,500`. At that minimum, planning MCSE is `0.02000000 sigma_d` (at most
+  `10.23400000`), the 95% half-width is `0.03921827 s_d` (at most
+  `20.06799106`), standardized MDE is `0.06339371 sigma_d`, and the legal-bound
+  absolute MDE is `32.43856074`. The strongest allowed claim is a positive
+  standardized moderate-or-larger mean error reduction with adequate
+  defined-pair support; the protocol makes no useful small absolute-AIR-effect
+  power claim from this worst-case bound.
+- **`P2-C3-PRECISION-DEFINED`.** `d_r=I_defined_050-I_defined_001` is in
+  `{-1,0,1}`, so `sigma_d<=1`. All 5,000 registered pairs are required because both
+  definedness indicators exist even when precision itself is undefined; a
+  missing, duplicate, or invalid replicate record invalidates the analysis.
+  MCSE is at most `0.01414214`, the 95% half-width is at most `0.02772479`, and
+  both the standardized and conservative absolute MDE are `0.04481398`. The
+  strongest allowed claim is that the definedness proportion is higher at
+  decision prevalence `0.50` by a moderate-or-larger paired difference.
+- **`P2-C4-AIR-FP-GATE`.** `d_r=I_FP_ungated-I_FP_gated` is in `{-1,0,1}`, so
+  `sigma_d<=1`; monotonicity is not assumed for power planning. All 5,000 registered
+  pairs are required because undefined AIR maps to no emitted flag under both
+  frozen policies and remains in the denominator; a missing, duplicate, or
+  invalid record invalidates the analysis. MCSE is at most `0.01414214`, the
+  95% half-width is at most `0.02772479`, and both the standardized and
+  conservative absolute MDE are `0.04481398`. The strongest allowed claim is a
+  moderate-or-larger reduction in false AIR flags under the gated policy in
+  this preregistered scenario.
+- **`P2-C5-MISSINGNESS-MAE`.** `d_r=AE_MNAR-AE_MCAR`. The paired performance
+  DGP has complete-data selection-rate difference zero; each observed
+  selection-rate difference is in `[-1,1]`, so each absolute error is in
+  `[0,1]`, `d_r` is in `[-1,1]`, and `sigma_d<=1`. There are 5,000 nominal pairs;
+  either metric being undefined removes that pair. A confirmatory conclusion
+  requires `R_valid>=2,500`. At that minimum, MCSE is at most `0.02000000`, the
+  95% half-width is at most `0.03921827`, and both the standardized and
+  conservative absolute MDE are `0.06339371`. The strongest allowed claim is a
+  moderate-or-larger increase in absolute selection-rate-difference error under
+  the frozen MNAR mechanism relative to MCAR.
+- **`P2-C6-AIR-COVERAGE`.** `d_r=I_cover_1000-I_cover_050` is in `{-1,0,1}`,
+  so `sigma_d<=1`. There are 5,000 nominal pairs; a pair is valid only when both
+  intervals are emitted, and undefined/unreliable metrics or insufficient
+  valid metric-bootstrap draws can remove it. A confirmatory conclusion
+  requires `R_valid>=2,500`. At that minimum, MCSE is at most `0.02000000`, the
+  95% half-width is at most `0.03921827`, and both the standardized and
+  conservative absolute MDE are `0.06339371`. The strongest allowed claim is a
+  moderate-or-larger increase in emitted-interval coverage at `N=1000`,
+  conditional on meeting the preregistered availability floor.
 
-These are conservative planning bounds; the final studentized tests and
-observed paired variances are reported. The manuscript claims only that the
-study evaluates moderate-or-larger effects in the preregistered scenarios. It
-does not claim reliable detection below `0.04481398` absolute paired-binary
-difference for C3/C4 or below `0.06339371` for C6 at its minimum denominator.
-Effects below the applicable standardized MDE for C1/C5 cannot support a
-no-effect conclusion. An adjusted non-rejection, a confidence bound crossing
-zero, an observed effect below the applicable planning MDE, or failure to meet
-the minimum valid denominator is reported as `inconclusive`; replicates are not
-added after results are viewed to obtain significance.
+The final studentized tests and observed paired variances are reported. The
+overall manuscript summary uses the weakest applicable binary precision:
+`0.06339371` absolute MDE and `0.03921827` worst-case 95% simulation-error
+half-width at 2,500 valid pairs. It does not use the more favorable C3/C4 bound
+to characterize all tests. C1 has only the much weaker legal absolute bound
+above and is described in standardized units. An adjusted non-rejection, a
+confidence bound crossing zero, an observed effect below the applicable
+planning MDE, or failure to meet the minimum valid denominator is reported as
+`inconclusive`, never as evidence of no effect. Replicates are not added after
+results are viewed to obtain significance. An observed paired MCSE or 95%
+half-width exceeding its test's listed conservative planning limit is likewise
+`precision_limited` and therefore `inconclusive`.
 
 ### Public-data analysis
 
@@ -651,8 +700,13 @@ At `R=5,000`, the worst-case proportion MCSE is `0.0071` and its normal 95%
 simulation-error half-width is `0.0139`. At population coverage `0.95`, MCSE is
 `0.0031` and the corresponding half-width is `0.0060`. These are single-
 proportion operating-characteristic diagnostics; the larger paired-difference
-MCSE bounds in the per-test power table govern confirmatory contrasts. Failure to meet
-proportion MCSE `<=0.0071`, MAE half-width `<=0.032`, or the C6 denominator is
+MCSE bounds in the per-test power contract govern confirmatory contrasts. C3
+and C4 require paired MCSE `<=0.01414214` and 95% half-width `<=0.02772479`;
+C5 and C6 require paired MCSE `<=0.02000000` and half-width `<=0.03921827`;
+C1 requires standardized MCSE `MCSE/s_d<=0.02000000` and standardized
+half-width `<=0.03921827`, while its legal absolute bounds remain the much
+weaker values stated above. Failure to meet proportion MCSE `<=0.0071`, MAE
+half-width `<=0.032`, the applicable paired precision boundary, or the C6 denominator is
 reported as `precision_limited`. The same status applies when C1/C5 have fewer
 than 2,500 valid pairs or C3/C4 do not have all 5,000 registered pairs. A
 precision-limited primary result is also `inconclusive` for confirmatory claims.
@@ -744,7 +798,7 @@ This study does not claim that:
 | C6 direction described only in prose | `d_r = I_cover_1000 - I_cover_050`; positive values support greater coverage at `N=1000`. |
 | H2 stratified bootstrap sampled reliability states separately, then an interim union bootstrap did not define paired units | Five AIR-keyed units pair each `N025` scenario with the equal-weight mean of its four reliable-N scenarios. One shared five-index vector resamples both sides through `delta_a`; fewer than 1,900 valid draws yields `not_estimable`. |
 | H2 scenario set expressed by brace grammar and aliases | The normative section lists all 25 unique IDs explicitly; aliases are excluded. |
-| Earlier 10,000- and 50,000-pair power bounds | Under A2, direct noncentral-t solutions give `0.04481398 SD` at 5,000 valid pairs and `0.06339371 SD` at the 2,500-pair minimum, at conservative one-sided planning level `0.01` and 80% power. Paired binary differences use the valid `s_d<=1` bound. |
+| Earlier 10,000- and 50,000-pair power bounds | Under A2, direct noncentral-t solutions give `0.04481398 SD` at 5,000 valid pairs and `0.06339371 SD` at the 2,500-pair minimum, at conservative one-sided planning level `0.01` and 80% power. Paired binary differences use the valid `SD(d_r)<=1` bound. |
 | Generator seed included `scenario_id` while prose claimed different scenarios shared row streams; separate summary/H2 formats created multiple roots | One seven-field root format covers all purposes. A routing table maps every random variable, shape, scope, role, consumption order, transform, and bounded-integer rule. The pair table freezes shared streams and deterministic transforms. |
 | Direct binary64 midpoint `(x+0.5)/2**64` and a separate endpoint-replacement rule could round the largest uint64 to `1.0` and make `ndtri` infinite | The only normal input is `(q52+0.5)*2**-52`, where `q52=x>>12`; the only closed-open uniform is `(x>>11)*2**-53`. Endpoint clipping/replacement is forbidden, and exact fixtures freeze both uint64 endpoints. |
 | A1 fixed confirmatory/H2 analysis at 50,000 replicates, which exceeded the approved execution resources before any confirmatory statistic was produced | A2 fixes confirmatory/H2 analysis at replicate IDs `0..4999`, recalculates precision and power by test and valid denominator, limits claims to moderate-or-larger effects, and preserves all scenarios, estimands, seeds, bootstrap rules, failure handling, and statistical methods. |
