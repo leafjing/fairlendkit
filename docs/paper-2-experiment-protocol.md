@@ -37,9 +37,9 @@ diagnostic estimand and H7 is exploratory; neither enters multiplicity testing.
 
 - **C1 — sample support:** in `SEL-N025` versus `SEL-N1000`, the mean absolute
   AIR error is larger at `n=25`. The paired statistic is
-  `mean(|AIR_hat_25 - AIR| - |AIR_hat_1000 - AIR|)` over all 50,000 replicate
+  `mean(|AIR_hat_25 - AIR| - |AIR_hat_1000 - AIR|)` over all 5,000 replicate
   IDs for which both AIR estimates are defined; paired availability is reported
-  against all 50,000 generated pairs.
+  against all 5,000 generated pairs.
 - **H2 — reliability separation, diagnostic:** across the frozen AIR scenario
   registry, the scenario-standardized mean absolute AIR error is reported for
   `reliable` and `unreliable` observations. It is an association between a
@@ -47,19 +47,19 @@ diagnostic estimand and H7 is exploratory; neither enters multiplicity testing.
 - **C3 — sparse decisions:** in `PERF-DEC001` versus `PERF-DEC050`, the
   proportion of defined precision estimates is lower at favorable-decision
   prevalence `0.01`. The paired statistic is the mean replicate-level
-  difference `I_defined_050 - I_defined_001` over replicate IDs 0–49,999.
+  difference `I_defined_050 - I_defined_001` over replicate IDs 0–4,999.
 - **C4 — AIR gating:** in `SEL-AIR081-N025`, the false-positive proportion is
   lower for the frozen reliability-gated policy than for the ungated policy.
   The paired statistic is `I_false_positive_ungated -
-  I_false_positive_gated` over replicate IDs 0–49,999. Population AIR is `0.81`,
+  I_false_positive_gated` over replicate IDs 0–4,999. Population AIR is `0.81`,
   so a flag is false.
 - **C5 — missingness:** in `MISS-MNAR30` versus `MISS-MCAR30`, the mean absolute
   selection-rate-difference error is larger under MNAR. The paired statistic is
   `|error_MNAR| - |error_MCAR|` against the same complete-data truth over
-  replicate IDs 0–49,999 for which both metrics are defined.
+  replicate IDs 0–4,999 for which both metrics are defined.
 - **C6 — bootstrap regularity:** emitted 95% AIR intervals have lower empirical
   coverage in `SEL-AIR081-N050` than in `SEL-AIR081-N1000`. The paired statistic is the
-  explicitly `d_r = I_cover_1000 - I_cover_050` over replicate IDs 0–49,999 for
+  explicitly `d_r = I_cover_1000 - I_cover_050` over replicate IDs 0–4,999 for
   which both intervals are emitted. Availability is reported separately and
   never counted as coverage.
 - **H7 — public-data stability, exploratory:** low-support public-data cells are
@@ -75,12 +75,12 @@ those five rows at family-wise `0.05`.
 
 | `test_id` | Status | Metric/endpoint | Scenarios/policies | Contrast and direction | Denominator | Statistic | Raw `alpha` | Holm family |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `P2-C1-AIR-MAE-N` | confirmatory | AIR absolute error | `SEL-N025` vs `SEL-N1000` | `AE_025 - AE_1000 > 0` | replicate IDs 0–49,999 with both AIR values defined; availability uses all 50,000 pairs | paired mean difference; one-sample studentized t-test | 0.05 | `P2-CONFIRMATORY-V1` |
-| `P2-H2-RELIABILITY-DIAGNOSTIC` | descriptive | AIR absolute error by reliability | five frozen AIR-paired units built from 25 explicitly listed unique AIR×size IDs | mean across units of `MAE_N025 - mean(MAE_N050,N100,N250,N1000)` | defined AIR values from replicate IDs 0–49,999; equal AIR-unit and within-unit reliable-N weights | paired-unit mean and joint paired-unit bootstrap interval | — | none |
-| `P2-C3-PRECISION-DEFINED` | confirmatory | precision defined indicator | `PERF-DEC001` vs `PERF-DEC050` | `I_defined_050 - I_defined_001 > 0` | all replicate IDs 0–49,999 | paired mean difference; one-sample studentized t-test | 0.05 | `P2-CONFIRMATORY-V1` |
-| `P2-C4-AIR-FP-GATE` | confirmatory | false AIR flag indicator | gated vs ungated in `SEL-AIR081-N025` | `FP_ungated - FP_gated > 0` | all replicate IDs 0–49,999; undefined AIR is no emitted flag and separately counted | paired mean risk difference; one-sample studentized t-test | 0.05 | `P2-CONFIRMATORY-V1` |
-| `P2-C5-MISSINGNESS-MAE` | confirmatory | selection-rate-difference absolute error | `MISS-MNAR30` vs `MISS-MCAR30` | `AE_MNAR - AE_MCAR > 0` | replicate IDs 0–49,999 with both metrics defined; availability uses all 50,000 pairs | paired mean difference; one-sample studentized t-test | 0.05 | `P2-CONFIRMATORY-V1` |
-| `P2-C6-AIR-COVERAGE` | confirmatory | 95% AIR interval coverage | `SEL-AIR081-N050` vs `SEL-AIR081-N1000` | `d_r=I_cover_1000-I_cover_050 > 0` | replicate IDs 0–49,999 with both intervals emitted; availability uses all 50,000 pairs | paired mean coverage difference; one-sample studentized t-test | 0.05 | `P2-CONFIRMATORY-V1` |
+| `P2-C1-AIR-MAE-N` | confirmatory | AIR absolute error | `SEL-N025` vs `SEL-N1000` | `AE_025 - AE_1000 > 0` | replicate IDs 0–4,999 with both AIR values defined; availability uses all 5,000 pairs; minimum `R_valid=2,500` for a confirmatory conclusion | paired mean difference; one-sample studentized t-test | 0.05 | `P2-CONFIRMATORY-V1` |
+| `P2-H2-RELIABILITY-DIAGNOSTIC` | descriptive | AIR absolute error by reliability | five frozen AIR-paired units built from 25 explicitly listed unique AIR×size IDs | mean across units of `MAE_N025 - mean(MAE_N050,N100,N250,N1000)` | defined AIR values from replicate IDs 0–4,999; equal AIR-unit and within-unit reliable-N weights | paired-unit mean and joint paired-unit bootstrap interval | — | none |
+| `P2-C3-PRECISION-DEFINED` | confirmatory | precision defined indicator | `PERF-DEC001` vs `PERF-DEC050` | `I_defined_050 - I_defined_001 > 0` | all replicate IDs 0–4,999 | paired mean difference; one-sample studentized t-test | 0.05 | `P2-CONFIRMATORY-V1` |
+| `P2-C4-AIR-FP-GATE` | confirmatory | false AIR flag indicator | gated vs ungated in `SEL-AIR081-N025` | `FP_ungated - FP_gated > 0` | all replicate IDs 0–4,999; undefined AIR is no emitted flag and separately counted | paired mean risk difference; one-sample studentized t-test | 0.05 | `P2-CONFIRMATORY-V1` |
+| `P2-C5-MISSINGNESS-MAE` | confirmatory | selection-rate-difference absolute error | `MISS-MNAR30` vs `MISS-MCAR30` | `AE_MNAR - AE_MCAR > 0` | replicate IDs 0–4,999 with both metrics defined; availability uses all 5,000 pairs; minimum `R_valid=2,500` for a confirmatory conclusion | paired mean difference; one-sample studentized t-test | 0.05 | `P2-CONFIRMATORY-V1` |
+| `P2-C6-AIR-COVERAGE` | confirmatory | 95% AIR interval coverage | `SEL-AIR081-N050` vs `SEL-AIR081-N1000` | `d_r=I_cover_1000-I_cover_050 > 0` | replicate IDs 0–4,999 with both intervals emitted; availability uses all 5,000 pairs; minimum `R_valid=2,500` for a confirmatory conclusion | paired mean coverage difference; one-sample studentized t-test | 0.05 | `P2-CONFIRMATORY-V1` |
 | `P2-H7-HMDA-STABILITY` | exploratory | subsample MAD from full-cohort metric | HMDA fractions 0.25/0.50/0.75 | median low-support MAD minus median supported-cell MAD | eligible cells under the frozen support cutoffs | cell-level difference and cell-bootstrap interval | — | none |
 
 ## Estimands and analysis units
@@ -137,7 +137,7 @@ SEL-AIR100-N025  SEL-AIR100-N050  SEL-AIR100-N100  SEL-AIR100-N250  SEL-AIR100-N
 ```
 
 For each scenario, compute mean absolute AIR error over defined values from
-replicate IDs 0–49,999. A scenario with zero defined AIR values is unavailable,
+replicate IDs 0–4,999. A scenario with zero defined AIR values is unavailable,
 not silently discarded or imputed.
 
 Every `N025` scenario is `unreliable`; every `N050/N100/N250/N1000` scenario is
@@ -169,7 +169,7 @@ otherwise H2 is `not_estimable`, with no interval, imputation, resampling, or
 one-sided substitute denominator.
 
 Coverage is not part of H2. State-specific definedness and interval availability
-use all 50,000 generated audits per scenario as their denominators and are
+use all 5,000 generated audits per scenario as their denominators and are
 reported jointly with MAE. No within-scenario or causal effect is claimed.
 
 ### Secondary operating characteristics
@@ -498,7 +498,7 @@ unclear redistribution terms are excluded.
 ### Monte Carlo summaries
 
 Every scenario used by a `P2-CONFIRMATORY-V1` test or H2 generates exactly
-50,000 independent replicates. Other descriptive/exploratory simulation
+5,000 independent replicates. Other descriptive/exploratory simulation
 scenarios generate exactly 10,000. Replicate ID `r` uses the sole generator
 seed construction and frozen `pair_id` table above; paired scenarios reuse
 the resulting row-level base uniforms before applying scenario transformations.
@@ -520,7 +520,7 @@ Primary conclusions rely on effect sizes and uncertainty, not only p-values.
 ### Confirmatory contrasts, tests, and multiplicity
 
 The confirmatory family contains exactly C1, C3, C4, C5, and C6. Each uses the
-fixed 50,000 replicate IDs (`0..49999`).
+fixed 5,000 replicate IDs (`0..4999`).
 Each test has one metric, endpoint, direction, denominator, and scenario pair
 defined above. Calculate its paired differences `d_r`, their mean `d_bar`,
 sample standard deviation `s_d` with Bessel correction, and
@@ -532,7 +532,9 @@ For every test report `d_bar`, Monte Carlo standard error
 `MCSE = s_d / sqrt(R_valid)`, and the one-sided 95% lower confidence bound
 `d_bar - t_0.95,R_valid-1 * MCSE`, in addition to the raw and Holm-adjusted
 p-values. The direction is supported only when the adjusted p-value is at most
-`0.05`; the bound and effect size remain visible regardless of that decision.
+`0.05` and the test meets its preregistered minimum valid-pair denominator and
+precision rules below; the bound and effect size remain visible regardless of
+that decision.
 
 The studentized mean test requires independent replicate pairs and finite
 variance, both guaranteed by the DGP and independent replicate seed streams; it
@@ -545,14 +547,86 @@ unadjusted 95% t intervals. H2, H7, every other metric, all trend analyses, and
 all additional scenario comparisons are descriptive or exploratory and do not
 enter this family.
 
-At 50,000 pairs, the worst-case Bonferroni planning level `0.05/5=0.01` and 80%
-power imply an approximate minimum detectable paired mean of
-`(z_0.99 + z_0.80)/sqrt(50000) = 0.0142` paired standard deviations. For a
-worst-case Bernoulli endpoint with standard deviation `0.5`, the conservative
-MDE is about `0.0071` absolute proportion. These are planning bounds; the final
-studentized tests and observed paired variances are reported. If an observed
-effect below these bounds is inconclusive, the manuscript must say so rather
-than add replicates solely to obtain significance.
+The conservative first-step Holm/Bonferroni planning level is `0.05/5=0.01`.
+Power is calculated directly for the registered one-sided studentized mean
+test, not by scaling an earlier design. At 5,000 valid pairs, `df=4999`,
+`t_0.99,4999=2.327094`, and the standardized effect `delta` solving
+`Pr[T_4999(ncp=delta*sqrt(5000)) > 2.327094] = 0.80` is `0.04481398`. At the
+minimum 2,500 valid pairs allowed for C1, C5, and C6, `df=2499`,
+`t_0.99,2499=2.327841`, and the corresponding direct solution is
+`delta=0.06339371`.
+
+A paired binary difference is in `{-1,0,1}`. Without a proven monotonic
+relationship its standard deviation can be as large as `1`; the single-
+Bernoulli `0.5` bound does not apply. For 95% two-sided simulation-error
+half-widths, use `t_0.975,R_valid-1 * MCSE`. In the planning statements below,
+`sigma_d=SD(d_r)` is the DGP standard deviation; `s_d` remains the observed
+sample standard deviation used by the final test. The per-test power contracts
+are:
+
+- **`P2-C1-AIR-MAE-N`.** `d_r=AE_025-AE_1000`. Because population AIR is
+  `0.8`, a defined equal-size empirical AIR is at most its reference-group
+  count. Therefore `AE_025` is in `[0,24.2]`, `AE_1000` is in `[0,999.2]`, and
+  `d_r` is in `[-999.2,24.2]`. Popoviciu's inequality proves only the
+  conservative `sigma_d<=511.7`; no `sigma_d<=1` claim is made. There are 5,000 nominal
+  pairs; either AIR being undefined because its reference selection rate is
+  zero removes that pair. A confirmatory conclusion requires
+  `R_valid>=2,500`. At that minimum, planning MCSE is `0.02000000 sigma_d` (at most
+  `10.23400000`), the 95% half-width is `0.03921827 s_d` (at most
+  `20.06799106`), standardized MDE is `0.06339371 sigma_d`, and the legal-bound
+  absolute MDE is `32.43856074`. The strongest allowed claim is a positive
+  standardized moderate-or-larger mean error reduction with adequate
+  defined-pair support; the protocol makes no useful small absolute-AIR-effect
+  power claim from this worst-case bound.
+- **`P2-C3-PRECISION-DEFINED`.** `d_r=I_defined_050-I_defined_001` is in
+  `{-1,0,1}`, so `sigma_d<=1`. All 5,000 registered pairs are required because both
+  definedness indicators exist even when precision itself is undefined; a
+  missing, duplicate, or invalid replicate record invalidates the analysis.
+  MCSE is at most `0.01414214`, the 95% half-width is at most `0.02772479`, and
+  both the standardized and conservative absolute MDE are `0.04481398`. The
+  strongest allowed claim is that the definedness proportion is higher at
+  decision prevalence `0.50` by a moderate-or-larger paired difference.
+- **`P2-C4-AIR-FP-GATE`.** `d_r=I_FP_ungated-I_FP_gated` is in `{-1,0,1}`, so
+  `sigma_d<=1`; monotonicity is not assumed for power planning. All 5,000 registered
+  pairs are required because undefined AIR maps to no emitted flag under both
+  frozen policies and remains in the denominator; a missing, duplicate, or
+  invalid record invalidates the analysis. MCSE is at most `0.01414214`, the
+  95% half-width is at most `0.02772479`, and both the standardized and
+  conservative absolute MDE are `0.04481398`. The strongest allowed claim is a
+  moderate-or-larger reduction in false AIR flags under the gated policy in
+  this preregistered scenario.
+- **`P2-C5-MISSINGNESS-MAE`.** `d_r=AE_MNAR-AE_MCAR`. The paired performance
+  DGP has complete-data selection-rate difference zero; each observed
+  selection-rate difference is in `[-1,1]`, so each absolute error is in
+  `[0,1]`, `d_r` is in `[-1,1]`, and `sigma_d<=1`. There are 5,000 nominal pairs;
+  either metric being undefined removes that pair. A confirmatory conclusion
+  requires `R_valid>=2,500`. At that minimum, MCSE is at most `0.02000000`, the
+  95% half-width is at most `0.03921827`, and both the standardized and
+  conservative absolute MDE are `0.06339371`. The strongest allowed claim is a
+  moderate-or-larger increase in absolute selection-rate-difference error under
+  the frozen MNAR mechanism relative to MCAR.
+- **`P2-C6-AIR-COVERAGE`.** `d_r=I_cover_1000-I_cover_050` is in `{-1,0,1}`,
+  so `sigma_d<=1`. There are 5,000 nominal pairs; a pair is valid only when both
+  intervals are emitted, and undefined/unreliable metrics or insufficient
+  valid metric-bootstrap draws can remove it. A confirmatory conclusion
+  requires `R_valid>=2,500`. At that minimum, MCSE is at most `0.02000000`, the
+  95% half-width is at most `0.03921827`, and both the standardized and
+  conservative absolute MDE are `0.06339371`. The strongest allowed claim is a
+  moderate-or-larger increase in emitted-interval coverage at `N=1000`,
+  conditional on meeting the preregistered availability floor.
+
+The final studentized tests and observed paired variances are reported. The
+overall manuscript summary uses the weakest applicable binary precision:
+`0.06339371` absolute MDE and `0.03921827` worst-case 95% simulation-error
+half-width at 2,500 valid pairs. It does not use the more favorable C3/C4 bound
+to characterize all tests. C1 has only the much weaker legal absolute bound
+above and is described in standardized units. An adjusted non-rejection, a
+confidence bound crossing zero, an observed effect below the applicable
+planning MDE, or failure to meet the minimum valid denominator is reported as
+`inconclusive`, never as evidence of no effect. Replicates are not added after
+results are viewed to obtain significance. An observed paired MCSE or 95%
+half-width exceeding its test's listed conservative planning limit is likewise
+`precision_limited` and therefore `inconclusive`.
 
 ### Public-data analysis
 
@@ -598,16 +672,16 @@ file is public.
 
 ### Fixed-run and monitoring rule
 
-Every scenario used by a confirmatory test or H2 runs exactly 50,000 replicates;
-all other registered scenarios run exactly 10,000. For the 50,000-run set,
-monitoring checkpoints are `R={10,000, 20,000, 30,000, 40,000}`. At a checkpoint the system
+Every scenario used by a confirmatory test or H2 runs exactly 5,000 replicates;
+all other registered scenarios run exactly 10,000. For the 5,000-run set,
+monitoring checkpoints are `R={1,000, 2,000, 3,000, 4,000}`. At a checkpoint the system
 may inspect only execution health, failure counts, deterministic hashes,
 resource use, and the following blinded MC precision diagnostics: denominators,
 MCSE magnitudes, and interval half-width magnitudes without effect signs,
 scenario labels, confirmatory statistics, p-values, or Holm results.
 
 There is no efficacy, futility, precision, or significance stopping. No
-confirmatory estimate or p-value is calculated before all 50,000 replicates for
+confirmatory estimate or p-value is calculated before all 5,000 replicates for
 every member of its scenario pair are complete and frozen. Failed jobs resume
 the same replicate IDs; they do not redraw or replace them.
 
@@ -616,13 +690,30 @@ At each scenario's fixed final `R`, report these adequacy diagnostics:
 - MCSE for coverage, definedness, reliability, interval availability, flag
   availability, false-positive rate, and false-negative rate;
 - normal 95% simulation-error half-width
-  `1.96 * sd(absolute_error) / sqrt(50000)` for primary mean absolute error;
+  `1.96 * sd(absolute_error) / sqrt(5000)` for primary mean absolute error;
 - the paired valid denominators for all five confirmatory contrasts; and
-- whether C6 has at least 25,000 paired emitted intervals.
+- whether C1 and C5 each have at least 2,500 defined pairs, C3 and C4 each have
+  all 5,000 registered pairs, and C6 has at least 2,500 paired emitted
+  intervals.
 
-Failure to meet MCSE `<=0.005`, MAE half-width `<=0.01`, or the C6 denominator
-is reported as `precision_limited`. A run is not extended beyond its fixed `R` and
-the result is not replaced, hidden, or rerun to obtain a desired conclusion.
+At `R=5,000`, the worst-case proportion MCSE is `0.0071` and its normal 95%
+simulation-error half-width is `0.0139`. At population coverage `0.95`, MCSE is
+`0.0031` and the corresponding half-width is `0.0060`. These are single-
+proportion operating-characteristic diagnostics; the larger paired-difference
+MCSE bounds in the per-test power contract govern confirmatory contrasts. C3
+and C4 require paired MCSE `<=0.01414214` and 95% half-width `<=0.02772479`;
+C5 and C6 require paired MCSE `<=0.02000000` and half-width `<=0.03921827`;
+C1 requires standardized MCSE `MCSE/s_d<=0.02000000` and standardized
+half-width `<=0.03921827`, while its legal absolute bounds remain the much
+weaker values stated above. Failure to meet proportion MCSE `<=0.0071`, MAE
+half-width `<=0.032`, the applicable paired precision boundary, or the C6 denominator is
+reported as `precision_limited`. The same status applies when C1/C5 have fewer
+than 2,500 valid pairs or C3/C4 do not have all 5,000 registered pairs. A
+precision-limited primary result is also `inconclusive` for confirmatory claims.
+A run is not extended beyond its fixed `R`, and the result is not replaced,
+hidden, or rerun to obtain a desired conclusion. The MAE boundary is the prior
+`0.01` half-width target scaled by the exact tenfold-reduction factor `sqrt(10)`
+and rounded conservatively from `0.03162278` to `0.032`.
 Summary-bootstrap draws remain fixed at 2,000. Structural zero denominators are
 valid results and are not rerun to force definedness.
 
@@ -696,20 +787,21 @@ This study does not claim that:
 | DGP and scenario identities were not frozen | `Core DGP`, `Regular scenario and scenario registry`, and `Missingness mechanisms` define the counter sampler, equations, parameters, solver, `REG`, missingness coefficients, and exhaustive ID grammar. | `REG`; all `SEL-*`, `PERF-*`, `MISS-*`, and `STRESS-*` IDs in the registry |
 | H2 estimand and state handling were ambiguous | `Primary operating characteristics` fixes definedness and coverage denominators, five AIR-keyed paired units, within-unit reliable-N weighting, joint bootstrap indices, invalid-draw handling, and non-causal wording. | `P2-H2-RELIABILITY-DIAGNOSTIC`; the 25 unique AIR-by-size scenario IDs grouped into five paired units |
 | H7 could not identify stability | `Public-data analysis` freezes 100 non-nested outer replicates per fraction, MAD, support cutoffs, cell-bootstrap interval, and an exploratory contrast; `Public-data plan` freezes the California cohort. | `P2-H7-HMDA-STABILITY`; `HMDA-SUB-{f}-{000..099}` |
-| Precision, stopping, bootstrap, and power rules were incomplete | `Monte Carlo summaries`, `Confirmatory contrasts, tests, and multiplicity`, and `Fixed-run and monitoring rule` freeze 2,000 summary draws, seed material, adequacy boundaries, blinded checkpoints, fixed 50,000-run confirmatory/H2 analysis, and conservative 80% MDEs. | all `P2-CONFIRMATORY-V1` tests, H2, and every registered scenario's fixed final R |
+| Precision, stopping, bootstrap, and power rules were incomplete | `Monte Carlo summaries`, `Confirmatory contrasts, tests, and multiplicity`, and `Fixed-run and monitoring rule` freeze 2,000 summary draws, seed material, adequacy boundaries, blinded checkpoints, fixed 5,000-run confirmatory/H2 analysis under A2, and conservative 80% MDEs. | all `P2-CONFIRMATORY-V1` tests, H2, and every registered scenario's fixed final R |
 
 ### Architecture-decision replacement map
 
 | Superseded clause | Frozen replacement |
 | --- | --- |
 | Sign-flip randomization test for paired differences | One-sided studentized mean test on replicate-level differences, with `d_bar`, MCSE, one-sided 95% lower bound, raw p-value, and Holm-adjusted p-value. |
-| Confirmatory analysis fixed at the first 10,000 replicates, with later precision extensions | Every confirmatory test uses exactly replicate IDs `0..49999`; checkpoints at 10k/20k/30k/40k are blinded run-quality monitoring only, with no early stopping. |
+| Confirmatory analysis fixed at the first 10,000 replicates, with later precision extensions | Under A2, every confirmatory test uses exactly replicate IDs `0..4999`; checkpoints at 1k/2k/3k/4k are blinded run-quality monitoring only, with no early stopping. |
 | C6 direction described only in prose | `d_r = I_cover_1000 - I_cover_050`; positive values support greater coverage at `N=1000`. |
 | H2 stratified bootstrap sampled reliability states separately, then an interim union bootstrap did not define paired units | Five AIR-keyed units pair each `N025` scenario with the equal-weight mean of its four reliable-N scenarios. One shared five-index vector resamples both sides through `delta_a`; fewer than 1,900 valid draws yields `not_estimable`. |
 | H2 scenario set expressed by brace grammar and aliases | The normative section lists all 25 unique IDs explicitly; aliases are excluded. |
-| 10,000-pair power bound (`0.0317` SD; `0.0159` worst-case proportion) | 50,000-pair bound (`0.0142` SD; `0.0071` worst-case proportion) at conservative one-sided planning level `0.01` and 80% power. |
+| Earlier 10,000- and 50,000-pair power bounds | Under A2, direct noncentral-t solutions give `0.04481398 SD` at 5,000 valid pairs and `0.06339371 SD` at the 2,500-pair minimum, at conservative one-sided planning level `0.01` and 80% power. Paired binary differences use the valid `SD(d_r)<=1` bound. |
 | Generator seed included `scenario_id` while prose claimed different scenarios shared row streams; separate summary/H2 formats created multiple roots | One seven-field root format covers all purposes. A routing table maps every random variable, shape, scope, role, consumption order, transform, and bounded-integer rule. The pair table freezes shared streams and deterministic transforms. |
 | Direct binary64 midpoint `(x+0.5)/2**64` and a separate endpoint-replacement rule could round the largest uint64 to `1.0` and make `ndtri` infinite | The only normal input is `(q52+0.5)*2**-52`, where `q52=x>>12`; the only closed-open uniform is `(x>>11)*2**-53`. Endpoint clipping/replacement is forbidden, and exact fixtures freeze both uint64 endpoints. |
+| A1 fixed confirmatory/H2 analysis at 50,000 replicates, which exceeded the approved execution resources before any confirmatory statistic was produced | A2 fixes confirmatory/H2 analysis at replicate IDs `0..4999`, recalculates precision and power by test and valid denominator, limits claims to moderate-or-larger effects, and preserves all scenarios, estimands, seeds, bootstrap rules, failure handling, and statistical methods. |
 
 ## Protocol amendment log
 
@@ -728,7 +820,8 @@ This study does not claim that:
 - **Affected registered analyses:** C1, C3, C4, C5, C6, H2, every simulated DGP
   using random rows, and secondary summaries using bootstrap indices.
 - **Unchanged:** research questions, hypotheses, DGP probability parameters,
-  scenario registry, estimands, statistical tests, `R=50,000`, Holm family,
+  scenario registry, estimands, statistical tests, the then-current
+  `R=50,000` (subsequently superseded by A2), Holm family,
   monitoring/stopping rules, public-data cohort, and non-claims.
 - **Random-stream compatibility:** breaking relative to the ambiguous RNG text
   in `9fd45de`. A1 streams and fixtures become authoritative only if this
@@ -736,13 +829,55 @@ This study does not claim that:
 - **Result exposure:** no data were downloaded, no experiment implementation
   was written or run, and no pilot, confirmatory, or public-data result was
   viewed before this amendment was proposed.
-- **Activation:** pending. Until approval and merge, `main@9fd45de` remains the
-  authoritative protocol; DGP/RNG implementation, integration PRs, and all
-  experiment runs remain frozen.
+- **Activation:** approved and merged as `865a2ba` on 2026-10-08. Its RNG
+  contract remains unchanged by A2.
+
+### A2 — fixed confirmatory/H2 replicate count of 5,000
+
+- **Date:** 2026-10-09
+- **Base protocol and implementation:** `main@4ae71c4`
+- **Owner approval:** @custice approved reducing confirmatory/H2 replication to
+  `R=5,000` on 2026-10-09 UTC before any confirmatory statistic was generated.
+- **Reason:** the independently reviewed execution gate projected that the
+  50,000-replicate plan exceeded the frozen execution budget on the available
+  host. The change makes the preregistered study executable without changing
+  the scenarios or selectively reacting to results.
+- **Change:** confirmatory and H2 scenarios use exactly replicate IDs
+  `0..4999`; monitoring checkpoints become 1k/2k/3k/4k; conservative 80% MDE,
+  MCSE, adequacy boundaries, C6 availability, and inconclusive rules are
+  recalculated above. Other descriptive/exploratory scenarios remain at
+  `R=10,000`.
+- **Narrowed claim:** the manuscript claims evaluation of moderate-or-larger
+  effects in the preregistered scenarios. It does not claim reliable detection
+  below `0.04481398` absolute paired-binary difference for C3/C4 or below
+  `0.06339371` for C6 at its minimum denominator, and it does not infer no
+  effect from C1/C5 effects below their standardized MDEs. Results below the
+  applicable planning MDE, results failing the updated precision or valid-pair
+  boundary, and adjusted non-rejections are labeled `inconclusive` rather than
+  extended or rerun.
+- **Unchanged:** all registered scenarios; hypotheses and directions; DGP
+  parameters; estimands; master seed and seed derivation; A1 random streams;
+  1,000-resample metric bootstrap; 2,000-draw summary/H2 bootstrap; undefined
+  and failure handling; studentized tests; Holm correction; public-data plan;
+  and non-claims.
+- **Result exposure:** no confirmatory estimate, MCSE, confidence bound,
+  p-value, Holm result, table, figure, or formal execution seal was generated
+  or viewed before owner approval of A2. Existing smoke, engineering-fixture,
+  benchmark, and resource evidence contains no confirmatory statistic.
+- **Random-stream compatibility:** the seed algorithm and existing replicate
+  IDs are unchanged; A2 uses the deterministic prefix `0..4999` and authorizes
+  no replacement or newly selected seeds.
+- **Activation:** pending. Until A2 is approved, merged, implemented, and bound
+  into a newly reviewed execution seal, the prior protocol remains the active
+  contract and all confirmatory execution remains frozen. Every pre-A2 seal and
+  resource projection is invalid for authorization; every pre-A2 manifest hash
+  and any future seal binding derived from it must be rejected.
 
 ## Required outputs before a paper release
 
 - approved protocol and amendment log;
+- A2-bound manifest, resource projection, and independently verified execution
+  seal generated only after the A2 implementation is merged;
 - machine-readable scenario and seed manifests;
 - data cards, source/license records, cohort rules, and SHA-256 manifests;
 - locked environment and one-command clean reproduction;
