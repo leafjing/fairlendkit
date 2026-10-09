@@ -45,6 +45,7 @@ RESOURCE_BENCHMARK_REPRESENTATIVE_IDS = (
 )
 PROTOCOL_A1_COMMIT = "865a2baf549d691d602334379ed03a7883989d6f"
 IMPLEMENTATION_BASE_COMMIT = "1143d0e5795eefa1abb3de4bf52fdc9eaf8f9b91"
+NORMATIVE_BASE_COMMIT = A2_SPECIFICATION_COMMIT
 PARALLEL_STRATEGY = "process-per-shard; deterministic shard queue"
 CHECKPOINT_POLICY = "immutable-success-or-retry-whole-shard"
 RELIABILITY_STATES = frozenset(
@@ -203,7 +204,7 @@ class ExecutionSeal:
     code_commit: str
     protocol_commit: str
     a2_protocol_commit: str
-    a2_specification_commit: str
+    normative_base_commit: str
     manifest_sha256: str
     shard_plan_sha256: str
     protocol_manifest_sha256: str
@@ -211,6 +212,15 @@ class ExecutionSeal:
     environment_lock_sha256: str
     benchmark_evidence_sha256: str
     capacity_evidence_sha256: str
+    host_identity_sha256: str
+    cpu_count: int
+    memory_bytes: int
+    disk_free_bytes: int
+    pip_freeze_sha256: str
+    python_executable_sha256: str
+    python_version: str
+    worker_count: int
+    parallel_strategy: str
 
     def __post_init__(self) -> None:
         if self.schema_version != "paper2-execution-seal-v2":
@@ -219,8 +229,8 @@ class ExecutionSeal:
             raise IntegrityError("Execution seal commit identity is invalid.")
         if self.a2_protocol_commit != A2_PROTOCOL_COMMIT:
             raise IntegrityError("Execution seal A2 protocol identity is invalid.")
-        if self.a2_specification_commit != A2_SPECIFICATION_COMMIT:
-            raise IntegrityError("Execution seal A2 specification identity is invalid.")
+        if self.normative_base_commit != NORMATIVE_BASE_COMMIT:
+            raise IntegrityError("Execution seal normative baseline identity is invalid.")
         for value in (
             self.manifest_sha256,
             self.shard_plan_sha256,
@@ -229,9 +239,24 @@ class ExecutionSeal:
             self.environment_lock_sha256,
             self.benchmark_evidence_sha256,
             self.capacity_evidence_sha256,
+            self.host_identity_sha256,
+            self.pip_freeze_sha256,
+            self.python_executable_sha256,
         ):
             if not _SHA256_RE.fullmatch(value):
                 raise IntegrityError("Execution seal hashes must be lowercase SHA-256 values.")
+        if any(
+            type(value) is not int or value <= 0
+            for value in (
+                self.cpu_count,
+                self.memory_bytes,
+                self.disk_free_bytes,
+                self.worker_count,
+            )
+        ):
+            raise IntegrityError("Execution seal capacity identity is invalid.")
+        if not self.python_version or self.parallel_strategy != PARALLEL_STRATEGY:
+            raise IntegrityError("Execution seal runtime strategy identity is invalid.")
 
 
 @dataclass(frozen=True)
@@ -240,7 +265,7 @@ class ExecutionManifest:
     implementation_base_commit: str
     protocol_commit: str
     a2_protocol_commit: str
-    a2_specification_commit: str
+    normative_base_commit: str
     protocol_manifest_sha256: str
     rng_fixture_sha256: str
     environment_lock_sha256: str
@@ -263,8 +288,8 @@ class ExecutionManifest:
             raise IntegrityError("Protocol/A1 commit does not match the frozen amendment.")
         if self.a2_protocol_commit != A2_PROTOCOL_COMMIT:
             raise IntegrityError("Protocol/A2 commit does not match the frozen amendment.")
-        if self.a2_specification_commit != A2_SPECIFICATION_COMMIT:
-            raise IntegrityError("Protocol/A2 specification baseline is not frozen.")
+        if self.normative_base_commit != NORMATIVE_BASE_COMMIT:
+            raise IntegrityError("Protocol normative baseline is not frozen.")
         for value in (
             self.protocol_manifest_sha256,
             self.rng_fixture_sha256,
@@ -480,7 +505,7 @@ class ShardMetadata:
     implementation_base_commit: str
     protocol_commit: str
     a2_protocol_commit: str
-    a2_specification_commit: str
+    normative_base_commit: str
     protocol_manifest_sha256: str
     rng_fixture_sha256: str
     environment_lock_sha256: str
@@ -568,7 +593,7 @@ def _git_has_frozen_base(repo_root: Path) -> bool:
         IMPLEMENTATION_BASE_COMMIT,
         PROTOCOL_A1_COMMIT,
         A2_PROTOCOL_COMMIT,
-        A2_SPECIFICATION_COMMIT,
+        NORMATIVE_BASE_COMMIT,
     )
     return all(
         subprocess.run(
@@ -615,7 +640,7 @@ def build_manifest(repo_root: Path) -> ExecutionManifest:
         implementation_base_commit=IMPLEMENTATION_BASE_COMMIT,
         protocol_commit=PROTOCOL_A1_COMMIT,
         a2_protocol_commit=A2_PROTOCOL_COMMIT,
-        a2_specification_commit=A2_SPECIFICATION_COMMIT,
+        normative_base_commit=NORMATIVE_BASE_COMMIT,
         protocol_manifest_sha256=sha256_file(
             repo_root / "src/fairlendkit/research/paper2/protocol.json"
         ),
@@ -677,7 +702,7 @@ def validate_execution_seal(
         code_commit=manifest.code_commit,
         protocol_commit=manifest.protocol_commit,
         a2_protocol_commit=manifest.a2_protocol_commit,
-        a2_specification_commit=manifest.a2_specification_commit,
+        normative_base_commit=manifest.normative_base_commit,
         manifest_sha256=manifest_sha256(manifest),
         shard_plan_sha256=shard_plan_sha256(),
         protocol_manifest_sha256=manifest.protocol_manifest_sha256,
@@ -685,6 +710,15 @@ def validate_execution_seal(
         environment_lock_sha256=manifest.environment_lock_sha256,
         benchmark_evidence_sha256=benchmark_evidence_sha256(evidence),
         capacity_evidence_sha256=capacity_evidence_sha256(capacity),
+        host_identity_sha256=capacity.host_identity_sha256,
+        cpu_count=capacity.cpu_count,
+        memory_bytes=capacity.memory_bytes,
+        disk_free_bytes=capacity.disk_free_bytes,
+        pip_freeze_sha256=manifest.pip_freeze_sha256,
+        python_executable_sha256=manifest.python_executable_sha256,
+        python_version=manifest.python_version,
+        worker_count=manifest.worker_count,
+        parallel_strategy=manifest.parallel_strategy,
     )
     if seal != expected:
         raise IntegrityError("Execution seal does not match observed runtime identity.")
@@ -879,7 +913,7 @@ def write_smoke_shard(
         implementation_base_commit=manifest.implementation_base_commit,
         protocol_commit=manifest.protocol_commit,
         a2_protocol_commit=manifest.a2_protocol_commit,
-        a2_specification_commit=manifest.a2_specification_commit,
+        normative_base_commit=manifest.normative_base_commit,
         protocol_manifest_sha256=manifest.protocol_manifest_sha256,
         rng_fixture_sha256=manifest.rng_fixture_sha256,
         environment_lock_sha256=manifest.environment_lock_sha256,
@@ -924,7 +958,7 @@ def validate_shard(
         "implementation_base_commit": manifest.implementation_base_commit,
         "protocol_commit": manifest.protocol_commit,
         "a2_protocol_commit": manifest.a2_protocol_commit,
-        "a2_specification_commit": manifest.a2_specification_commit,
+        "normative_base_commit": manifest.normative_base_commit,
         "protocol_manifest_sha256": manifest.protocol_manifest_sha256,
         "rng_fixture_sha256": manifest.rng_fixture_sha256,
         "environment_lock_sha256": manifest.environment_lock_sha256,
