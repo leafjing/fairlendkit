@@ -49,9 +49,11 @@ edge cases, tests, report representation, and limitations are documented.
   [`milestone-3-core-audit-engine.md`](milestone-3-core-audit-engine.md).
   Release evidence merged at `1d11c7d`: `239 passed`, with the same fail-closed
   release verifier green on Python 3.11 and 3.12.
-  Threshold scanning, renderers, CLI, proxy screening, governance integration,
-  and mitigation remain later milestones.
-- Milestone 4: user workflow and reports — contract defined in
+  Threshold scanning, proxy screening, governance integration, and mitigation
+  remain later milestones.
+- Milestone 4: user workflow and reports — implementation candidate complete;
+  independent review and two-runtime CI are the remaining closure gates. The
+  contract is defined in
   [`milestone-4-user-workflow.md`](milestone-4-user-workflow.md). Delivery order
   is CLI plus canonical JSON, metrics CSV, self-contained HTML, then the
   multi-format release gate. This milestone consumes the existing Schema 2.0

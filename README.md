@@ -138,8 +138,10 @@ Implementation is tracked as ordered, testable work packages in the
 ## Status
 
 Pre-alpha. Milestone 3 core audit engine and reliability contracts are
-implemented and tested on Python 3.11 and 3.12. Reporting surfaces and the
-remaining V1 workflow are still under development.
+implemented. The Milestone 4 candidate adds the installed CLI and JSON, CSV,
+and HTML reporting workflow; it remains subject to independent review and green
+Python 3.11/3.12 CI before closure. Threshold sensitivity and the remaining V1
+workflow are still under development.
 
 ## Milestone 3 release evidence
 
@@ -151,11 +153,16 @@ remaining V1 workflow are still under development.
 - Architecture: application orchestration is adapter-neutral; pandas and the
   concrete bootstrap estimator are composed only at the outer API boundary.
 - Runtime gate: full tests on Python 3.11 and 3.12 plus `git diff --check`.
-- Scope gate: repository exports no CLI, HTML/CSV renderer, threshold scan,
-  proxy screening, governance integration, or mitigation workflow.
+- Historical scope gate: at Milestone 3 closure the repository exported no CLI,
+  HTML/CSV renderer, threshold scan, proxy screening, governance integration,
+  or mitigation workflow. Milestone 4 intentionally supersedes the first two
+  exclusions without changing the analytical scope.
 
 The complete checked-in verification record is
 [`docs/milestone-3-release-evidence.md`](docs/milestone-3-release-evidence.md).
+
+The Milestone 4 candidate evidence is recorded in
+[`docs/milestone-4-release-evidence.md`](docs/milestone-4-release-evidence.md).
 
 ## Citation
 

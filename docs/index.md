@@ -27,6 +27,7 @@ page for each topic; it does not replace the normative contracts.
 - [Testing strategy](testing.md)
 - [Milestone 3 release evidence](milestone-3-release-evidence.md)
 - [Milestone 4 user workflow and reports](milestone-4-user-workflow.md)
+- [Milestone 4 release evidence](milestone-4-release-evidence.md)
 - [Citation and research relationship](citation-and-research.md)
 - [Repository discoverability decisions](discoverability-audit.md)
 - [Technical discovery configuration and site templates](repository-discoverability-config.md)
