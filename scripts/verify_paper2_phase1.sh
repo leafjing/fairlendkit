@@ -11,4 +11,4 @@ if find . -path './.git' -prune -o -type f \
   exit 1
 fi
 
-./scripts/verify_milestone3_release.sh
+./scripts/verify_milestone4_release.sh

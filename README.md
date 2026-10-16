@@ -97,6 +97,20 @@ result: AuditResult = run_audit(data, config)
 payload = result.model_dump_json()
 ```
 
+Run the Milestone 4 user workflow from an installed checkout:
+
+```bash
+fairlendkit audit \
+  --data examples/workflow/credit.csv \
+  --config examples/workflow/audit-config.json \
+  --output reports/example
+```
+
+The command writes canonical Schema 2.0 JSON, a metrics CSV projection, and a
+self-contained HTML review report. Existing selected artifacts are protected;
+use `--overwrite` only when replacement is intentional. Use repeated `--format`
+options to request a subset, for example `--format json --format html`.
+
 See [`examples/synthetic/run_audit.py`](examples/synthetic/run_audit.py) for a
 complete configuration and dataframe. The existing
 [`audit-result.json`](examples/synthetic/audit-result.json) is retained as the
@@ -107,8 +121,7 @@ Schema 1.0 compatibility and migration fixture; it is not current writer output.
 The following remain future milestones and are not exposed by the current core:
 
 - threshold scanning or a fairness-accuracy frontier;
-- HTML or CSV renderers and a user-facing JSON renderer;
-- a CLI or notebook workflow;
+- a notebook workflow beyond the checked-in command-line example;
 - proxy-risk screening;
 - governance integration or investigation lifecycle tooling; and
 - mitigation, reweighing, threshold recommendations, or model retraining.
@@ -125,8 +138,10 @@ Implementation is tracked as ordered, testable work packages in the
 ## Status
 
 Pre-alpha. Milestone 3 core audit engine and reliability contracts are
-implemented and tested on Python 3.11 and 3.12. Reporting surfaces and the
-remaining V1 workflow are still under development.
+implemented. The Milestone 4 candidate adds the installed CLI and JSON, CSV,
+and HTML reporting workflow; it remains subject to independent review and green
+Python 3.11/3.12 CI before closure. Threshold sensitivity and the remaining V1
+workflow are still under development.
 
 ## Milestone 3 release evidence
 
@@ -138,11 +153,16 @@ remaining V1 workflow are still under development.
 - Architecture: application orchestration is adapter-neutral; pandas and the
   concrete bootstrap estimator are composed only at the outer API boundary.
 - Runtime gate: full tests on Python 3.11 and 3.12 plus `git diff --check`.
-- Scope gate: repository exports no CLI, HTML/CSV renderer, threshold scan,
-  proxy screening, governance integration, or mitigation workflow.
+- Historical scope gate: at Milestone 3 closure the repository exported no CLI,
+  HTML/CSV renderer, threshold scan, proxy screening, governance integration,
+  or mitigation workflow. Milestone 4 intentionally supersedes the first two
+  exclusions without changing the analytical scope.
 
 The complete checked-in verification record is
 [`docs/milestone-3-release-evidence.md`](docs/milestone-3-release-evidence.md).
+
+The Milestone 4 candidate evidence is recorded in
+[`docs/milestone-4-release-evidence.md`](docs/milestone-4-release-evidence.md).
 
 ## Citation
 

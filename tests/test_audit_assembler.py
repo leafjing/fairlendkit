@@ -126,6 +126,28 @@ def test_vectorized_bootstrap_path_is_byte_exact_with_reference_path(monkeypatch
     assert optimized.encode("utf-8") == reference.encode("utf-8")
 
 
+def test_brier_bootstrap_is_byte_exact_across_supported_python_summation():
+    audit_config = config(
+        bootstrap_seed=20261016,
+        bootstrap_resamples=100,
+        minimum_valid_resamples=50,
+    )
+    audit_data = pd.DataFrame({
+        "outcome": [1, 0, 1, 0, 1, 0, 1, 0],
+        "score": [0.90, 0.80, 0.20, 0.10, 0.85, 0.75, 0.25, 0.15],
+        "group": ["A", "A", "A", "A", "B", "B", "B", "B"],
+    })
+
+    result = run_audit(audit_data, audit_config)
+    interval = next(
+        item
+        for item in result.uncertainty
+        if item.metric_key.endswith("str-224222.brier_score")
+    )
+
+    assert interval.lower.hex() == "0x1.62d0e560418abp-4"
+
+
 def test_run_audit_assembles_deterministic_schema_v2_without_mutation():
     data = frame()
     original = data.copy(deep=True)

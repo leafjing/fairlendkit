@@ -61,8 +61,8 @@ The configuration must define label semantics. FairLendKit must never infer whet
 
 ## V1 outputs
 
-- `audit.html`: human-readable review report
-- `audit.json`: machine-readable report and metadata
+- `report.html`: human-readable review report
+- `audit-result.json`: machine-readable report and metadata
 - `metrics.csv`: overall and group metrics
 - `threshold_frontier.csv`: threshold sensitivity results
 - Run metadata: input fingerprint, configuration, package version, timestamp, and warnings

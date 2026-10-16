@@ -189,11 +189,11 @@ def brier_score(
     if any(not 0.0 <= value <= 1.0 for value in probabilities):
         raise ValueError("favorable_probability values must be finite and within [0, 1]")
     normalized_weights = _validated_weights(weights, len(outcomes))
-    denominator = sum(normalized_weights)
+    denominator = math.fsum(normalized_weights)
     if denominator == 0:
         reason = "empty_population" if not outcomes else "zero_total_weight"
         return MetricValue(None, None, 0.0, reason)
-    numerator = sum(
+    numerator = math.fsum(
         weight * (probability - float(outcome)) ** 2
         for outcome, probability, weight in zip(
             outcomes, probabilities, normalized_weights

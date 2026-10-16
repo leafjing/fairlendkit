@@ -22,5 +22,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - name: Run the current fail-closed verification gate
+      - name: Verify the Milestone 4 release candidate
+        run: ./scripts/verify_milestone4_release.sh
+      - name: Verify the Paper 2 execution freeze
         run: ./scripts/verify_paper2_execution_gate.sh

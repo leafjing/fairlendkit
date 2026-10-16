@@ -86,4 +86,3 @@ A warning or suppression triggered when an audit group's sample count is below t
 - State disparity direction and name both comparison and reference groups.
 - Use `potential proxy-risk indicator` for proxy screening results.
 - Do not generate `compliant`, `non-compliant`, `legal`, or `illegal` as automated conclusions.
-

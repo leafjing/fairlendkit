@@ -32,11 +32,11 @@ human-owned investigation process.
 
 ## Capabilities not currently implemented
 
-The current core does not include threshold scanning, fairness-performance
-frontiers, HTML/CSV renderers, a CLI, proxy-risk screening, governance workflow
-integration, mitigation, threshold recommendations, reweighing, or model
-retraining. Consult the [Roadmap](roadmap.md) before interpreting a planned
-feature as available.
+The current workflow does not include threshold scanning, fairness-performance
+frontiers, proxy-risk screening, governance workflow integration, mitigation,
+threshold recommendations, reweighing, or model retraining. JSON, CSV, and HTML
+are views of the same audit result; they do not add analysis. Consult the
+[Roadmap](roadmap.md) before interpreting a planned feature as available.
 
 ## Safe communication
 
