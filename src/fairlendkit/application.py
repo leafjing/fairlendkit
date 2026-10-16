@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
+import math
 from typing import Protocol
 
 from fairlendkit.config import AuditConfig
@@ -284,7 +285,9 @@ def _unweighted_scope_metric_value(
     if metric is MetricNameV2.BRIER_SCORE:
         if config.score_type.value != "probability":
             return None
-        return sum(
+        # Python 3.12 changed float summation, so the built-in ``sum`` would
+        # make bootstrap artifacts differ across supported runtimes.
+        return math.fsum(
             (
                 data.favorable_score[index]
                 - float(data.favorable_outcome[index])
