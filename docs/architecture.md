@@ -98,9 +98,9 @@ result domain contracts remain dataframe-independent.
 
 ```bash
 fairlendkit audit \
-  --data examples/synthetic/credit.csv \
-  --config examples/synthetic/audit.yml \
-  --output reports/
+  --data examples/workflow/credit.csv \
+  --config examples/workflow/audit-config.json \
+  --output reports/example
 ```
 
 ## Dependency direction

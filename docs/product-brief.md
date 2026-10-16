@@ -68,7 +68,9 @@ When an Endeavor statement, paper claim, or implementation behavior conflicts wi
 
 ### V1 release readiness
 
-- One versioned synthetic example generates `audit.html`, `audit.json`, `metrics.csv`, and `threshold_frontier.csv` from a documented command.
+- One versioned synthetic example generates `report.html`,
+  `audit-result.json`, `metrics.csv`, and `threshold_frontier.csv` from a
+  documented command.
 - Hand-calculated fixtures verify metric direction, favorable-label behavior, and reference-group comparisons.
 - Key disparity results include group sample sizes and configured uncertainty; small or undefined comparisons produce explicit warnings or suppression.
 - HTML, JSON, and CSV values are derived from one typed result model and remain mutually consistent.
