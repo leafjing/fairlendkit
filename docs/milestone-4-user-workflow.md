@@ -200,4 +200,3 @@ Milestone 4 is complete only when:
    3.12; and
 9. README, documentation index, roadmap, and limitations agree with the shipped
    behavior.
-

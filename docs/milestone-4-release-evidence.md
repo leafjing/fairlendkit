@@ -71,4 +71,3 @@ threshold scanning, a fairness-performance frontier, proxy-risk screening,
 governance dispositions, mitigation, recommendations, retraining, or legal and
 compliance conclusions. Paper 2 confirmatory execution remains frozen and no
 research seal or result is produced by this release gate.
-
