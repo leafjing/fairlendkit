@@ -34,6 +34,15 @@ class _CliParser(argparse.ArgumentParser):
         self.exit(EXIT_USAGE, f"fairlendkit: error: {message}\n")
 
 
+class _StoreOnce(argparse.Action):
+    """Reject ambiguous repetition of a singleton path option."""
+
+    def __call__(self, parser, namespace, values, option_string=None) -> None:
+        if getattr(namespace, self.dest, None) is not None:
+            parser.error(f"argument {option_string}: may not be repeated")
+        setattr(namespace, self.dest, values)
+
+
 def _package_version() -> str:
     try:
         return version("fairlendkit")
@@ -46,9 +55,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=_package_version())
     commands = parser.add_subparsers(dest="command", required=True)
     audit = commands.add_parser("audit", help="run one reproducible audit")
-    audit.add_argument("--data", required=True, type=Path)
-    audit.add_argument("--config", required=True, type=Path)
-    audit.add_argument("--output", required=True, type=Path)
+    audit.add_argument("--data", required=True, type=Path, action=_StoreOnce)
+    audit.add_argument("--config", required=True, type=Path, action=_StoreOnce)
+    audit.add_argument("--output", required=True, type=Path, action=_StoreOnce)
     audit.add_argument(
         "--format",
         action="append",
@@ -128,6 +137,8 @@ def _publish_many(artifacts: dict[Path, bytes], *, overwrite: bool) -> None:
         conflicts = [target for target in artifacts if target.exists()]
         if conflicts and not overwrite:
             raise _OutputError("output target exists; use --overwrite to replace it")
+        if any(target.is_symlink() or not target.is_file() for target in conflicts):
+            raise _OutputError("an output target exists but is not a regular file")
         for target, content in artifacts.items():
             with tempfile.NamedTemporaryFile(
                 mode="wb", dir=output, prefix=f".{target.name}.new.", delete=False

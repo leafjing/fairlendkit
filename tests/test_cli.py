@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import csv
 import io
+import os
 from pathlib import Path
 
 import pytest
@@ -133,3 +134,68 @@ def test_cli_usage_error_is_stable():
     with pytest.raises(SystemExit) as raised:
         main(["audit"])
     assert raised.value.code == EXIT_USAGE
+
+
+def test_cli_rejects_repeated_singleton_options(tmp_path):
+    data, config = _write_inputs(tmp_path)
+    with pytest.raises(SystemExit) as raised:
+        main([
+            "audit",
+            "--data", str(data),
+            "--data", str(data),
+            "--config", str(config),
+            "--output", str(tmp_path / "out"),
+        ])
+    assert raised.value.code == EXIT_USAGE
+
+
+def test_overwrite_transaction_restores_all_previous_artifacts_on_failure(
+    tmp_path, monkeypatch, capsys
+):
+    data, config = _write_inputs(tmp_path)
+    output = tmp_path / "reports"
+    output.mkdir()
+    old = {
+        "audit-result.json": b"old-json",
+        "metrics.csv": b"old-csv",
+        "report.html": b"old-html",
+    }
+    for name, content in old.items():
+        (output / name).write_bytes(content)
+
+    real_replace = os.replace
+    calls = 0
+
+    def fail_second_publication(source, target):
+        nonlocal calls
+        calls += 1
+        if calls == 5:
+            raise OSError("simulated publication failure")
+        return real_replace(source, target)
+
+    monkeypatch.setattr("fairlendkit.cli.os.replace", fail_second_publication)
+    assert main([
+        "audit",
+        "--data", str(data),
+        "--config", str(config),
+        "--output", str(output),
+        "--overwrite",
+    ]) == EXIT_OUTPUT
+    assert {name: (output / name).read_bytes() for name in old} == old
+    assert "output could not be published safely" in capsys.readouterr().err
+
+
+def test_overwrite_refuses_non_regular_selected_target(tmp_path, capsys):
+    data, config = _write_inputs(tmp_path)
+    output = tmp_path / "reports"
+    (output / "metrics.csv").mkdir(parents=True)
+
+    assert main([
+        "audit",
+        "--data", str(data),
+        "--config", str(config),
+        "--output", str(output),
+        "--overwrite",
+    ]) == EXIT_OUTPUT
+    assert (output / "metrics.csv").is_dir()
+    assert "not a regular file" in capsys.readouterr().err
