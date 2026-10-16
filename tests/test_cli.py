@@ -99,12 +99,15 @@ def test_cli_reports_input_failure_without_record_data_or_traceback(tmp_path, ca
     assert "Traceback" not in error
 
 
-def test_renderer_failure_publishes_no_selected_artifacts(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("error_type", [RuntimeError, ValueError, TypeError])
+def test_renderer_failure_publishes_no_selected_artifacts(
+    tmp_path, monkeypatch, capsys, error_type
+):
     data, config = _write_inputs(tmp_path)
     output = tmp_path / "reports"
 
     def fail_renderer(result):
-        raise RuntimeError("renderer detail must not escape")
+        raise error_type("renderer detail must not escape")
 
     monkeypatch.setattr("fairlendkit.cli.render_html", fail_renderer)
     assert main(["audit", "--data", str(data), "--config", str(config), "--output", str(output)]) == 1
@@ -114,6 +117,39 @@ def test_renderer_failure_publishes_no_selected_artifacts(tmp_path, monkeypatch,
     error = capsys.readouterr().err
     assert "unexpected internal error" in error
     assert "renderer detail" not in error
+
+
+def test_permission_failure_preserves_existing_artifacts(
+    tmp_path, monkeypatch, capsys
+):
+    data, config = _write_inputs(tmp_path)
+    output = tmp_path / "reports"
+    output.mkdir()
+    old = {
+        "audit-result.json": b"old-json",
+        "metrics.csv": b"old-csv",
+        "report.html": b"old-html",
+    }
+    for name, content in old.items():
+        (output / name).write_bytes(content)
+
+    def deny_temporary_file(*args, **kwargs):
+        raise PermissionError("simulated permission denial")
+
+    monkeypatch.setattr(
+        "fairlendkit.cli.tempfile.NamedTemporaryFile", deny_temporary_file
+    )
+    assert main([
+        "audit",
+        "--data", str(data),
+        "--config", str(config),
+        "--output", str(output),
+        "--overwrite",
+    ]) == EXIT_OUTPUT
+    assert {name: (output / name).read_bytes() for name in old} == old
+    error = capsys.readouterr().err
+    assert "output could not be published safely" in error
+    assert "permission denial" not in error
 
 
 def test_format_selection_preserves_unrelated_output_files(tmp_path):

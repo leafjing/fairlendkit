@@ -76,7 +76,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (OSError, UnicodeError, json.JSONDecodeError, pd.errors.ParserError):
         _diagnostic("input could not be read or parsed")
         return EXIT_INPUT
-    except (ValidationError, DataValidationError, TypeError, ValueError):
+    except (ValidationError, DataValidationError):
         _diagnostic("configuration or audit data failed validation")
         return EXIT_VALIDATION
     except _OutputError as error:
