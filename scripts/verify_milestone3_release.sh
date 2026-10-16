@@ -37,6 +37,16 @@ actual_hash="$(sha256sum "$release_tmp/audit-result-v2.json" | cut -d' ' -f1)"
 expected_hash="$(tr -d '\n' < "$repo_root/examples/synthetic/audit-result-v2.sha256")"
 test "$actual_hash" = "$expected_hash"
 
+workflow_output="$release_tmp/workflow-report"
+"$release_tmp/venv/bin/fairlendkit" audit \
+  --data "$repo_root/examples/workflow/credit.csv" \
+  --config "$repo_root/examples/workflow/audit-config.json" \
+  --output "$workflow_output"
+(
+  cd "$workflow_output"
+  sha256sum -c "$repo_root/examples/workflow/artifact-sha256.txt"
+)
+
 cd "$repo_root"
 "$venv_python" -m pytest -q
 "$venv_python" -m pytest -q tests/test_architecture.py

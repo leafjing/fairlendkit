@@ -17,6 +17,8 @@ from pydantic import ValidationError
 from fairlendkit.api import run_audit
 from fairlendkit.config import AuditConfig
 from fairlendkit.data import DataValidationError
+from fairlendkit.report.csv import render_metrics_csv
+from fairlendkit.report.html import render_html
 from fairlendkit.report.json import render_json
 
 EXIT_INTERNAL = 1
@@ -50,9 +52,9 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument(
         "--format",
         action="append",
-        choices=("json",),
+        choices=("json", "csv", "html"),
         dest="formats",
-        help="output format; Milestone 4.1 currently supports json",
+        help="output format; may be repeated (default: all)",
     )
     audit.add_argument("--overwrite", action="store_true")
     return parser
@@ -85,12 +87,18 @@ def _run_audit_command(args: argparse.Namespace) -> int:
     data = pd.read_csv(args.data, encoding="utf-8")
     result = run_audit(data, config)
 
-    formats = tuple(dict.fromkeys(args.formats or ("json",)))
-    if formats != ("json",):
-        raise ValueError("unsupported output format selection")
-    target = args.output / "audit-result.json"
-    _publish_one(target, render_json(result), overwrite=args.overwrite)
-    print(f"wrote {target}")
+    formats = tuple(dict.fromkeys(args.formats or ("json", "csv", "html")))
+    renderers = {
+        "json": ("audit-result.json", render_json),
+        "csv": ("metrics.csv", render_metrics_csv),
+        "html": ("report.html", render_html),
+    }
+    artifacts = {
+        args.output / renderers[format_name][0]: renderers[format_name][1](result)
+        for format_name in formats
+    }
+    _publish_many(artifacts, overwrite=args.overwrite)
+    print(f"wrote {len(artifacts)} artifact(s) to {args.output}")
     return 0
 
 
@@ -103,31 +111,59 @@ class _OutputError(Exception):
     """Expected safe-publication failure."""
 
 
-def _publish_one(target: Path, content: bytes, *, overwrite: bool) -> None:
+def _publish_many(artifacts: dict[Path, bytes], *, overwrite: bool) -> None:
+    if not artifacts:
+        raise _OutputError("no output artifacts were selected")
+    parents = {target.parent for target in artifacts}
+    if len(parents) != 1:
+        raise _OutputError("selected artifacts must share one output directory")
+    output = next(iter(parents))
+    temporary: dict[Path, Path] = {}
+    backups: dict[Path, Path] = {}
+    published: list[Path] = []
     try:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if not target.parent.is_dir():
+        output.mkdir(parents=True, exist_ok=True)
+        if not output.is_dir():
             raise _OutputError("output path is not a directory")
-        if target.exists() and not overwrite:
+        conflicts = [target for target in artifacts if target.exists()]
+        if conflicts and not overwrite:
             raise _OutputError("output target exists; use --overwrite to replace it")
-        temporary: Path | None = None
-        try:
+        for target, content in artifacts.items():
             with tempfile.NamedTemporaryFile(
-                mode="wb", dir=target.parent, prefix=f".{target.name}.", delete=False
+                mode="wb", dir=output, prefix=f".{target.name}.new.", delete=False
             ) as stream:
-                temporary = Path(stream.name)
+                temporary[target] = Path(stream.name)
                 stream.write(content)
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, target)
-            temporary = None
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
+        for target in conflicts:
+            with tempfile.NamedTemporaryFile(
+                mode="wb", dir=output, prefix=f".{target.name}.old.", delete=False
+            ) as stream:
+                backup = Path(stream.name)
+            backup.unlink()
+            os.replace(target, backup)
+            backups[target] = backup
+        for target in artifacts:
+            os.replace(temporary[target], target)
+            temporary.pop(target)
+            published.append(target)
+        for backup in backups.values():
+            backup.unlink(missing_ok=True)
     except _OutputError:
         raise
     except OSError as error:
+        for target in reversed(published):
+            target.unlink(missing_ok=True)
+        for target, backup in backups.items():
+            if backup.exists():
+                os.replace(backup, target)
         raise _OutputError("output could not be published safely") from error
+    finally:
+        for path in temporary.values():
+            path.unlink(missing_ok=True)
+        for path in backups.values():
+            path.unlink(missing_ok=True)
 
 
 def _diagnostic(message: str) -> None:

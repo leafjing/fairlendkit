@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import csv
+import io
 from pathlib import Path
 
 import pytest
@@ -27,7 +29,7 @@ def _write_inputs(tmp_path: Path) -> tuple[Path, Path]:
             {
                 "outcome_column": "outcome",
                 "score_column": "score",
-                "population_definition": "CLI integration fixture",
+                "population_definition": "CLI <script>alert('x')</script> fixture",
                 "sampling_definition": "Two fixed rows",
                 "score_type": "probability",
                 "dataset_version": "fixture-1",
@@ -52,7 +54,7 @@ def _write_inputs(tmp_path: Path) -> tuple[Path, Path]:
     return data, config
 
 
-def test_cli_writes_canonical_schema_2_json(tmp_path, capsys):
+def test_cli_writes_consistent_json_csv_and_safe_html(tmp_path, capsys):
     data, config = _write_inputs(tmp_path)
     output = tmp_path / "reports"
 
@@ -62,6 +64,14 @@ def test_cli_writes_canonical_schema_2_json(tmp_path, capsys):
     assert payload.endswith(b"\n") and not payload.endswith(b"\n\n")
     result = AuditResultV2.model_validate_json(payload)
     assert result.schema_version == "2.0"
+    rows = list(csv.DictReader(io.StringIO((output / "metrics.csv").read_text(encoding="utf-8"))))
+    assert [row["metric_key"] for row in rows] == [metric.key for metric in result.observed_metrics]
+    assert len(rows) == len(result.observed_metrics)
+    html = (output / "report.html").read_text(encoding="utf-8")
+    assert "<script>alert" not in html
+    assert "&lt;script&gt;alert" in html
+    assert "https://" not in html and "http://" not in html
+    assert "Human review required" in html
     assert capsys.readouterr().err == ""
 
 
@@ -86,6 +96,37 @@ def test_cli_reports_input_failure_without_record_data_or_traceback(tmp_path, ca
     assert "input could not be read or parsed" in error
     assert "secret-customer-row" not in error
     assert "Traceback" not in error
+
+
+def test_renderer_failure_publishes_no_selected_artifacts(tmp_path, monkeypatch, capsys):
+    data, config = _write_inputs(tmp_path)
+    output = tmp_path / "reports"
+
+    def fail_renderer(result):
+        raise RuntimeError("renderer detail must not escape")
+
+    monkeypatch.setattr("fairlendkit.cli.render_html", fail_renderer)
+    assert main(["audit", "--data", str(data), "--config", str(config), "--output", str(output)]) == 1
+    assert not (output / "audit-result.json").exists()
+    assert not (output / "metrics.csv").exists()
+    assert not (output / "report.html").exists()
+    error = capsys.readouterr().err
+    assert "unexpected internal error" in error
+    assert "renderer detail" not in error
+
+
+def test_format_selection_preserves_unrelated_output_files(tmp_path):
+    data, config = _write_inputs(tmp_path)
+    output = tmp_path / "reports"
+    output.mkdir()
+    unrelated = output / "practitioner-notes.txt"
+    unrelated.write_text("preserve", encoding="utf-8")
+
+    assert main(["audit", "--data", str(data), "--config", str(config), "--output", str(output), "--format", "csv"]) == 0
+    assert (output / "metrics.csv").is_file()
+    assert not (output / "audit-result.json").exists()
+    assert not (output / "report.html").exists()
+    assert unrelated.read_text(encoding="utf-8") == "preserve"
 
 
 def test_cli_usage_error_is_stable():

@@ -97,6 +97,20 @@ result: AuditResult = run_audit(data, config)
 payload = result.model_dump_json()
 ```
 
+Run the Milestone 4 user workflow from an installed checkout:
+
+```bash
+fairlendkit audit \
+  --data examples/workflow/credit.csv \
+  --config examples/workflow/audit-config.json \
+  --output reports/example
+```
+
+The command writes canonical Schema 2.0 JSON, a metrics CSV projection, and a
+self-contained HTML review report. Existing selected artifacts are protected;
+use `--overwrite` only when replacement is intentional. Use repeated `--format`
+options to request a subset, for example `--format json --format html`.
+
 See [`examples/synthetic/run_audit.py`](examples/synthetic/run_audit.py) for a
 complete configuration and dataframe. The existing
 [`audit-result.json`](examples/synthetic/audit-result.json) is retained as the
@@ -107,8 +121,7 @@ Schema 1.0 compatibility and migration fixture; it is not current writer output.
 The following remain future milestones and are not exposed by the current core:
 
 - threshold scanning or a fairness-accuracy frontier;
-- HTML or CSV renderers and a user-facing JSON renderer;
-- a CLI or notebook workflow;
+- a notebook workflow beyond the checked-in command-line example;
 - proxy-risk screening;
 - governance integration or investigation lifecycle tooling; and
 - mitigation, reweighing, threshold recommendations, or model retraining.
