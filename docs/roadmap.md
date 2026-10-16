@@ -51,6 +51,17 @@ edge cases, tests, report representation, and limitations are documented.
   release verifier green on Python 3.11 and 3.12.
   Threshold scanning, renderers, CLI, proxy screening, governance integration,
   and mitigation remain later milestones.
+- Milestone 4: user workflow and reports — contract defined in
+  [`milestone-4-user-workflow.md`](milestone-4-user-workflow.md). Delivery order
+  is CLI plus canonical JSON, metrics CSV, self-contained HTML, then the
+  multi-format release gate. This milestone consumes the existing Schema 2.0
+  result and does not add or recompute metrics.
+
+Milestone 4 deliberately pulls the stable reporting subset of Epic 5 ahead of
+Epic 4 threshold sensitivity. This produces a usable audit workflow without
+coupling report delivery to new analytical behavior. Threshold scanning remains
+the next analytical epic and will extend the versioned result contract before
+threshold sections can appear in reports.
 
 ## V1.1 — Mitigation experiments
 

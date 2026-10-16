@@ -103,6 +103,12 @@ variation or test seams, not for hypothetical flexibility.
 
 ## Epic 5 — Reporting, flags, and audit trail
 
+The first stable subset is delivered as
+[`Milestone 4 — User Workflow and Reports`](milestone-4-user-workflow.md) before
+Epic 4. It includes CLI orchestration and Schema 2.0 JSON/CSV/HTML views of the
+already implemented audit result. Threshold-specific report content remains
+blocked on Epic 4 and is not part of this early subset.
+
 ### 5.1 Typed result and flag model
 
 - Define stable result sections and transparent flag rules with supporting
@@ -156,3 +162,7 @@ Epic 1 -> Epic 2 -> Epic 3 -> Epic 4 -> Epic 5 -> Epic 6 -> Epic 7
 
 Reporting design may be prototyped earlier, but its public schema is not final
 until validation, metrics, and threshold contracts are stable.
+
+The Milestone 4 reporting subset is an explicit exception only for fields
+already stable in AuditResult Schema 2.0. It cannot reserve, infer, or emit
+future threshold fields. Epic 4 precedes any threshold-report schema extension.

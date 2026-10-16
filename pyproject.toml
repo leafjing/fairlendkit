@@ -35,6 +35,9 @@ dependencies = [
   "pydantic>=2.8",
 ]
 
+[project.scripts]
+fairlendkit = "fairlendkit.cli:main"
+
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
 paper2 = ["numpy==1.26.4", "scipy==1.17.1"]
