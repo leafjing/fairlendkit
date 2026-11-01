@@ -2,6 +2,8 @@
 
 from fairlendkit.alternative_data.contracts import (
     AcquisitionMethod,
+    AggregateReportEvidence,
+    AggregateReportRelease,
     AlternativeDataConfig,
     AlternativeDataSource,
     CashFlowEventType,
@@ -10,13 +12,12 @@ from fairlendkit.alternative_data.contracts import (
     ObservationWindow,
     RecordStatus,
     RentEventType,
-    SafeSignalProjection,
+    DisclosureState,
     SignalEventType,
     SignalFamily,
     SignalRecord,
     TransferScope,
     UtilityEventType,
-    report_safe_projection,
 )
 from fairlendkit.alternative_data.leakage import (
     GateDisposition,
@@ -36,6 +37,8 @@ from fairlendkit.alternative_data.reasons import (
 
 __all__ = [
     "AcquisitionMethod",
+    "AggregateReportEvidence",
+    "AggregateReportRelease",
     "AlternativeDataDisposition",
     "AlternativeDataConfig",
     "AlternativeDataEvidence",
@@ -49,7 +52,7 @@ __all__ = [
     "ObservationWindow",
     "RecordStatus",
     "RentEventType",
-    "SafeSignalProjection",
+    "DisclosureState",
     "SignalFamily",
     "SignalEventType",
     "SignalRecord",
@@ -60,6 +63,5 @@ __all__ = [
     "evaluate_outcome_record",
     "evaluate_source_completion",
     "make_evidence",
-    "report_safe_projection",
     "select_authoritative_feature_records",
 ]

@@ -197,23 +197,31 @@ def select_authoritative_feature_records(
             if target.observed_at > record.observed_at:
                 raise ValueError(AlternativeDataReasonCode.NON_MONOTONIC_HISTORY.value)
 
-    revision_parent = {
-        (record.source_id, record.source_version, record.record_id): (
-            record.source_id,
-            record.source_version,
-            record.revision_of,
-        )
-        for record in items
-        if record.revision_of is not None
-    }
-    for identity in revision_parent:
+    revision_parent = {}
+    linkage_parent = {}
+    for record in items:
+        identity = (record.source_id, record.source_version, record.record_id)
+        if record.revision_of is not None:
+            revision_parent[identity] = (
+                record.source_id,
+                record.source_version,
+                record.revision_of,
+            )
+            linkage_parent[identity] = revision_parent[identity]
+        if record.reversal_of is not None:
+            target = (record.source_id, record.source_version, record.reversal_of)
+            if identity in linkage_parent and linkage_parent[identity] != target:
+                raise ValueError(AlternativeDataReasonCode.NON_MONOTONIC_HISTORY.value)
+            linkage_parent[identity] = target
+
+    for identity in linkage_parent:
         seen: set[tuple[str, str, str]] = set()
         cursor = identity
-        while cursor in revision_parent:
+        while cursor in linkage_parent:
             if cursor in seen:
                 raise ValueError(AlternativeDataReasonCode.NON_MONOTONIC_HISTORY.value)
             seen.add(cursor)
-            cursor = revision_parent[cursor]
+            cursor = linkage_parent[cursor]
 
     eligible = {
         (record.source_id, record.source_version, record.record_id): record
@@ -229,17 +237,19 @@ def select_authoritative_feature_records(
     terminal = [
         record for identity, record in eligible.items() if identity not in revised_targets
     ]
-    roots: dict[tuple[str, str, str], SignalRecord] = {}
+    terminal_by_root: dict[tuple[str, str, str], list[SignalRecord]] = {}
     for record in terminal:
         root = (record.source_id, record.source_version, record.record_id)
         while root in revision_parent:
             root = revision_parent[root]
-        current = roots.get(root)
-        if current is None or (current.observed_at, current.record_id) < (
-            record.observed_at,
-            record.record_id,
-        ):
-            roots[root] = record
+        terminal_by_root.setdefault(root, []).append(record)
+
+    roots: dict[tuple[str, str, str], SignalRecord] = {}
+    for root, candidates in terminal_by_root.items():
+        observed = [item.observed_at for item in candidates]
+        if len(observed) != len(set(observed)):
+            raise ValueError(AlternativeDataReasonCode.NON_MONOTONIC_HISTORY.value)
+        roots[root] = max(candidates, key=lambda item: item.observed_at)
     return tuple(
         sorted(
             roots.values(),

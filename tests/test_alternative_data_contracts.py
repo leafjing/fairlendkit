@@ -5,13 +5,14 @@ from pydantic import ValidationError
 
 from fairlendkit.alternative_data import (
     AlternativeDataConfig,
+    AggregateReportEvidence,
+    AggregateReportRelease,
     AlternativeDataReasonCode,
     AlternativeDataSource,
     CreditCoverage,
     ObservationWindow,
     SignalRecord,
     make_evidence,
-    report_safe_projection,
 )
 
 
@@ -176,6 +177,15 @@ def test_signal_amount_is_decimal_string_and_temporal_form_is_exclusive():
             )
         )
 
+    with pytest.raises(ValidationError, match="same temporal type"):
+        SignalRecord(
+            **record_values(
+                event_time=None,
+                period_start="2025-12-01",
+                period_end="2025-12-31T00:00:00Z",
+            )
+        )
+
 
 def test_signal_family_payload_and_exact_vocabulary_are_enforced():
     with pytest.raises(ValidationError, match="does not belong"):
@@ -202,20 +212,37 @@ def test_signal_family_payload_and_exact_vocabulary_are_enforced():
         )
 
 
-def test_report_projection_cannot_serialize_consumer_or_linkage_identifiers():
-    record = SignalRecord(
-        **record_values(
-            record_id="revision-secret",
-            revision_of="record-secret-previous",
-        )
+def test_report_boundary_accepts_only_aggregate_suppressed_evidence():
+    sparse = AggregateReportEvidence(
+        cell_id="cell-a",
+        table_id="provider-by-group",
+        state="suppressed",
+        minimum_report_cell_count=10,
+        count_bucket="0..9",
+        reason_code="ad_sparse_report_cell",
     )
-    rendered = report_safe_projection(record).model_dump_json()
+    complementary = AggregateReportEvidence(
+        cell_id="cell-b",
+        table_id="coverage-by-group",
+        state="suppressed",
+        minimum_report_cell_count=10,
+        count_bucket="hidden",
+        reason_code="ad_complementary_suppression",
+    )
+    release = AggregateReportRelease(cells=(sparse, complementary))
+    rendered = release.model_dump_json()
+    assert "entity_id" not in rendered and "record_id" not in rendered
+    assert "numerator" in rendered and '"numerator":null' in rendered
 
-    assert "consumer-secret-17" not in rendered
-    assert "revision-secret" not in rendered
-    assert "record-secret-previous" not in rendered
-    assert "entity_id" not in rendered
-    assert "record_id" not in rendered
+    with pytest.raises(ValidationError, match="cannot expose"):
+        AggregateReportEvidence(
+            **{**sparse.model_dump(), "entity_count": 3}
+        )
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        AggregateReportRelease(
+            cells=(sparse,),
+            raw_record=record_values(),
+        )
 
 
 def test_validation_errors_hide_sensitive_input_values():

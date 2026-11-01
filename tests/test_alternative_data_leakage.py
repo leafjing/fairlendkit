@@ -278,6 +278,45 @@ def test_authoritative_branch_uses_canonical_latest_terminal_version():
     assert tuple(item.record_id for item in selected) == ("record-3",)
 
 
+def test_equal_time_parallel_terminal_revisions_fail_independent_of_order():
+    original = record()
+    left = record(
+        record_id="record-2",
+        revision_of="record-1",
+        observed_at="2025-12-31T12:00:00Z",
+    )
+    right = record(
+        record_id="record-3",
+        revision_of="record-1",
+        observed_at="2025-12-31T12:00:00Z",
+    )
+    for items in ((original, left, right), (right, left, original)):
+        with pytest.raises(ValueError, match="ad_non_monotonic_history"):
+            select_authoritative_feature_records(
+                items, (source(),), window(), datetime(2026, 2, 1, tzinfo=UTC)
+            )
+
+
+@pytest.mark.parametrize(
+    "items",
+    [
+        (
+            record(record_id="one", event_type="reversal", amount=None, reversal_of="two"),
+            record(record_id="two", event_type="reversal", amount=None, reversal_of="one"),
+        ),
+        (
+            record(record_id="one", revision_of="two"),
+            record(record_id="two", event_type="reversal", amount=None, reversal_of="one"),
+        ),
+    ],
+)
+def test_reversal_and_mixed_linkage_cycles_fail_closed(items):
+    with pytest.raises(ValueError, match="ad_non_monotonic_history"):
+        select_authoritative_feature_records(
+            items, (source(),), window(), datetime(2026, 2, 1, tzinfo=UTC)
+        )
+
+
 def test_authoritative_selection_rejects_missing_and_non_monotonic_links():
     with pytest.raises(ValueError, match="ad_revision_target_missing"):
         select_authoritative_feature_records(

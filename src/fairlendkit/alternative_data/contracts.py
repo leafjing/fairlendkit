@@ -64,6 +64,11 @@ class RecordStatus(StrEnum):
     UNAVAILABLE = "unavailable"
 
 
+class DisclosureState(StrEnum):
+    PUBLISHED = "published"
+    SUPPRESSED = "suppressed"
+
+
 class TransferScope(StrEnum):
     INTERNAL = "internal"
     EXTERNAL = "external"
@@ -373,8 +378,13 @@ class SignalRecord(StrictModel):
         period = self.period_start is not None or self.period_end is not None
         if point == period or (period and None in (self.period_start, self.period_end)):
             raise ValueError("configure exactly event_time or both period boundaries")
-        if period and self.period_end < self.period_start:  # type: ignore[operator]
-            raise ValueError("period_end cannot precede period_start")
+        if period:
+            start_is_datetime = isinstance(self.period_start, datetime)
+            end_is_datetime = isinstance(self.period_end, datetime)
+            if start_is_datetime != end_is_datetime:
+                raise ValueError("period boundaries must use the same temporal type")
+            if self.period_end < self.period_start:  # type: ignore[operator]
+                raise ValueError("period_end cannot precede period_start")
         allowed_types = {
             SignalFamily.CASH_FLOW: {item.value for item in CashFlowEventType},
             SignalFamily.RENT: {item.value for item in RentEventType},
@@ -457,23 +467,62 @@ class SignalRecord(StrictModel):
         return self.event_time if self.event_time is not None else self.period_end  # type: ignore[return-value]
 
 
-class SafeSignalProjection(StrictModel):
-    """Deliberately excludes every consumer and linkage identifier."""
+class AggregateReportEvidence(StrictModel):
+    """Only aggregate, disclosure-controlled evidence may cross into reports."""
 
-    source_id: str
-    source_version: str
-    signal_family: SignalFamily
-    provider_id: str | None
-    event_type: SignalEventType
-    status: RecordStatus
+    cell_id: str
+    table_id: str
+    state: DisclosureState
+    minimum_report_cell_count: int = Field(ge=10)
+    entity_count: int | None = Field(default=None, ge=0)
+    count_bucket: str | None = None
+    value: float | None = None
+    numerator: float | None = None
+    denominator: float | None = None
+    interval_lower: float | None = None
+    interval_upper: float | None = None
+    reason_code: str | None = None
+
+    @field_validator("cell_id", "table_id")
+    @classmethod
+    def validate_report_ids(cls, value: str, info: object) -> str:
+        return _non_blank(value, getattr(info, "field_name", "report identity"))
+
+    @model_validator(mode="after")
+    def validate_disclosure_boundary(self) -> "AggregateReportEvidence":
+        hidden = (
+            self.entity_count,
+            self.value,
+            self.numerator,
+            self.denominator,
+            self.interval_lower,
+            self.interval_upper,
+        )
+        if self.state == DisclosureState.SUPPRESSED:
+            if any(item is not None for item in hidden):
+                raise ValueError("suppressed evidence cannot expose counts or values")
+            allowed = {
+                f"0..{self.minimum_report_cell_count - 1}": "ad_sparse_report_cell",
+                "hidden": "ad_complementary_suppression",
+            }
+            if allowed.get(self.count_bucket) != self.reason_code:
+                raise ValueError("suppressed evidence requires its canonical bucket and reason")
+        else:
+            if self.entity_count is None or self.entity_count < self.minimum_report_cell_count:
+                raise ValueError("published evidence must meet the disclosure minimum")
+            if self.count_bucket is not None or self.reason_code is not None:
+                raise ValueError("published evidence cannot carry suppression metadata")
+        return self
 
 
-def report_safe_projection(record: SignalRecord) -> SafeSignalProjection:
-    return SafeSignalProjection(
-        source_id=record.source_id,
-        source_version=record.source_version,
-        signal_family=record.signal_family,
-        provider_id=record.provider_id,
-        event_type=record.event_type,
-        status=record.status,
-    )
+class AggregateReportRelease(StrictModel):
+    """Typed report boundary; raw SignalRecord objects are never accepted."""
+
+    cells: tuple[AggregateReportEvidence, ...]
+
+    @model_validator(mode="after")
+    def validate_unique_cells(self) -> "AggregateReportRelease":
+        identities = tuple((cell.table_id, cell.cell_id) for cell in self.cells)
+        if len(set(identities)) != len(identities):
+            raise ValueError("aggregate report cell identities must be unique")
+        return self
