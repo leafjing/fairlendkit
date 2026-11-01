@@ -6,8 +6,6 @@ import logging
 import re
 
 import pytest
-from pydantic import ValidationError
-
 from fairlendkit.alternative_data import (
     ProxyConfig,
     ProxyEntity,
@@ -112,7 +110,7 @@ def rows(*, single_provider=False, single_coverage=False, baseline=False):
 
 
 def test_approved_contract_is_exact_and_caller_scores_are_forbidden(caplog):
-    with pytest.raises(ValidationError):
+    with pytest.raises(ProxyFailure, match="ad_proxy_isolation_failure"):
         ProxyEntity(
             entity_id="secret", window="development", candidate=1,
             protected="a", provider_stratum="p", coverage_stratum="c",
@@ -162,6 +160,63 @@ def test_approved_contract_is_exact_and_caller_scores_are_forbidden(caplog):
     log_text = "\n".join(record.getMessage() for record in caplog.records)
     assert all(secret not in log_text for secret in secrets)
     assert "ad_proxy_weighting_unsupported" in log_text
+
+
+def test_public_entity_validation_is_stable_and_payload_free(caplog):
+    base = dict(
+        entity_id="entity-safe",
+        window="development",
+        candidate=1.0,
+        protected="class-a",
+        provider_stratum="provider-a",
+        coverage_stratum="coverage-a",
+        **provenance(),
+    )
+    cases = (
+        ({"window": "SECRET-WINDOW"}, ProxyReason.ISOLATION_FAILURE),
+        ({"as_of_time": "SECRET-TIME"}, ProxyReason.ISOLATION_FAILURE),
+        ({"candidate": {"raw": "SECRET-CANDIDATE"}}, ProxyReason.ISOLATION_FAILURE),
+        ({"weight": "SECRET-WEIGHT"}, ProxyReason.WEIGHTING_UNSUPPORTED),
+        ({"candidate_score": "SECRET-SCORE"}, ProxyReason.ISOLATION_FAILURE),
+    )
+    secrets = (
+        "SECRET-WINDOW",
+        "SECRET-TIME",
+        "SECRET-CANDIDATE",
+        "SECRET-WEIGHT",
+        "SECRET-SCORE",
+    )
+    expected_contract = {
+        ProxyReason.ISOLATION_FAILURE: (
+            "error",
+            "An entity, fitted transform, category vocabulary, or target-derived value crosses a proxy-screening fold or development/holdout boundary.",
+        ),
+        ProxyReason.WEIGHTING_UNSUPPORTED: (
+            "error",
+            "Proxy-screening configuration requests weighted eligibility, fitting, metrics, bootstrap, or suppression.",
+        ),
+    }
+    for updates, reason in cases:
+        payload = {**base, **updates}
+        with pytest.raises(ProxyFailure) as captured:
+            ProxyEntity.model_validate(payload)
+        error = captured.value
+        assert error.reason_code == reason.value
+        assert (error.disposition, error.canonical_message) == expected_contract[reason]
+        surfaces = (
+            str(error),
+            repr(error),
+            repr(error.errors()),
+            error.json(),
+            repr(error.__cause__),
+            repr(error.__context__),
+        )
+        assert all(secret not in surface for secret in secrets for surface in surfaces)
+        assert error.__cause__ is None
+        assert error.__context__ is None
+        logging.getLogger("fairlendkit.proxy.entity-boundary").error("%s", error)
+    log_text = "\n".join(record.getMessage() for record in caplog.records)
+    assert all(secret not in log_text for secret in secrets)
 
 
 def test_reason_contract_dispositions_and_messages_are_exact():
