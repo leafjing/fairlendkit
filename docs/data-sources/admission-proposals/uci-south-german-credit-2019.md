@@ -105,8 +105,48 @@ the candidate returns to review; this proposal does not resolve that conflict.
 
 ## Proposed one-time controlled retrieval gate
 
-The reviewer may authorize exactly one metadata-recorded retrieval attempt with
-all of these controls. Any unmet control aborts without admitting bytes.
+The reviewer may authorize exactly one metadata-recorded retrieval attempt only
+after the deterministic harness and tests named below are committed and
+independently reviewed. This prose is not executable authorization. Any unmet
+control aborts without admitting bytes.
+
+### Required harness and review command
+
+The prepared implementation must consist of:
+
+- `scripts/retrieve_uci_south_german_credit.py`, containing no import-time or
+  default network action; and
+- `tests/test_uci_south_german_credit_retrieval.py`, using an injected fake
+  transport and temporary directories only.
+
+The only permitted live invocation after a separate authorization is:
+
+```text
+python3 scripts/retrieve_uci_south_german_credit.py retrieve \
+  --run-id <authorization-issued-run-id> \
+  --quarantine-root <approved-absolute-non-repository-path> \
+  --audit-root <approved-absolute-non-repository-path>
+```
+
+The URL, host allowlist, expected sizes, member allowlist, and limits in this
+proposal are compiled constants, not caller-overridable flags. `retrieve`
+requires an authorization-issued run ID recorded in the independent approval;
+there is no retry or resume mode. Before authorization, reviewers run only:
+
+```text
+python3 -m pytest tests/test_uci_south_german_credit_retrieval.py -q
+```
+
+The test suite must cover an allowed redirect chain plus wrong-host, downgrade,
+IP-literal, credential-bearing, excessive-hop, oversized-header, oversized-
+stream, truncated/interrupted-stream, and content-length-mismatch responses. ZIP
+fixtures must cover valid structure plus absolute and parent traversal, NUL,
+duplicate path, case collision, Unicode-normalization collision, symlink,
+device/non-regular member, encryption, nested archive, excess member count,
+member and total size excess, compression-ratio excess, trailing/concatenated
+payload, missing member, unexpected member, and exact-size mismatch. Each
+failure assertion also proves no source byte remains and no second attempt with
+the same run ID can start.
 
 ### Network controls
 
@@ -142,16 +182,66 @@ all of these controls. Any unmet control aborts without admitting bytes.
 
 ### Storage and promotion
 
-- Stage the single attempt in an isolated, non-repository quarantine directory
-  created for this review; never use a shared user download folder.
-- After verification, store the immutable source ZIP and accepted members under
-  `data/vendor/uci-south-german-credit-2019/raw/`, with write bits removed. No
-  transformed file belongs in `raw/`.
-- Promotion into that path requires a follow-up reviewed commit containing the
-  completed manifest, hashes, NOTICE, data card, schema-validation evidence,
-  and privacy result. Retrieval authorization alone is not promotion approval.
-- On any failure, retain only non-sensitive failure metadata needed for review;
-  do not commit partial bytes or retry automatically.
+- Both approved roots must resolve outside the repository worktree, outside the
+  user's shared download directories, and outside each other. Symlinked roots,
+  world/group-writable parents, relative paths, and pre-existing run paths are
+  rejected.
+- The harness creates `<quarantine-root>/<run-id>/` with mode `0700` using an
+  exclusive create. It creates `<audit-root>/<run-id>.spent` exclusively with
+  mode `0400` before the first request. This non-sensitive tombstone is retained
+  indefinitely; its existence makes the same run ID fail before network access.
+  The run can never be retried, resumed, or overwritten, including after failure.
+- Partial response bytes use a newly and exclusively created file with mode
+  `0600`. Temporary extraction, if needed after structural validation, uses only
+  a private `0700` child directory. The harness never executes, imports, sources,
+  or shells any downloaded member.
+- On success, the ZIP and verified members remain only inside the non-repository
+  run directory, with files changed to mode `0400` and directories kept `0700`.
+  Nothing is copied, moved, linked, staged, or committed under `data/`, `docs/`,
+  tests, fixtures, caches, or another repository path.
+- Promotion to `data/vendor/uci-south-german-credit-2019/raw/` is a later action
+  requiring a follow-up reviewed commit proposal containing the completed
+  manifest, hashes, NOTICE, data card, schema-validation evidence, and privacy
+  result. Retrieval authorization is neither promotion nor admission approval.
+
+### Cleanup, retention, and audit lifecycle
+
+- The audit root contains one `<run-id>.json` record created exclusively with
+  mode `0600`. It records authorization identity, state transitions, timestamps,
+  redirect metadata, byte counts, hashes or failure reason, cleanup outcome, and
+  retention deadline, but never source bytes or row/member content.
+- State transitions are append-safe and monotonic:
+  `prepared -> started -> succeeded` or `prepared -> started -> failed`. A final
+  `cleaned` transition records byte removal; no terminal state can return to
+  `started`.
+- On failure or interruption, a `finally` path closes handles and unlinks the
+  partial ZIP plus every temporary member before returning. It then removes
+  empty temporary directories and records whether cleanup completed. The tests
+  inject interruption at every write/extraction phase. The contract requires
+  unlinking and directory synchronization; it does not claim forensic secure
+  erasure on copy-on-write or journaled storage.
+- A failed run retains only its non-sensitive audit JSON for 30 calendar days,
+  then the approved cleanup command removes it. The `.spent` tombstone remains.
+  Failed source and extracted bytes have zero retention and are removed before
+  the command exits.
+- A successful quarantined package is retained for at most 7 calendar days from
+  `succeeded`. It remains `0400`/`0700` and inaccessible to product code. If the
+  follow-up review has not approved promotion by the deadline, the cleanup
+  command deletes all source/member bytes and marks the audit `cleaned`.
+- The prepared harness must expose a non-network cleanup command scoped to one
+- The only cleanup invocation is:
+
+  ```text
+  python3 scripts/retrieve_uci_south_german_credit.py cleanup \
+    --run-id <authorization-issued-run-id> \
+    --quarantine-root <same-approved-absolute-path> \
+    --audit-root <same-approved-absolute-path>
+  ```
+
+  It performs no network operation, is scoped to the exact run ID, preserves
+  the `.spent` tombstone, and refuses paths outside the two approved roots.
+  Automatic retry, scheduled redownload, and cleanup by broad glob or recursive
+  repository path are prohibited.
 
 ## Post-retrieval admission checklist
 
