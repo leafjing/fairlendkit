@@ -95,7 +95,27 @@ Evaluation also requires a forward temporal holdout whose feature window begins
 after the development window ends. No entity may cross development and holdout
 populations. Cross-validation estimates development variability; the temporal
 holdout is separately labeled and cannot be merged into it. A screen is
-unavailable if either isolation rule cannot be satisfied.
+rejected with `ad_proxy_window_conflict` for invalid window ordering or
+`ad_proxy_isolation_failure` for population/preprocessing leakage. Insufficient
+fold support remains unavailable under `ad_insufficient_fold_support`.
+
+Development predictability uses only out-of-fold scores from the deterministic
+folds. Temporal-holdout predictability never performs holdout cross-validation:
+after development scoring is complete, fit exactly one new diagnostic model on
+the entire canonically ordered development population and score the holdout once.
+All preprocessing is refit on full development only. Numeric median, missing
+indicator, mean, and `ddof=0` standard deviation come only from development.
+Categorical vocabulary and rare mapping are learned only from full development;
+holdout-only levels map to `unseen`. The holdout never changes a coefficient,
+preprocessing value, category vocabulary, or threshold.
+
+The intercept-only baseline, approved baseline model, and baseline-plus-candidate
+model use the exact same development and holdout entity pairs. Each is refit on
+all development entities with its declared feature set and the same optimizer;
+baseline and augmented holdout scores are emitted as an inseparable pair for
+incremental AUC. Golden fixtures freeze full-development preprocessing values,
+rare/unseen vocabulary, optimizer iterations, coefficients, and holdout logits
+for the null, baseline, candidate, and baseline-plus-candidate diagnostic models.
 
 Each fold must contain at least the configured raw entity minimum and every
 protected class used by its metric. Fewer than two protected classes, an absent
@@ -207,11 +227,32 @@ populations produce unavailable evidence with no point estimate or flag.
 Configuration must explicitly provide `association_threshold`,
 `predictability_auc_threshold`, `incremental_auc_threshold`, confidence level,
 fold count, minimum valid folds, per-fold class minimum, stability tolerance,
-bootstrap seed/resamples, and minimum valid resamples. Association thresholds
-are in `[0,1]`, predictability AUC thresholds in `[0.5,1]`, incremental AUC
-thresholds in `[0,1]`, and stability tolerance in `[0,1]`. Fold count is at
-least 2; minimum valid folds is between 2 and fold count. There are no hidden
-defaults.
+bootstrap seed/resamples, minimum valid resamples, `minimum_stratum_entities`,
+and exhaustive canonical `provider_strata` and `coverage_strata`. Association
+thresholds are in `[0,1]`, predictability AUC thresholds in `[0.5,1]`,
+incremental AUC thresholds in `[0,1]`, and stability tolerance in `[0,1]`. Fold
+count is at least 2; minimum valid folds is between 2 and fold count. There are
+no hidden defaults. `minimum_stratum_entities` is an integer at least the
+configured `minimum_report_cell_count` and at least `2`; it applies to raw
+distinct entities before any derived evidence.
+
+Every eligible entity maps to exactly one declared provider stratum and one
+declared coverage stratum; an explicitly declared `other` stratum closes each
+vocabulary. Stratum labels are contract IDs, not raw provider/category values.
+When a dimension has at least two nonempty strata, compute the same metric and
+interval separately for every stratum in both development and holdout. Every
+stratum must meet `minimum_stratum_entities`, contain all protected classes
+required by the metric, reach `minimum_valid_resamples`, and use the same metric,
+preprocessing isolation, direction, and reliability rules as the overall result.
+Insufficient support produces `ad_proxy_stratum_support` and no flag. A dimension
+with exactly one nonempty declared stratum records stability as not applicable;
+it does not fabricate a comparison.
+
+Association statistics are recomputed from the entities inside each stratum.
+Predictability and incremental AUC reuse the already frozen overall-window
+out-of-fold or temporal-holdout scores and subset those paired arrays by stratum;
+they never fit a provider- or coverage-specific model. Bootstrap resamples only
+within that stratum and remains protected-class-stratified.
 
 Intervals use the existing SHA-256 counter bootstrap and Hyndman-Fan Type 7
 percentiles. Resampling is at entity level, stratified by protected class. For
@@ -232,12 +273,24 @@ prediction, coefficient, or resample array. When
 `valid_resamples < minimum_valid_resamples`, `reliable=false` and interval
 endpoints are null; a release model cannot re-inject them.
 
-A potential proxy-risk screening flag is emitted only when the corresponding
-point estimate meets or exceeds its inclusive threshold, its confidence lower
-bound also meets the threshold, all fold/reliability gates pass, and the
-absolute difference `abs(holdout - development)` is no more than the stability
-tolerance for the same metric and class aggregation. Failure of stability
-produces `ad_proxy_holdout_unstable`, not a flag. Every flag records rule
+A potential proxy-risk screening flag uses one fixed conjunctive rule. For the
+same metric, class aggregation, paired entity definition, and inclusive threshold
+`T`, both development and holdout must independently satisfy
+`reliable=true AND point>=T AND lower>=T`. The temporal comparison must satisfy
+`abs(holdout_point-development_point)<=stability_tolerance`.
+
+For each provider and coverage dimension with at least two nonempty strata,
+every required stratum must be reliable in both windows and must satisfy
+`abs(stratum_point-window_overall_point)<=stability_tolerance` separately in
+development and holdout. Stratum point/lower values are stability evidence and
+do not separately have to meet `T`; the overall development and holdout results
+are the threshold evidence. Any unsupported required stratum yields
+`ad_proxy_stratum_support`; any supported provider/coverage difference above
+tolerance yields `ad_proxy_stratum_unstable`. A temporal difference above
+tolerance yields `ad_proxy_holdout_unstable`. Every such failure emits no flag.
+
+Thus a flag is emitted only when all development, holdout, fold, bootstrap,
+pairing, provider, coverage, and disclosure gates pass. Every flag records rule
 ID/version, candidate ID, protected attribute,
 metric, threshold, point estimate, interval, baseline where applicable, fold
 support, populations, and neutral review prompt.
@@ -323,6 +376,31 @@ Fixtures are frozen, entity-level, order-permuted, and use no real consumer data
    identifier, weight-enabled, or protected-derived candidates fail closed.
    No fixture produces a causation, discrimination, legality, compliance,
    creditworthiness, feature-removal, or threshold-recommendation statement.
+8. **One-sided threshold:** development has `point>=T` and `lower>=T`, while
+   holdout has either `point<T` or `lower<T`; no flag is emitted even when the
+   absolute temporal difference is within tolerance. The converse fixture
+   (holdout passes, development fails) also emits no flag.
+9. **Provider/coverage stability:** two supported provider strata and two
+   supported coverage strata reproduce the overall metric within tolerance and
+   permit the gate. Mutating one supported stratum beyond tolerance produces
+   `ad_proxy_stratum_unstable`; reducing one below support produces
+   `ad_proxy_stratum_support`. Neither mutation emits a flag.
+10. **Holdout fitting:** frozen full-development numeric transforms, category
+    vocabulary, `rare`/`unseen` mapping, coefficients, iterations, and holdout
+    logits prove the holdout is scored once and is never used for fitting or
+    cross-validation. Baseline and augmented score arrays have identical entity
+    order and length.
+11. **Reason-code matrix:** one minimal fixture each requests weighting, supplies
+    a prohibited candidate, creates an entity conflict, reverses/overlaps the
+    windows, leaks one entity/transform across isolation boundaries, omits a
+    protected value, creates an undefined statistic, and mismatches the paired
+    baseline population. It asserts respectively
+    `ad_proxy_weighting_unsupported`, `ad_proxy_candidate_prohibited`,
+    `ad_proxy_entity_conflict`, `ad_proxy_window_conflict`,
+    `ad_proxy_isolation_failure`, `ad_proxy_protected_missing`,
+    `ad_proxy_statistic_undefined`, and
+    `ad_proxy_paired_population_mismatch`, including disposition and exact
+    canonical message. Input-order permutations preserve each result.
 
 AD-4 fixtures must cover protected/identifier/leakage-field rejection, entity
 and time leakage, deterministic folds, binary and multiclass AUC, missing state,

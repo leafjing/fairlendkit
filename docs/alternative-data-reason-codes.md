@@ -85,6 +85,28 @@ Disposition meanings:
 | `ad_high_cardinality_unsupported` | unavailable | Candidate categories exceed the configured supported maximum after rare-level mapping. |
 | `ad_proxy_model_nonconvergence` | unavailable | The versioned proxy-screening model did not converge. |
 | `ad_proxy_holdout_unstable` | observe | Temporal-holdout evidence exceeds the configured stability tolerance. |
+| `ad_proxy_stratum_support` | unavailable | A required provider or coverage stratum lacks configured entity, class, or bootstrap support. |
+| `ad_proxy_stratum_unstable` | observe | Supported provider or coverage evidence exceeds the configured stability tolerance. |
+
+## Proxy-screening boundary codes
+
+| Code | Default | Trigger |
+|---|---|---|
+| `ad_proxy_weighting_unsupported` | error | Proxy-screening configuration requests weighted eligibility, fitting, metrics, bootstrap, or suppression. |
+| `ad_proxy_candidate_prohibited` | error | A candidate or baseline field is protected-derived, outcome, decision, post-decision, identifier, free text, exact geolocation, fold, weight, provider key, leakage-rejected, or otherwise prohibited by the proxy contract. |
+| `ad_proxy_entity_conflict` | error | One proxy-screening entity has conflicting protected, candidate, baseline, provider, coverage, or reducer values after authoritative reduction. |
+| `ad_proxy_window_conflict` | error | Proxy-screening development and temporal-holdout windows are not strictly forward and non-overlapping. |
+| `ad_proxy_isolation_failure` | error | An entity, fitted transform, category vocabulary, or target-derived value crosses a proxy-screening fold or development/holdout boundary. |
+| `ad_proxy_protected_missing` | exclude | An entity lacks the user-supplied protected attribute required by this proxy screen. |
+| `ad_proxy_statistic_undefined` | unavailable | A proxy statistic has no defined denominator, required class comparison, finite value, or corrected contingency dimension. |
+| `ad_proxy_paired_population_mismatch` | error | Baseline and baseline-plus-candidate proxy evidence do not contain the exact same canonically ordered entity population. |
+
+These mappings are exhaustive for the named AD-4 boundary failures. They are
+asserted before generic validation codes: a forbidden candidate cannot become
+`ad_unknown_field`, an entity/window conflict cannot become an unavailable
+metric, and a paired-population mismatch cannot be silently intersected. The
+canonical message is exactly the Trigger sentence in this table, with no field,
+entity, provider, protected label, or source value interpolated.
 
 `ad_signal_not_provided`, `ad_provider_nonparticipation`, and
 `ad_provider_reporting_gap` are availability facts. They must not increment a
