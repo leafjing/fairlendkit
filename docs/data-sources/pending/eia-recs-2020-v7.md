@@ -63,7 +63,8 @@ Official HEAD metadata checked 2026-11-01 without retrieving bodies:
 The metadata-only [`eia-recs-2020-v7-manifest.json`](eia-recs-2020-v7-manifest.json)
 records these facts. Publisher checksums, actual SHA-256, official release date,
 column inventory, and confirmation that no member is third-party remain open.
-Status stays `evidence_incomplete` despite a credible path to `repository`.
+Status stays `evidence_incomplete`; manifest-level and member-level
+redistribution remain `unverified` despite a credible path to `repository`.
 
 ## Field, weight, and imputation evidence
 

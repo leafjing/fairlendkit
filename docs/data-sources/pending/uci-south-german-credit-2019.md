@@ -58,6 +58,9 @@ The metadata-only
 [`uci-south-german-credit-2019-manifest.json`](uci-south-german-credit-2019-manifest.json)
 pins these claims. Publisher checksums and repository SHA-256 values remain null
 because data retrieval is not authorized by this documentation change.
+The CC BY 4.0 presentation is affirmative license evidence, but manifest-level
+and member-level redistribution remain `unverified` until admission closes the
+package, provenance, and privacy checks.
 
 Remaining admission work is narrower but material: resolve the release-date
 discrepancy through UCI's official <https://archive.ics.uci.edu/contact> route,
