@@ -1,0 +1,36 @@
+{
+  "manifest_version": "1.0",
+  "candidate_id": "cfpb-making-ends-meet",
+  "publisher_legal_name": "Consumer Financial Protection Bureau",
+  "canonical_landing_url": "https://www.consumerfinance.gov/data-research/public-data-inventory/",
+  "persistent_identifier": null,
+  "release_id": null,
+  "release_date": null,
+  "retrieved_at": null,
+  "license_id": "UNVERIFIED",
+  "license_url": "",
+  "terms_url": null,
+  "redistribution": "unverified",
+  "package_url": null,
+  "expected_uncompressed_bytes": null,
+  "expected_compressed_bytes": null,
+  "files": [
+    {
+      "path": "cfpb_making-ends-meet_public-use-file_user-guide.pdf",
+      "media_type": "application/pdf",
+      "expected_bytes": 261183,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "methodology",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "unverified"
+    }
+  ],
+  "documentation": [
+    "https://www.consumerfinance.gov/data-research/public-data-inventory/",
+    "https://files.consumerfinance.gov/f/documents/cfpb_making-ends-meet_public-use-file_user-guide.pdf"
+  ],
+  "review_state": "evidence_incomplete"
+}

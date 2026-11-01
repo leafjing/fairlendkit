@@ -8,7 +8,8 @@
 - HTOPS overview: <https://www.census.gov/programs-surveys/htops.html>
 - Official data page linked there:
   <https://www.census.gov/programs-surveys/household-pulse-survey/data.html>
-- Exact release/version: not selected; each cycle/wave requires its own manifest
+- Selected investigation snapshot: July 2026 cross-sectional PUF, collected
+  2026-07-15 through 2026-08-03; no publisher-issued release identity verified
 - License/redistribution: Census and file-specific terms require verification
 - Decision: none
 - Trust tier: A for publisher authority; admission remains incomplete
@@ -39,3 +40,32 @@ mature credit outcome.
   quality/coverage example; later waves enter as separate manifests.
 - Unacceptable condition: no stable wave archive or disclosure terms prevent
   safe reproducible use.
+
+## Verified official metadata snapshot
+
+The official PUF page states that every release includes a PUF, replicate-weight
+file, and data dictionary. It also distinguishes 2025 longitudinal HTOPS from
+the cross-sectional design beginning in March 2026. The July 2026 collection is
+therefore a distinct cross-sectional release and must not be pooled with 2025.
+
+Official page and HEAD metadata checked 2026-11-01 without retrieving bodies:
+
+- CSV ZIP: 20,037,422 bytes, last modified 2026-09-10;
+- English questionnaire: 397,247 bytes, last modified 2026-09-24;
+- source and accuracy statement: 1,279,166 bytes, last modified 2026-09-24;
+- quality measures workbook: 12,763 bytes, last modified 2026-09-24; and
+- July user note dated 2026-10-30: 283,812 bytes.
+
+The metadata-only
+[`census-htops-hps-manifest.json`](census-htops-hps-manifest.json) pins these
+artifacts with `release_id=null`, `redistribution=unverified`, and file scope
+`unverified`. The ZIP member names, dictionary and replicate-weight placement,
+checksums, license/terms, revision identity, and the October user note's effect
+on the September ZIP remain unresolved. Candidate status stays
+`evidence_incomplete`; no artifact is approved for download.
+
+Any eventual use defaults to `quality_only`. Survey-reported rent, mortgage,
+energy, or expense difficulty is not a transaction history or credit outcome.
+Weights and replicate weights must remain wave-specific, and no uncertainty
+estimate may be published before the official variance procedure receives an
+independent calculation contract and golden fixture.

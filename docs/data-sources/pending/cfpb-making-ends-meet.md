@@ -7,9 +7,9 @@
 - Publisher class: government
 - Official user guide:
   <https://files.consumerfinance.gov/f/documents/cfpb_making-ends-meet_public-use-file_user-guide.pdf>
-- Historical data paths under `/data-research/making-ends-meet-survey-data/`
-  currently redirect to the CFPB data-research root; no stable package URL is
-  pinned
+- The current CFPB Public Data Inventory still lists Making Ends Meet as raw,
+  one-time data, but its Making Ends Meet link and historical public-data path
+  redirect to the CFPB data-research root; no stable package URL is pinned
 - Exact release/version: sample-specific public-use files, not yet selected
 - License/redistribution: per-download public-use terms not yet captured
 - Decision: none
@@ -42,3 +42,30 @@ hashes, and an approved `quality_only` or `risk_eligible` outcome mapping.
   limited-file coverage example; risk use only if temporal outcome review passes.
 - Unacceptable condition: terms prohibit the intended automated research or
   linked credit-derived fields cannot be handled under the privacy boundary.
+
+## Verified official metadata snapshot
+
+Checked 2026-11-01 without retrieving a data package:
+
+- the official Public Data Inventory lists “Making Ends Meet Survey,” describes
+  it as a series of general financial surveys, and classifies it as raw,
+  one-time data;
+- the inventory's program link and the formerly indexed `/public-data/` route
+  redirect to the generic CFPB data-research page rather than a package page;
+- the official public-use-file user guide remains directly accessible at the
+  CFPB file host; HEAD metadata reports 261,183 bytes and last modification on
+  2026-03-17; and
+- no current official package URL, publisher release identity, file/member
+  inventory, checksum, or download terms were located.
+
+The metadata-only
+[`cfpb-making-ends-meet-manifest.json`](cfpb-making-ends-meet-manifest.json)
+therefore pins only the official inventory and user guide. It uses
+`release_id=null`, `package_url=null`, `redistribution=unverified`, and file
+scope `unverified`. Candidate status remains `evidence_incomplete`; the guide is
+evidence, not authorization to reconstruct, download, or redistribute a sample.
+
+No sample is selected until CFPB restores or identifies an official package
+page with sample identity and terms. Survey hardship is never a default label,
+and credit-derived variables cannot become `risk_eligible` without explicit
+time alignment, outcome semantics, maturity, privacy, and censoring review.

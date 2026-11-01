@@ -1,0 +1,86 @@
+{
+  "manifest_version": "1.0",
+  "candidate_id": "census-htops-hps",
+  "publisher_legal_name": "U.S. Census Bureau",
+  "canonical_landing_url": "https://www.census.gov/programs-surveys/household-pulse-survey/data/datasets.html",
+  "persistent_identifier": null,
+  "release_id": null,
+  "release_date": null,
+  "retrieved_at": null,
+  "license_id": "UNVERIFIED",
+  "license_url": "",
+  "terms_url": null,
+  "redistribution": "unverified",
+  "package_url": "https://www2.census.gov/programs-surveys/demo/datasets/hhp/2026/topical/HTOPS_HPS_2607_CSV.zip",
+  "expected_uncompressed_bytes": null,
+  "expected_compressed_bytes": 20037422,
+  "files": [
+    {
+      "path": "HTOPS_HPS_2607_CSV.zip",
+      "media_type": "application/zip",
+      "expected_bytes": 20037422,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "data",
+      "contains_row_level_data": true,
+      "unit_of_observation": "one response to the July 2026 cross-sectional HTOPS Household Pulse collection",
+      "expected_columns": [],
+      "redistribution_scope": "unverified"
+    },
+    {
+      "path": "HTOPS_2607_Questionnaire_ENGLISH.pdf",
+      "media_type": "application/pdf",
+      "expected_bytes": 397247,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "other_documentation",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "unverified"
+    },
+    {
+      "path": "HTOPS_2607_Source_and_Accuracy.pdf",
+      "media_type": "application/pdf",
+      "expected_bytes": 1279166,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "methodology",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "unverified"
+    },
+    {
+      "path": "2607_HTOPS_Household_Pulse_User_Notes_10302026.pdf",
+      "media_type": "application/pdf",
+      "expected_bytes": 283812,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "other_documentation",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "unverified"
+    },
+    {
+      "path": "HTOPS_2607_Quality_Measures.xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "expected_bytes": 12763,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "methodology",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "unverified"
+    }
+  ],
+  "documentation": [
+    "https://www.census.gov/programs-surveys/household-pulse-survey/data/datasets.html",
+    "https://www.census.gov/programs-surveys/household-pulse-survey/technical-documentation/questionnaires.html",
+    "https://www.census.gov/programs-surveys/household-pulse-survey/technical-documentation/source-accuracy.html",
+    "https://www.census.gov/programs-surveys/household-pulse-survey/technical-documentation/user-notes.html"
+  ],
+  "review_state": "evidence_incomplete"
+}
