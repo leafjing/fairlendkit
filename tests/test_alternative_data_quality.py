@@ -10,6 +10,7 @@ from fairlendkit.alternative_data import (
     ObservationWindow,
     QualityPopulationEntity,
     SignalRecord,
+    build_quality_report_release,
     calculate_quality_evidence,
 )
 
@@ -143,6 +144,10 @@ def test_quality_engine_assembles_eligibility_coverage_and_group_evidence():
     assert scope_keys[0] == "overall"
     assert len([key for key in scope_keys if key.startswith("coverage.")]) == 3
     assert len([key for key in scope_keys if key.startswith("group.")]) == 2
+    assert "family.cash_flow" in scope_keys
+    family_scope = next(scope for scope in result.scopes if scope.scope_key == "family.cash_flow")
+    assert family_scope.signal_family == "cash_flow"
+    assert family_scope.input_record_count == 5
 
 
 def test_missing_signal_is_unavailable_and_never_becomes_adverse_behavior():
@@ -259,3 +264,58 @@ def test_quality_engine_fails_closed_on_future_evidence():
             coverages=(coverage("entity-secret-1"),),
             config=config(),
         )
+
+
+def test_cross_table_suppression_prevents_sparse_cell_reconstruction():
+    entities = tuple(
+        entity(f"entity-secret-{index}", "rare" if index == 0 else "common")
+        for index in range(20)
+    )
+    records = tuple(
+        record(f"record-{index}", entity_id=item.entity_id)
+        for index, item in enumerate(entities)
+    )
+    coverages = tuple(coverage(item.entity_id) for item in entities)
+
+    release = build_quality_report_release(
+        entities=entities,
+        records=records,
+        coverages=coverages,
+        config=config(),
+    )
+    rare = next(
+        cell
+        for cell in release.cells
+        if cell.table_id.startswith("quality.group.")
+        and cell.cell_id.endswith("7261726522")
+    )
+    assert rare.state == "suppressed"
+    assert rare.count_bucket == "0..9"
+    assert rare.reason_code == "ad_sparse_report_cell"
+    assert rare.entity_count is None
+    assert any(
+        cell.reason_code == "ad_complementary_suppression"
+        for cell in release.cells
+    )
+
+    serialized = release.model_dump_json()
+    assert "entity-secret-0" not in serialized
+    assert '"entity_count":1' not in serialized
+
+
+def test_primary_suppression_handles_zero_count_configured_cells():
+    entities = tuple(entity(f"entity-secret-{index}", "A") for index in range(12))
+    release = build_quality_report_release(
+        entities=entities,
+        records=(),
+        coverages=tuple(coverage(item.entity_id) for item in entities),
+        config=config(),
+    )
+    established = next(
+        cell
+        for cell in release.cells
+        if cell.table_id == "quality.coverage"
+        and cell.cell_id.endswith("65737461626c697368656422")
+    )
+    assert established.state == "suppressed"
+    assert established.count_bucket == "0..9"

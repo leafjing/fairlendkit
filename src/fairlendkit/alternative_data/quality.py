@@ -39,6 +39,7 @@ GroupLabel = str | int | bool
 
 class QualityScopeKind(StrEnum):
     OVERALL = "overall"
+    SIGNAL_FAMILY = "signal_family"
     COVERAGE = "coverage"
     AUDIT_GROUP = "audit_group"
 
@@ -89,6 +90,7 @@ class ProviderCoverage(StrictModel):
 class QualityScopeResult(StrictModel):
     scope_key: str = Field(pattern=r"^[a-z][a-z0-9_.-]*$")
     scope_kind: QualityScopeKind
+    signal_family: SignalFamily | None = None
     attribute: str | None = None
     group: GroupLabel | None = None
     entity_count: int = Field(ge=0)
@@ -123,6 +125,11 @@ class QualityScopeResult(StrictModel):
         if self.scope_kind == QualityScopeKind.OVERALL:
             if self.attribute is not None or self.group is not None:
                 raise ValueError("overall scope cannot carry a group")
+            if self.signal_family is not None:
+                raise ValueError("overall scope cannot carry a signal family")
+        elif self.scope_kind == QualityScopeKind.SIGNAL_FAMILY:
+            if self.signal_family is None or self.attribute is not None:
+                raise ValueError("signal-family scope requires only signal_family")
         elif self.attribute is None:
             raise ValueError("grouped scopes require an attribute")
         time_values = (
@@ -192,7 +199,9 @@ def calculate_quality_evidence(
 
     sources = {source.source_id: source for source in config.sources}
     record_reasons: dict[tuple[str, str, str], set[AlternativeDataReasonCode]] = {}
-    entity_reasons: dict[str, list[AlternativeDataReasonCode]] = {
+    entity_reasons: dict[
+        str, list[tuple[AlternativeDataReasonCode, SignalFamily | None]]
+    ] = {
         entity_id: [] for entity_id in entity_map
     }
 
@@ -200,7 +209,7 @@ def calculate_quality_evidence(
         coverage = coverage_map.get(entity_id)
         if coverage is None or not coverage.evidence_available:
             entity_reasons[entity_id].append(
-                AlternativeDataReasonCode.COVERAGE_STRATUM_UNAVAILABLE
+                (AlternativeDataReasonCode.COVERAGE_STRATUM_UNAVAILABLE, None)
             )
             continue
         decision = evaluate_credit_coverage(
@@ -209,7 +218,7 @@ def calculate_quality_evidence(
         if decision.disposition == GateDisposition.ERROR:
             raise ValueError(decision.reason_code.value)
         if decision.disposition == GateDisposition.EXCLUDE:
-            entity_reasons[entity_id].append(decision.reason_code)
+            entity_reasons[entity_id].append((decision.reason_code, None))
         if not _typed_contains(
             config.allowed_coverage_strata, coverage.coverage_stratum
         ):
@@ -257,9 +266,24 @@ def calculate_quality_evidence(
             QualityScopeKind.OVERALL,
             None,
             None,
+            None,
             set(entity_map),
         )
     ]
+    for family in sorted(
+        {source.signal_family for source in config.sources},
+        key=lambda item: item.value,
+    ):
+        scopes.append(
+            _scope(
+                f"family.{family.value}",
+                QualityScopeKind.SIGNAL_FAMILY,
+                family,
+                None,
+                None,
+                set(entity_map),
+            )
+        )
     coverage_values = sorted(
         config.allowed_coverage_strata, key=_typed_sort_key
     )
@@ -269,13 +293,16 @@ def calculate_quality_evidence(
             for entity_id, coverage in coverage_map.items()
             if coverage.evidence_available
             and _typed_equal(coverage.coverage_stratum, value)
-            and AlternativeDataReasonCode.OBSERVED_AFTER_DECISION
-            not in entity_reasons[entity_id]
+            and not any(
+                code == AlternativeDataReasonCode.OBSERVED_AFTER_DECISION
+                for code, _ in entity_reasons[entity_id]
+            )
         }
         scopes.append(
             _scope(
                 f"coverage.{_typed_token(value)}",
                 QualityScopeKind.COVERAGE,
+                None,
                 "coverage_stratum",
                 value,
                 members,
@@ -286,13 +313,16 @@ def calculate_quality_evidence(
         for entity_id in entity_map
         if entity_id not in coverage_map
         or not coverage_map[entity_id].evidence_available
-        or AlternativeDataReasonCode.OBSERVED_AFTER_DECISION
-        in entity_reasons[entity_id]
+        or any(
+            code == AlternativeDataReasonCode.OBSERVED_AFTER_DECISION
+            for code, _ in entity_reasons[entity_id]
+        )
     }
     scopes.append(
         _scope(
             "coverage.unavailable",
             QualityScopeKind.COVERAGE,
+            None,
             "coverage_stratum",
             None,
             unavailable_coverage,
@@ -321,6 +351,7 @@ def calculate_quality_evidence(
                 _scope(
                     f"group.{_typed_token(name)}.{_typed_token(value)}",
                     QualityScopeKind.AUDIT_GROUP,
+                    None,
                     name,
                     value,
                     members,
@@ -331,15 +362,17 @@ def calculate_quality_evidence(
         spec: tuple[
             str,
             QualityScopeKind,
+            SignalFamily | None,
             str | None,
             GroupLabel | None,
             set[str],
         ]
     ):
-        key, kind, attribute, group, members = spec
+        key, kind, family, attribute, group, members = spec
         return _assemble_scope(
             key=key,
             kind=kind,
+            family=family,
             attribute=attribute,
             group=group,
             members=members,
@@ -362,28 +395,44 @@ def calculate_quality_evidence(
 def _scope(
     key: str,
     kind: QualityScopeKind,
+    family: SignalFamily | None,
     attribute: str | None,
     group: GroupLabel | None,
     members: set[str],
-) -> tuple[str, QualityScopeKind, str | None, GroupLabel | None, set[str]]:
-    return key, kind, attribute, group, members
+) -> tuple[
+    str,
+    QualityScopeKind,
+    SignalFamily | None,
+    str | None,
+    GroupLabel | None,
+    set[str],
+]:
+    return key, kind, family, attribute, group, members
 
 
 def _assemble_scope(
     *,
     key: str,
     kind: QualityScopeKind,
+    family: SignalFamily | None,
     attribute: str | None,
     group: GroupLabel | None,
     members: set[str],
     records: tuple[SignalRecord, ...],
     authoritative_ids: set[tuple[str, str, str]],
     record_reasons: dict[tuple[str, str, str], set[AlternativeDataReasonCode]],
-    entity_reasons: dict[str, list[AlternativeDataReasonCode]],
+    entity_reasons: dict[
+        str, list[tuple[AlternativeDataReasonCode, SignalFamily | None]]
+    ],
     sources: dict[str, AlternativeDataSource],
     as_of_time: datetime,
 ) -> QualityScopeResult:
-    scoped = tuple(record for record in records if record.entity_id in members)
+    scoped = tuple(
+        record
+        for record in records
+        if record.entity_id in members
+        and (family is None or record.signal_family == family)
+    )
     authoritative = tuple(
         record for record in scoped if _record_identity(record) in authoritative_ids
     )
@@ -407,7 +456,11 @@ def _assemble_scope(
     excluded_entities = 0
     unavailable_entities = 0
     for entity_id in members:
-        codes = entity_reasons[entity_id]
+        codes = tuple(
+            code
+            for code, reason_family in entity_reasons[entity_id]
+            if family is None or reason_family is None or reason_family == family
+        )
         dispositions = {REASON_CONTRACT[code][0] for code in codes}
         if AlternativeDataDisposition.EXCLUDE in dispositions:
             excluded_entities += 1
@@ -439,7 +492,11 @@ def _assemble_scope(
     )
 
     providers = []
-    for source_id in sorted(sources):
+    for source_id in sorted(
+        source_id
+        for source_id, source in sources.items()
+        if family is None or source.signal_family == family
+    ):
         source = sources[source_id]
         provider_records = tuple(
             record
@@ -472,6 +529,7 @@ def _assemble_scope(
     return QualityScopeResult(
         scope_key=key,
         scope_kind=kind,
+        signal_family=family,
         attribute=attribute,
         group=group,
         entity_count=len(members),
@@ -498,7 +556,9 @@ def _add_signal_availability_reasons(
     entities: dict[str, QualityPopulationEntity],
     records: tuple[SignalRecord, ...],
     config: AlternativeDataConfig,
-    reasons: dict[str, list[AlternativeDataReasonCode]],
+    reasons: dict[
+        str, list[tuple[AlternativeDataReasonCode, SignalFamily | None]]
+    ],
 ) -> None:
     families = {source.signal_family for source in config.sources}
     observed = {(record.entity_id, record.signal_family) for record in records}
@@ -506,7 +566,7 @@ def _add_signal_availability_reasons(
         for family in sorted(families, key=lambda item: item.value):
             if (entity_id, family) not in observed:
                 reasons[entity_id].append(
-                    AlternativeDataReasonCode.SIGNAL_NOT_PROVIDED
+                    (AlternativeDataReasonCode.SIGNAL_NOT_PROVIDED, family)
                 )
 
 

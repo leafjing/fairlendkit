@@ -43,6 +43,7 @@ from fairlendkit.alternative_data.quality import (
     QualityScopeResult,
     calculate_quality_evidence,
 )
+from fairlendkit.alternative_data.suppression import build_quality_report_release
 
 __all__ = [
     "AcquisitionMethod",
@@ -78,6 +79,7 @@ __all__ = [
     "evaluate_outcome_record",
     "evaluate_source_completion",
     "calculate_quality_evidence",
+    "build_quality_report_release",
     "make_evidence",
     "select_authoritative_feature_records",
 ]
