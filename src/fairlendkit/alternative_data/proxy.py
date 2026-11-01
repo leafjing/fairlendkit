@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 import csv
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import StrEnum
 import hashlib
 from html import escape
@@ -58,16 +59,24 @@ class ProxyReason(StrEnum):
     COMPLEMENTARY = "ad_complementary_suppression"
 
 
-_MESSAGES = {
-    ProxyReason.WEIGHTING_UNSUPPORTED: "Weighted proxy screening is not supported.",
-    ProxyReason.CANDIDATE_PROHIBITED: "The candidate is prohibited by the proxy-screening contract.",
-    ProxyReason.ENTITY_CONFLICT: "Conflicting entity evidence prevents proxy screening.",
-    ProxyReason.WINDOW_CONFLICT: "Development and holdout windows conflict.",
-    ProxyReason.ISOLATION_FAILURE: "Development and holdout isolation failed.",
-    ProxyReason.PROTECTED_MISSING: "The protected attribute is missing.",
-    ProxyReason.STATISTIC_UNDEFINED: "The proxy-screening statistic is undefined.",
-    ProxyReason.PAIRED_POPULATION_MISMATCH: "Paired model populations do not match.",
-    ProxyReason.MODEL_NONCONVERGENCE: "The fixed diagnostic model did not converge.",
+_REASON_CONTRACT = {
+    ProxyReason.WEIGHTING_UNSUPPORTED: ("error", "Proxy-screening configuration requests weighted eligibility, fitting, metrics, bootstrap, or suppression."),
+    ProxyReason.CANDIDATE_PROHIBITED: ("error", "A candidate or baseline field is protected-derived, outcome, decision, post-decision, identifier, free text, exact geolocation, fold, weight, provider key, leakage-rejected, or otherwise prohibited by the proxy contract."),
+    ProxyReason.ENTITY_CONFLICT: ("error", "One proxy-screening entity has conflicting protected, candidate, baseline, provider, coverage, or reducer values after authoritative reduction."),
+    ProxyReason.WINDOW_CONFLICT: ("error", "Proxy-screening development and temporal-holdout windows are not strictly forward and non-overlapping."),
+    ProxyReason.ISOLATION_FAILURE: ("error", "An entity, fitted transform, category vocabulary, or target-derived value crosses a proxy-screening fold or development/holdout boundary."),
+    ProxyReason.PROTECTED_MISSING: ("exclude", "An entity lacks the user-supplied protected attribute required by this proxy screen."),
+    ProxyReason.STATISTIC_UNDEFINED: ("unavailable", "A proxy statistic has no defined denominator, required class comparison, finite value, or corrected contingency dimension."),
+    ProxyReason.PAIRED_POPULATION_MISMATCH: ("error", "Baseline and baseline-plus-candidate proxy evidence do not contain the exact same canonically ordered entity population."),
+    ProxyReason.INSUFFICIENT_FOLD_SUPPORT: ("unavailable", "Proxy-screening folds do not meet configured entity and class support."),
+    ProxyReason.HIGH_CARDINALITY: ("unavailable", "Candidate categories exceed the configured supported maximum after rare-level mapping."),
+    ProxyReason.MODEL_NONCONVERGENCE: ("unavailable", "The versioned proxy-screening model did not converge."),
+    ProxyReason.HOLDOUT_UNSTABLE: ("observe", "Temporal-holdout evidence exceeds the configured stability tolerance."),
+    ProxyReason.STRATA_NOT_COMPARABLE: ("unavailable", "Provider or coverage stability lacks at least two nonempty supported strata in both development and holdout."),
+    ProxyReason.STRATUM_SUPPORT: ("unavailable", "A required provider or coverage stratum lacks configured entity, class, or bootstrap support."),
+    ProxyReason.STRATUM_UNSTABLE: ("observe", "Supported provider or coverage evidence exceeds the configured stability tolerance."),
+    ProxyReason.SPARSE: ("unavailable", "Distinct-entity count is below the configured disclosure minimum."),
+    ProxyReason.COMPLEMENTARY: ("unavailable", "An additional cell is hidden to prevent recovery of a sparse value."),
 }
 
 
@@ -76,9 +85,16 @@ class ProxyFailure(ValueError):
 
     def __init__(self, reason: ProxyReason):
         self.reason_code = reason.value
-        self.disposition = "fail_closed"
-        self.canonical_message = _MESSAGES.get(reason, reason.value)
+        self.disposition, self.canonical_message = _REASON_CONTRACT.get(
+            reason, ("unavailable", reason.value)
+        )
         super().__init__(self.reason_code)
+
+
+class _CategoryLevel(StrEnum):
+    MISSING = "__internal_missing__"
+    RARE = "__internal_rare__"
+    UNSEEN = "__internal_unseen__"
 
 
 class ProxyEntity(StrictModel):
@@ -89,9 +105,14 @@ class ProxyEntity(StrictModel):
     provider_stratum: str = Field(min_length=1)
     coverage_stratum: str = Field(min_length=1)
     baseline: tuple[float | int | str | bool | None, ...] = ()
-    candidate_observed_by_as_of: bool = True
-    protected_observed_by_as_of: bool = True
-    baseline_observed_by_as_of: bool = True
+    candidate_source_id: str = Field(min_length=1)
+    candidate_derivation_version: str = Field(min_length=1)
+    reducer_id: str = Field(min_length=1)
+    reducer_version: str = Field(min_length=1)
+    as_of_time: datetime
+    candidate_available_time: datetime
+    protected_observation_time: datetime
+    baseline_available_time: datetime | None = None
     population_eligible: bool = True
     weight: float | None = None
 
@@ -110,6 +131,10 @@ class ProxyConfig(StrictModel):
     protected_attribute_id: str = Field(min_length=1)
     baseline_id: str | None = None
     candidate_kind: CandidateKind
+    candidate_source_id: str = Field(min_length=1)
+    candidate_derivation_version: str = Field(min_length=1)
+    reducer_id: str = Field(min_length=1)
+    reducer_version: str = Field(min_length=1)
     baseline_kinds: tuple[CandidateKind, ...] = ()
     development_window: str = Field(min_length=1)
     holdout_window: str = Field(min_length=1)
@@ -258,6 +283,18 @@ class ProxyTrace(StrictModel):
     candidate_id: str
     protected_attribute_id: str
     baseline_id: str | None
+    candidate_source_id: str
+    candidate_derivation_version: str
+    reducer_id: str
+    reducer_version: str
+    candidate_kind: CandidateKind
+    baseline_kinds: tuple[CandidateKind, ...]
+    association_threshold: float
+    predictability_auc_threshold: float
+    incremental_auc_threshold: float
+    stability_tolerance: float
+    provider_strata: tuple[str, ...]
+    coverage_strata: tuple[str, ...]
     weighting: str
     development_window: str
     holdout_window: str
@@ -504,7 +541,7 @@ def _fit_logistic(matrix: Sequence[Sequence[float]], labels: Sequence[int], clas
 
 @dataclass(frozen=True)
 class _Encoder:
-    numeric: tuple[tuple[float, float], ...]
+    numeric: tuple[tuple[float, float, float], ...]
     categorical: tuple[
         tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]], ...
     ]
@@ -515,19 +552,19 @@ class _Encoder:
         numeric_index = categorical_index = 0
         for kind, value in zip(self.kinds, values):
             if kind == CandidateKind.NUMERIC:
-                median, std = self.numeric[numeric_index]
+                median, mean, std = self.numeric[numeric_index]
                 numeric_index += 1
                 missing = not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value))
                 number = median if missing else float(value)
-                output.extend((0.0 if std == 0 else (number - median) / std, float(missing)))
+                output.extend((0.0 if std == 0 else (number - mean) / std, float(missing)))
             else:
                 vocabulary, rare_sources = self.categorical[categorical_index]
                 categorical_index += 1
-                token = _typed_token("missing" if value is None else value)
+                token = _typed_token(_CategoryLevel.MISSING) if value is None else _typed_token(value)
                 if token in rare_sources:
-                    token = _typed_token("rare")
+                    token = _typed_token(_CategoryLevel.RARE)
                 elif token not in vocabulary:
-                    token = _typed_token("unseen")
+                    token = _typed_token(_CategoryLevel.UNSEEN)
                 output.extend(float(token == item) for item in vocabulary)
         return tuple(output)
 
@@ -546,14 +583,18 @@ def _fit_encoder(rows: Sequence[ProxyEntity], kinds: tuple[CandidateKind, ...], 
             imputed = [median if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value)) else float(value) for value in values]
             mean = math.fsum(imputed) / len(imputed)
             variance = math.fsum((value - mean) ** 2 for value in imputed) / len(imputed)
-            numeric.append((median, math.sqrt(max(0.0, variance))))
+            numeric.append((median, mean, math.sqrt(max(0.0, variance))))
         else:
-            counts = Counter(_typed_token("missing" if value is None else value) for value in values)
+            counts = Counter(
+                _typed_token(_CategoryLevel.MISSING) if value is None else _typed_token(value)
+                for value in values
+            )
             retained = sorted(token for token, count in counts.items() if count >= config.minimum_level_entities)
             rare_sources = tuple(sorted(token for token, count in counts.items() if count < config.minimum_level_entities))
             if rare_sources:
-                retained.append(_typed_token("rare"))
-            retained.append(_typed_token("unseen"))
+                retained.append(_typed_token(_CategoryLevel.RARE))
+            retained.append(_typed_token(_CategoryLevel.MISSING))
+            retained.append(_typed_token(_CategoryLevel.UNSEEN))
             retained = sorted(set(retained))
             if len(retained) > config.maximum_categories:
                 raise ProxyFailure(ProxyReason.HIGH_CARDINALITY)
@@ -667,14 +708,14 @@ def _association(rows, config, window, dimension="overall", stratum="overall"):
         pairs = tuple((float(row.candidate), row.protected) for row in observed)
         key = _key(window, "eta_squared", dimension, stratum)
         return _evidence(key, observed, lambda draw: eta_squared(pairs[i] for i in draw), config, missing=len(selected)-len(observed))
-    pairs = tuple(("missing" if row.candidate is None else row.candidate, row.protected) for row in selected)
+    pairs = tuple((_CategoryLevel.MISSING if row.candidate is None else row.candidate, row.protected) for row in selected)
     key = _key(window, "cramers_v", dimension, stratum)
     return _evidence(key, selected, lambda draw: cramers_v(pairs[i] for i in draw), config)
 
 
 def _missingness(rows, config, window):
     selected = tuple(row for row in rows if row.window == window and row.protected is not None)
-    pairs = tuple(("missing" if row.candidate is None else "present", row.protected) for row in selected)
+    pairs = tuple((_CategoryLevel.MISSING if row.candidate is None else "present", row.protected) for row in selected)
     return _evidence(_key(window, "missingness_cramers_v"), selected, lambda draw: cramers_v(pairs[i] for i in draw), config, missing=sum(row.candidate is None for row in selected))
 
 
@@ -758,8 +799,8 @@ def _apply_release_suppression(evidence, rows, config, previous_release):
         units = {
             "eligible": members,
             "missing": frozenset(
-                row.entity_id for row in rows
-                if row.entity_id in members and row.candidate is None
+                row.entity_id for row in scoped_rows
+                if row.protected is not None and row.candidate is None
             ),
             "bootstrap": members,
             "flag_candidate": members,
@@ -778,12 +819,18 @@ def _apply_release_suppression(evidence, rows, config, previous_release):
                 if row.entity_id in members and _typed_token(row.protected) == label
             )
         if config.candidate_kind == CandidateKind.CATEGORICAL:
-            margins = sorted({_typed_token("missing" if row.candidate is None else row.candidate) for row in scoped_rows if row.protected is not None})
+            margins = sorted({
+                _typed_token(_CategoryLevel.MISSING) if row.candidate is None else _typed_token(row.candidate)
+                for row in scoped_rows if row.protected is not None
+            })
             for index, label in enumerate(margins):
                 units[f"candidate_margin_{index:03d}"] = frozenset(
                     row.entity_id for row in scoped_rows
                     if row.protected is not None
-                    and _typed_token("missing" if row.candidate is None else row.candidate) == label
+                    and (
+                        _typed_token(_CategoryLevel.MISSING)
+                        if row.candidate is None else _typed_token(row.candidate)
+                    ) == label
                 )
         if key.stratum_dimension == "overall":
             for fold in range(config.fold_count):
@@ -885,7 +932,19 @@ def _trace(config):
     return ProxyTrace(
         protocol_version=config.protocol_version, population_id=config.population_id,
         candidate_id=config.candidate_id, protected_attribute_id=config.protected_attribute_id,
-        baseline_id=config.baseline_id, weighting="unweighted",
+        baseline_id=config.baseline_id,
+        candidate_source_id=config.candidate_source_id,
+        candidate_derivation_version=config.candidate_derivation_version,
+        reducer_id=config.reducer_id, reducer_version=config.reducer_version,
+        candidate_kind=config.candidate_kind,
+        baseline_kinds=config.baseline_kinds,
+        association_threshold=config.association_threshold,
+        predictability_auc_threshold=config.predictability_auc_threshold,
+        incremental_auc_threshold=config.incremental_auc_threshold,
+        stability_tolerance=config.stability_tolerance,
+        provider_strata=config.provider_strata,
+        coverage_strata=config.coverage_strata,
+        weighting="unweighted",
         development_window=config.development_window, holdout_window=config.holdout_window,
         fold_seed_fingerprint=fingerprint(config.fold_seed), fold_count=config.fold_count,
         minimum_valid_folds=config.minimum_valid_folds, per_fold_class_minimum=config.per_fold_class_minimum,
@@ -904,9 +963,42 @@ def _trace(config):
 
 def build_proxy_release(rows: Iterable[ProxyEntity], config: ProxyConfig, previous_release: ProxyRelease | None = None) -> ProxyRelease:
     entities = reduce_entities(rows)
+    current_trace = _trace(config)
+    if previous_release is not None and previous_release.trace != current_trace:
+        raise ProxyFailure(ProxyReason.ISOLATION_FAILURE)
     if any(row.weight not in (None, 1.0) for row in entities):
         raise ProxyFailure(ProxyReason.WEIGHTING_UNSUPPORTED)
-    if any(not row.population_eligible or not row.candidate_observed_by_as_of or not row.protected_observed_by_as_of or not row.baseline_observed_by_as_of for row in entities):
+    if any(
+        not row.population_eligible
+        or row.candidate_source_id != config.candidate_source_id
+        or row.candidate_derivation_version != config.candidate_derivation_version
+        or row.reducer_id != config.reducer_id
+        or row.reducer_version != config.reducer_version
+        for row in entities
+    ):
+        raise ProxyFailure(ProxyReason.ENTITY_CONFLICT)
+    if any(
+        value.tzinfo is None or value.utcoffset() is None
+        for row in entities
+        for value in (
+            row.as_of_time, row.candidate_available_time,
+            row.protected_observation_time,
+            *( () if row.baseline_available_time is None else (row.baseline_available_time,) ),
+        )
+    ):
+        raise ProxyFailure(ProxyReason.ISOLATION_FAILURE)
+    if any(
+        row.candidate_available_time > row.as_of_time
+        or row.protected_observation_time > row.as_of_time
+        or (
+            config.baseline_id is not None
+            and (
+                row.baseline_available_time is None
+                or row.baseline_available_time > row.as_of_time
+            )
+        )
+        for row in entities
+    ):
         raise ProxyFailure(ProxyReason.ISOLATION_FAILURE)
     if any(row.protected is None for row in entities):
         # Missing protected rows are excluded from metrics but made explicit by evidence counts.
@@ -1055,7 +1147,7 @@ def build_proxy_release(rows: Iterable[ProxyEntity], config: ProxyConfig, previo
         if any(json.dumps(ref.model_dump(mode="json"), sort_keys=True) not in published_keys for ref in refs):
             flag = None
             reason = ProxyReason.COMPLEMENTARY.value
-    return ProxyRelease(evidence=evidence, flag=flag, flag_state="published" if flag else "unavailable", flag_reason_code=reason, trace=_trace(config))
+    return ProxyRelease(evidence=evidence, flag=flag, flag_state="published" if flag else "unavailable", flag_reason_code=reason, trace=current_trace)
 
 
 def _normalized_rows(release: ProxyRelease) -> tuple[dict[str, Any], ...]:
