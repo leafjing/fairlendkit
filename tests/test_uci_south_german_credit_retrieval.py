@@ -407,6 +407,119 @@ def test_run_directory_creation_failure_reaches_cleaned_terminal_state(
     assert (audit / "mkdir-failure.spent").is_file()
 
 
+@pytest.mark.parametrize(
+    ("failed_state", "disk_terminal", "note"),
+    [
+        (
+            "failed",
+            "started",
+            "retrieval_lifecycle_error:audit_failed_transition_not_persisted",
+        ),
+        (
+            "cleaned",
+            "failed",
+            "retrieval_lifecycle_error:audit_cleaned_transition_not_persisted",
+        ),
+    ],
+)
+def test_audit_transition_write_failure_preserves_original_error_and_spent_marker(
+    tmp_path, monkeypatch, failed_state, disk_terminal, note
+):
+    data = archive_bytes()
+    quarantine, audit = roots(tmp_path)
+    transport = FakeTransport([RuntimeError("original retrieval failure")])
+    original_write = harness._write_json
+
+    def fail_selected_transition(path, payload):
+        if payload["states"][-1]["state"] == failed_state:
+            raise OSError(f"injected {failed_state} audit write failure")
+        return original_write(path, payload)
+
+    monkeypatch.setattr(harness, "_write_json", fail_selected_transition)
+    with pytest.raises(RuntimeError, match="original retrieval failure") as captured:
+        harness._retrieve_once(
+            run_id=f"audit-{failed_state}-failure",
+            quarantine_root=quarantine,
+            audit_root=audit,
+            transport=transport,
+            policy=policy(data),
+        )
+
+    run_id = f"audit-{failed_state}-failure"
+    assert note in (captured.value.__notes__ or [])
+    assert json.loads((audit / f"{run_id}.json").read_text())["states"][-1][
+        "state"
+    ] == disk_terminal
+    marker = json.loads(
+        (audit / f"{run_id}.persistence-failure.json").read_text()
+    )
+    assert marker["attempted_state"] == failed_state
+    assert marker["original_failure_reason"] == "RuntimeError: original retrieval failure"
+    assert marker["cleanup_completed"] is True
+    assert marker["remaining_bytes_state"] == "absent"
+    assert marker["retry_forbidden"] is True
+    assert not (quarantine / run_id).exists()
+    assert (audit / f"{run_id}.spent").is_file()
+    calls = len(transport.calls)
+    with pytest.raises(FileExistsError):
+        harness._retrieve_once(
+            run_id=run_id,
+            quarantine_root=quarantine,
+            audit_root=audit,
+            transport=transport,
+            policy=policy(data),
+        )
+    assert len(transport.calls) == calls
+
+
+def test_primary_and_emergency_audit_write_failure_still_fails_closed(
+    tmp_path, monkeypatch
+):
+    data = archive_bytes()
+    quarantine, audit = roots(tmp_path)
+    transport = FakeTransport([RuntimeError("original retrieval failure")])
+    original_write = harness._write_json
+    original_exclusive = harness._exclusive_json
+
+    def fail_failed_transition(path, payload):
+        if payload["states"][-1]["state"] == "failed":
+            raise OSError("primary audit unavailable")
+        return original_write(path, payload)
+
+    def fail_emergency_marker(path, payload):
+        if path.name.endswith(".persistence-failure.json"):
+            raise OSError("emergency audit unavailable")
+        return original_exclusive(path, payload)
+
+    monkeypatch.setattr(harness, "_write_json", fail_failed_transition)
+    monkeypatch.setattr(harness, "_exclusive_json", fail_emergency_marker)
+    with pytest.raises(RuntimeError, match="original retrieval failure") as captured:
+        harness._retrieve_once(
+            run_id="all-audit-failure",
+            quarantine_root=quarantine,
+            audit_root=audit,
+            transport=transport,
+            policy=policy(data),
+        )
+
+    assert "retrieval_lifecycle_error:audit_failed_transition_not_persisted" in (
+        captured.value.__notes__ or []
+    )
+    assert not (audit / "all-audit-failure.persistence-failure.json").exists()
+    assert (audit / "all-audit-failure.spent").is_file()
+    assert not (quarantine / "all-audit-failure").exists()
+    calls = len(transport.calls)
+    with pytest.raises(FileExistsError):
+        harness._retrieve_once(
+            run_id="all-audit-failure",
+            quarantine_root=quarantine,
+            audit_root=audit,
+            transport=transport,
+            policy=policy(data),
+        )
+    assert len(transport.calls) == calls
+
+
 class FakeInspector:
     def __init__(self, *, commit="a" * 40, dirty=False):
         self._commit = commit

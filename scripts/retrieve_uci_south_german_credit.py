@@ -225,9 +225,35 @@ def _retrieve_once(
                 )
             except BaseException:
                 audit["remaining_bytes_state"] = "unknown"
-        _transition(audit_path, audit, "failed", timestamp)
+        try:
+            _transition(audit_path, audit, "failed", timestamp)
+        except BaseException as persistence_error:
+            _record_persistence_failure(
+                audit_root=audit_root,
+                run_id=run_id,
+                attempted_state="failed",
+                original_error=error,
+                persistence_error=persistence_error,
+                audit=audit,
+                at=timestamp,
+            )
+            error.add_note("retrieval_lifecycle_error:audit_failed_transition_not_persisted")
+            raise error from None
         if audit["cleanup_completed"]:
-            _transition(audit_path, audit, "cleaned", timestamp)
+            try:
+                _transition(audit_path, audit, "cleaned", timestamp)
+            except BaseException as persistence_error:
+                _record_persistence_failure(
+                    audit_root=audit_root,
+                    run_id=run_id,
+                    attempted_state="cleaned",
+                    original_error=error,
+                    persistence_error=persistence_error,
+                    audit=audit,
+                    at=timestamp,
+                )
+                error.add_note("retrieval_lifecycle_error:audit_cleaned_transition_not_persisted")
+                raise error from None
         raise
 
 
@@ -612,6 +638,38 @@ def _transition(path: Path, audit: dict[str, object], state: str, at: datetime) 
     assert isinstance(states, list)
     states.append({"state": state, "at": at.isoformat()})
     _write_json(path, audit)
+
+
+def _record_persistence_failure(
+    *,
+    audit_root: Path,
+    run_id: str,
+    attempted_state: str,
+    original_error: BaseException,
+    persistence_error: BaseException,
+    audit: dict[str, object],
+    at: datetime,
+) -> None:
+    """Best-effort sidecar that never replaces the originating retrieval error."""
+
+    marker = audit_root / f"{run_id}.persistence-failure.json"
+    payload = {
+        "schema_version": "1.0",
+        "run_id": run_id,
+        "attempted_state": attempted_state,
+        "at": at.isoformat(),
+        "original_failure_reason": _safe_failure(original_error),
+        "audit_persistence_failure_reason": _safe_failure(persistence_error),
+        "cleanup_completed": audit.get("cleanup_completed", False),
+        "remaining_bytes_state": audit.get("remaining_bytes_state", "unknown"),
+        "retry_forbidden": True,
+    }
+    try:
+        _exclusive_json(marker, payload)
+    except BaseException:
+        # The permanent .spent marker is the final fail-closed control even when
+        # the primary audit and emergency sidecar cannot be persisted.
+        return
 
 
 def _remove_run_bytes(run_dir: Path) -> None:
