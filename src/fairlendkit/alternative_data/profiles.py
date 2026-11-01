@@ -178,6 +178,16 @@ def _calculate_cash_flow_profile(
         reasons.append(AlternativeDataReasonCode.INSUFFICIENT_CALENDAR_COVERAGE)
     if reporting_gaps:
         reasons.append(AlternativeDataReasonCode.PROVIDER_REPORTING_GAP)
+    if any(item.event_type == SignalEventType.REVERSAL for item in selected):
+        reasons.append(AlternativeDataReasonCode.CASHFLOW_REVERSAL_OBSERVED)
+    if any(
+        item.event_type in {SignalEventType.INFLOW, SignalEventType.OUTFLOW}
+        and item.category_id is None
+        for item in active
+    ):
+        reasons.append(AlternativeDataReasonCode.CASHFLOW_CATEGORY_UNRESOLVED)
+    if uncertain:
+        reasons.append(AlternativeDataReasonCode.UNCERTAIN_TRANSFER)
     return _CashFlowProfile(
         state=_Availability.AVAILABLE if complete else _Availability.UNAVAILABLE,
         calendar_period_count=len(months),
@@ -338,6 +348,24 @@ def _obligation_profile(
         reasons.append(AlternativeDataReasonCode.PROVIDER_NONPARTICIPATION)
     if unmatched_payment:
         reasons.append(AlternativeDataReasonCode.UNMATCHED_OBLIGATION)
+    if not utility and any(
+        item.event_type == SignalEventType.PARTIAL_PAYMENT for item in selected
+    ):
+        reasons.append(AlternativeDataReasonCode.RENT_PARTIAL_PAYMENT_OBSERVED)
+    if not utility and any(item.event_type == SignalEventType.WAIVER for item in selected):
+        reasons.append(AlternativeDataReasonCode.RENT_WAIVER_OBSERVED)
+    if utility and any(
+        item.event_type == SignalEventType.ESTIMATED_BILL for item in selected
+    ):
+        reasons.append(AlternativeDataReasonCode.UTILITY_ESTIMATED_BILL_OBSERVED)
+    if utility and any(
+        item.event_type == SignalEventType.ADJUSTMENT for item in selected
+    ):
+        reasons.append(AlternativeDataReasonCode.UTILITY_ADJUSTMENT_OBSERVED)
+    if utility and any(
+        item.event_type == SignalEventType.SERVICE_INTERRUPTION for item in selected
+    ):
+        reasons.append(AlternativeDataReasonCode.SERVICE_INTERRUPTION_OBSERVED)
     scheduled_amount = sum((item.amount or Decimal(0) for item in obligations.values()), Decimal(0))
     return {
         "state": _Availability.AVAILABLE if observed else _Availability.UNAVAILABLE,
@@ -382,15 +410,14 @@ def _family_records(
     if len({item.entity_id for item in family_items}) > 1:
         raise ValueError("internal signal profiles require exactly one entity scope")
     sources = {source.source_id: source for source in config.sources}
-    return tuple(
-        item
+    if any(
+        item.amount is not None
+        and sources[item.source_id].default_currency is not None
+        and item.currency != sources[item.source_id].default_currency
         for item in family_items
-        if not (
-            item.amount is not None
-            and sources[item.source_id].default_currency is not None
-            and item.currency != sources[item.source_id].default_currency
-        )
-    )
+    ):
+        raise ValueError(AlternativeDataReasonCode.CURRENCY_INCONSISTENT.value)
+    return family_items
 
 
 def _calendar_months(start: datetime, end: datetime) -> tuple[tuple[int, int], ...]:

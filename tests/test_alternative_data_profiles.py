@@ -1,4 +1,7 @@
 from decimal import Decimal
+import csv
+import io
+import json
 
 import pytest
 
@@ -115,6 +118,10 @@ def test_cash_flow_oracle_uses_decimal_reversals_and_period_denominators():
     assert profile.reversed_amount == Decimal("100")
     assert profile.balance_availability_rate == Decimal(1)
     assert profile.internal_transfer_count == 1
+    assert set(profile.reason_codes) == {
+        "ad_cashflow_category_unresolved",
+        "ad_cashflow_reversal_observed",
+    }
 
 
 def test_cash_flow_reporting_gap_never_invents_zero_behavior():
@@ -148,6 +155,12 @@ def test_rent_oracle_excludes_nonparticipating_period_from_behavior():
     assert profile.timely_paid_rate == Decimal(1) / Decimal(2)
     assert profile.partial_payment_rate == Decimal(1) / Decimal(2)
     assert profile.amount_coverage_rate == Decimal(1)
+    assert profile.reporting_gap_count == 1
+    assert set(profile.reason_codes) == {
+        "ad_provider_nonparticipation",
+        "ad_provider_reporting_gap",
+        "ad_rent_partial_payment_observed",
+    }
 
 
 def test_utility_oracle_uses_linked_adjustments_and_explicit_payments():
@@ -172,6 +185,10 @@ def test_utility_oracle_uses_linked_adjustments_and_explicit_payments():
     assert profile.partial_payment_rate == Decimal(1) / Decimal(3)
     assert profile.estimated_bill_rate == Decimal(1) / Decimal(3)
     assert profile.adjustment_rate == Decimal(1) / Decimal(3)
+    assert set(profile.reason_codes) == {
+        "ad_utility_adjustment_observed",
+        "ad_utility_estimated_bill_observed",
+    }
 
 
 def test_explicit_adapter_rejects_unmapped_and_unknown_categories():
@@ -238,13 +255,63 @@ def test_profile_mutations_fail_closed_or_remain_unavailable_without_adverse_inf
             config=config("cash_flow"),
         )
 
-    profile = _calculate_cash_flow_profile(
+    with pytest.raises(ValueError, match="ad_currency_inconsistent"):
+        _calculate_cash_flow_profile(
+            (
+                record("cash_flow", "usd", "inflow", "2025-01-01T00:00:00Z", "100"),
+                record("cash_flow", "eur", "inflow", "2025-01-02T00:00:00Z", "999", currency="EUR"),
+            ),
+            config=config("cash_flow"),
+        )
+
+    unmatched = _calculate_rent_profile(
         (
-            record("cash_flow", "usd", "inflow", "2025-01-01T00:00:00Z", "100"),
-            record("cash_flow", "eur", "inflow", "2025-01-02T00:00:00Z", "999", currency="EUR"),
+            record(
+                "rent",
+                "orphan-payment",
+                "payment",
+                "2025-01-05",
+                "100",
+                obligation_id="missing-obligation",
+            ),
         ),
-        config=config("cash_flow"),
+        config=config("rent"),
+        grace_days=5,
     )
-    assert profile.inflow_total == Decimal("100")
-    assert profile.state == "unavailable"
-    assert profile.mean_monthly_inflow is None
+    assert unmatched.state == "unavailable"
+    assert unmatched.fully_paid_count == 0
+    assert unmatched.timely_paid_count == 0
+    assert set(unmatched.reason_codes) == {
+        "ad_obligation_schedule_unavailable",
+        "ad_unmatched_obligation",
+    }
+
+
+def test_profiles_are_order_independent_and_identifiers_do_not_leak(caplog):
+    rows = (
+        record("cash_flow", "secret-record-a", "inflow", "2025-01-01T00:00:00Z", "100"),
+        record("cash_flow", "secret-record-b", "inflow", "2025-02-01T00:00:00Z", "200"),
+        record("cash_flow", "secret-record-c", "inflow", "2025-03-01T00:00:00Z", "300"),
+    )
+    first = _calculate_cash_flow_profile(rows, config=config("cash_flow"))
+    second = _calculate_cash_flow_profile(reversed(rows), config=config("cash_flow"))
+    assert first == second
+
+    payload = first.model_dump(mode="json")
+    json_text = json.dumps(payload, sort_keys=True)
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerows(sorted((key, value) for key, value in payload.items()))
+    html_text = "".join(
+        f"<dt>{key}</dt><dd>{value}</dd>" for key, value in sorted(payload.items())
+    )
+    diagnostics = repr(first)
+    artifacts = (json_text, csv_buffer.getvalue(), html_text, diagnostics, caplog.text)
+    for secret in (
+        "secret-entity",
+        "secret-record-a",
+        "secret-record-b",
+        "secret-record-c",
+        "permission-ref",
+    ):
+        assert all(secret not in artifact for artifact in artifacts)
