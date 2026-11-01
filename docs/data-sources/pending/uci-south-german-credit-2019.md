@@ -65,6 +65,11 @@ confirm whether the archive has a stable revision identity/checksum, verify the
 original collection/label horizon, and complete privacy plus benchmark-scope
 review. Candidate status remains `evidence_incomplete`.
 
+An explicitly unsent request is prepared at
+[`../contact-drafts/uci-south-german-credit-request.md`](../contact-drafts/uci-south-german-credit-request.md).
+It is a review artifact only and must not be sent without custice's explicit
+authorization.
+
 ## Enablement plan
 
 - Target: `repository` as the first directly included risk-metric benchmark,

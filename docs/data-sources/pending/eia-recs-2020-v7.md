@@ -14,7 +14,9 @@
 - Method guide:
   <https://www.eia.gov/consumption/residential/data/2020/pdf/microdata-guide.pdf>
 - Exact release/version: 2020 RECS public microdata v7
-- License/redistribution: EIA terms not yet recorded
+- License/redistribution: EIA's official Copyrights and Reuse page permits use
+  and distribution of EIA data, files, and databases, subject to attribution
+  guidance and exclusion of identified third-party material
 - Decision: none
 - Trust tier: A for publisher authority; admission remains incomplete
 
@@ -62,3 +64,56 @@ The metadata-only [`eia-recs-2020-v7-manifest.json`](eia-recs-2020-v7-manifest.j
 records these facts. Publisher checksums, actual SHA-256, official release date,
 column inventory, and confirmation that no member is third-party remain open.
 Status stays `evidence_incomplete` despite a credible path to `repository`.
+
+## Field, weight, and imputation evidence
+
+The official v7 codebook was inspected as documentation only; the row-level CSV
+was not retrieved. It establishes these semantics:
+
+- `DOEID` is a respondent identifier and must be discarded before any report,
+  log, exception, cache key, or exported fixture;
+- `NWEIGHT` is the final analysis weight, and `NWEIGHT1` through `NWEIGHT60`
+  are the 60 final analysis replicate weights;
+- variables prefixed with `Z` are field-specific imputation indicators where
+  the codebook explicitly pairs them with a measure; values are not inferred
+  from the prefix alone;
+- for many household fields, indicator values distinguish `1 Imputed`, `0 Not
+  imputed`, and `-2 Not applicable`; these states must remain separate from
+  ordinary missingness;
+- `PERIODEL` records electricity billing-data coverage bands, while analogous
+  period fields exist for other fuels; annual totals can therefore have
+  unequal source coverage and cannot be treated as uniformly observed; and
+- `ZELAMOUNT` distinguishes no imputation, amount-and-cost imputation, and an
+  electricity-amount-only solar case. Other fuel amount flags have their own
+  documented domains and must not inherit the electricity mapping.
+
+The official microdata page says the first 2020 release contained preliminary
+household characteristics, the June 2023 release added final consumption,
+expenditure, and end-use estimates, and later updates added variables through
+January 2024. This is why the adapter must require v7 rather than accepting an
+unversioned “2020 RECS” file.
+
+The official microdata guide is the required authority for estimate and
+relative-standard-error calculations. Until its replicate-weight procedure is
+encoded as an independently reviewed contract and golden fixture, the project
+must not substitute an ordinary unweighted variance, silently normalize
+weights, or publish uncertainty estimates.
+
+## Proposed use boundary; no admission yet
+
+Any future admission is `quality_only` by default. Permitted research claims
+are limited to utility-data coverage, energy expenditure/consumption quality,
+imputation prevalence, weighted representation, and coverage differences.
+
+`SCALEE`, `NOHEATEL`, `NOHEATNG`, and related hardship fields may support
+clearly labeled survey-based coverage or hardship analysis. They are not loan
+performance labels. A disconnection notice, inability to afford service, an
+imputed amount, short supplier-data coverage, or missing utility service must
+not be renamed as delinquency, default, adverse behavior, or a consumer credit
+outcome. RECS supplies no verified credit decision time, performance window,
+or mature binary credit outcome, so `risk_eligible` remains false.
+
+Remaining blockers are publisher/repository hashes, row-level schema and null
+token verification after retrieval authorization, third-party-member review,
+the exact official release date, and an approved replicate-weight calculation
+contract. No RECS data may be downloaded or committed while these remain open.
