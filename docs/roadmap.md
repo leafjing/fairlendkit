@@ -61,9 +61,17 @@ edge cases, tests, report representation, and limitations are documented.
 
 Milestone 4 deliberately pulls the stable reporting subset of Epic 5 ahead of
 Epic 4 threshold sensitivity. This produces a usable audit workflow without
-coupling report delivery to new analytical behavior. Threshold scanning remains
-the next analytical epic and will extend the versioned result contract before
-threshold sections can appear in reports.
+coupling report delivery to new analytical behavior.
+
+- Milestone 5: alternative-data credit assessment — active. The contract is
+  defined in
+  [`alternative-data-credit-assessment.md`](alternative-data-credit-assessment.md).
+  It adds leakage-safe longitudinal data validation, signal-specific quality
+  evidence, credit-risk performance diagnostics, coverage fairness, and
+  potential proxy-risk screening for cash-flow, rent, and utility signals.
+- Threshold scanning and the fairness-accuracy frontier are frozen and deferred
+  until Milestone 5 closes. Existing experimental branches are not release
+  contracts and must not be merged into this milestone.
 
 ## V1.1 — Mitigation experiments
 
