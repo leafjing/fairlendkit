@@ -41,3 +41,19 @@ and a default `quality_only` use unless a mature credit outcome is documented.
   rent/utility quality and representation example, and manifest verifier.
 - Unacceptable condition: panel/linkage restrictions or disclosure risk cannot
   be reconciled with aggregate report controls.
+
+## Verified official metadata snapshot
+
+The official national PUF page identifies version `v1.1`. Official HEAD metadata
+checked 2026-11-01 without retrieving bodies records:
+
+- national PUF v1.1 CSV ZIP: 129,491,194 bytes, last modified 2025-01-22;
+- value-label package: 228,274 bytes, last modified 2025-01-22; and
+- national PUF version-control PDF: 128,758 bytes, last modified 2025-02-18.
+
+The metadata-only
+[`census-ahs-2023-puf-manifest.json`](census-ahs-2023-puf-manifest.json)
+pins the version and artifacts. Dataset-level reuse/redistribution terms, archive
+members, publisher checksums, repository SHA-256, and version-control contents
+remain unverified, so members default to `external_only` and candidate status
+remains `evidence_incomplete`.

@@ -43,3 +43,20 @@ privacy review, and outcome fitness. Default analytical disposition is
   outcome claim.
 - Unacceptable condition: identifier/linkage restrictions incompatible with
   safe processing or terms that prohibit reproducible local analysis.
+
+## Verified official metadata snapshot
+
+Official HEAD metadata checked 2026-11-01 without retrieving bodies:
+
+- current 2024 CSV ZIP: 3,787,684 bytes, last modified 2026-02-09;
+- current 2024 codebook: 848,401 bytes, last modified 2026-02-09; and
+- the canonical SHED page continues to expose both artifacts.
+
+Because a 2024 survey artifact was updated in 2026, the manifest identifies this
+snapshot as `shed-2024-public-use-current-2026-02-09`; “2024” alone is not a
+sufficient version. The Board linking-policy page only resolves third-party
+linked-content restrictions and is not yet affirmative dataset redistribution
+permission. The metadata-only
+[`federal-reserve-shed-2024-manifest.json`](federal-reserve-shed-2024-manifest.json)
+therefore remains `redistribution=unverified` and defaults members to
+`external_only` pending confirmation.

@@ -45,3 +45,20 @@ release times, and a `quality_only` approved-use record.
   utility data card, variance tests, and source verifier.
 - Unacceptable condition: official terms bar intended use or public fields have
   disclosure constraints incompatible with repository-safe outputs.
+
+## Verified official metadata snapshot
+
+Official HEAD metadata checked 2026-11-01 without retrieving bodies:
+
+- v7 CSV: 56,044,261 bytes, last modified 2024-01-22;
+- v7 codebook: 58,382 bytes, last modified 2024-01-22;
+- microdata guide: 581,524 bytes, last modified 2023-06-07; and
+- EIA's Copyrights and Reuse page states that U.S. government publications are
+  public domain and that EIA data/files/databases may be used or distributed,
+  with source/date acknowledgment requested; third-party protected items remain
+  excluded from that permission.
+
+The metadata-only [`eia-recs-2020-v7-manifest.json`](eia-recs-2020-v7-manifest.json)
+records these facts. Publisher checksums, actual SHA-256, official release date,
+column inventory, and confirmation that no member is third-party remain open.
+Status stays `evidence_incomplete` despite a credible path to `repository`.

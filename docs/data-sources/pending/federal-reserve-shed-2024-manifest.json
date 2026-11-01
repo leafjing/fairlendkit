@@ -1,0 +1,47 @@
+{
+  "manifest_version": "1.0",
+  "candidate_id": "federal-reserve-shed-2024",
+  "publisher_legal_name": "Board of Governors of the Federal Reserve System",
+  "canonical_landing_url": "https://www.federalreserve.gov/consumerscommunities/shed_data.htm",
+  "persistent_identifier": null,
+  "release_id": "shed-2024-public-use-current-2026-02-09",
+  "release_date": null,
+  "retrieved_at": null,
+  "license_id": "UNVERIFIED",
+  "license_url": "",
+  "terms_url": "https://www.federalreserve.gov/website-linking-policies.htm",
+  "redistribution": "unverified",
+  "package_url": "https://www.federalreserve.gov/consumerscommunities/files/SHED_public_use_data_2024_(CSV).zip",
+  "expected_uncompressed_bytes": null,
+  "expected_compressed_bytes": 3787684,
+  "files": [
+    {
+      "path": "SHED_public_use_data_2024_(CSV).zip",
+      "media_type": "application/zip",
+      "expected_bytes": 3787684,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "data",
+      "contains_row_level_data": true,
+      "unit_of_observation": "one 2024 SHED survey respondent",
+      "expected_columns": [],
+      "redistribution_scope": "external_only"
+    },
+    {
+      "path": "SHED_2024codebook.pdf",
+      "media_type": "application/pdf",
+      "expected_bytes": 848401,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "codebook",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "external_only"
+    }
+  ],
+  "documentation": [
+    "https://www.federalreserve.gov/consumerscommunities/shed_data.htm"
+  ],
+  "review_state": "evidence_incomplete"
+}

@@ -1,0 +1,60 @@
+{
+  "manifest_version": "1.0",
+  "candidate_id": "census-ahs-2023-puf",
+  "publisher_legal_name": "U.S. Census Bureau and U.S. Department of Housing and Urban Development",
+  "canonical_landing_url": "https://www.census.gov/programs-surveys/ahs/data/2023/ahs-2023-public-use-file--puf-/ahs-2023-national-public-use-file--puf-.html",
+  "persistent_identifier": null,
+  "release_id": "ahs-2023-national-puf-v1.1",
+  "release_date": null,
+  "retrieved_at": null,
+  "license_id": "UNVERIFIED",
+  "license_url": "",
+  "terms_url": null,
+  "redistribution": "unverified",
+  "package_url": "https://www2.census.gov/programs-surveys/ahs/2023/AHS%202023%20National%20PUF%20v1.1%20CSV.zip",
+  "expected_uncompressed_bytes": null,
+  "expected_compressed_bytes": 129491194,
+  "files": [
+    {
+      "path": "AHS 2023 National PUF v1.1 CSV.zip",
+      "media_type": "application/zip",
+      "expected_bytes": 129491194,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "data",
+      "contains_row_level_data": true,
+      "unit_of_observation": "AHS housing unit/household record",
+      "expected_columns": [],
+      "redistribution_scope": "external_only"
+    },
+    {
+      "path": "AHS 2023 Value Labels Package.zip",
+      "media_type": "application/zip",
+      "expected_bytes": 228274,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "codebook",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "external_only"
+    },
+    {
+      "path": "AHS 2023 National PUF Version Control.pdf",
+      "media_type": "application/pdf",
+      "expected_bytes": 128758,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "methodology",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "external_only"
+    }
+  ],
+  "documentation": [
+    "https://www.census.gov/programs-surveys/ahs/data.html",
+    "https://www.census.gov/programs-surveys/ahs/tech-documentation/codebooks.html"
+  ],
+  "review_state": "evidence_incomplete"
+}

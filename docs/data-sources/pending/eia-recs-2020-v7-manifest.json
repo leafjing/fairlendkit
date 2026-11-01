@@ -1,0 +1,60 @@
+{
+  "manifest_version": "1.0",
+  "candidate_id": "eia-recs-2020-v7",
+  "publisher_legal_name": "U.S. Energy Information Administration",
+  "canonical_landing_url": "https://www.eia.gov/consumption/residential/data/2020/index.php?view=microdata",
+  "persistent_identifier": null,
+  "release_id": "recs-2020-public-v7",
+  "release_date": null,
+  "retrieved_at": null,
+  "license_id": "US-GOV-PUBLIC-DOMAIN-EIA",
+  "license_url": "https://www.eia.gov/about/copyrights_reuse.php",
+  "terms_url": "https://www.eia.gov/about/copyrights_reuse.php",
+  "redistribution": "permitted",
+  "package_url": null,
+  "expected_uncompressed_bytes": null,
+  "expected_compressed_bytes": null,
+  "files": [
+    {
+      "path": "csv/recs2020_public_v7.csv",
+      "media_type": "text/csv",
+      "expected_bytes": 56044261,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "data",
+      "contains_row_level_data": true,
+      "unit_of_observation": "one sampled housing unit/household",
+      "expected_columns": [],
+      "redistribution_scope": "repository"
+    },
+    {
+      "path": "xls/RECS 2020 Codebook for Public File - v7.xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "expected_bytes": 58382,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "codebook",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "repository"
+    },
+    {
+      "path": "pdf/microdata-guide.pdf",
+      "media_type": "application/pdf",
+      "expected_bytes": 581524,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "methodology",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "repository"
+    }
+  ],
+  "documentation": [
+    "https://www.eia.gov/consumption/residential/data/2020/index.php?view=microdata",
+    "https://www.eia.gov/about/copyrights_reuse.php"
+  ],
+  "review_state": "evidence_incomplete"
+}
