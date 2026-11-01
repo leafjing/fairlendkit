@@ -5,6 +5,62 @@ must not begin until this contract, deterministic fold fixtures, thresholds, and
 privacy tests pass independent review. Outputs are exploratory screening
 evidence, never proxy, causation, intent, legality, or feature-removal verdicts.
 
+## Typed input and applicability boundary
+
+One screen is identified by `(protocol_version, population_id, candidate_id,
+protected_attribute_id, baseline_id, development_window, holdout_window)`. The
+caller supplies typed entity-level evidence only:
+
+- a versioned eligible population produced after AD-0 leakage and AD-1 quality
+  gates, with population inclusion/exclusion reason counts;
+- one explicitly configured numeric or categorical candidate value per entity,
+  including an explicit missing state and derivation/version;
+- one user-supplied categorical protected attribute used only as an audit target;
+- an optional approved baseline feature set with its own contracts; and
+- development/temporal-holdout membership, candidate availability time, source,
+  provider, coverage stratum, and protected-group observation time.
+
+The first release does not consume a credit outcome, decision label, model
+score, or outcome maturity field. Credit-label maturity is therefore not an
+eligibility requirement; supplying an outcome as a candidate or baseline field
+is prohibited. Every candidate, baseline, and protected attribute must have been
+observed no later than the applicable `as_of_time`. Post-decision observations,
+future revisions, or fields rejected by the leakage gate fail closed before a
+screen exists.
+
+Protected attributes are never inferred. An entity with a missing protected
+attribute is excluded from that protected-attribute screen and retained in an
+explicit excluded count; it is not assigned to an `unknown` class. Candidate
+missingness remains evidence: categorical screens use an explicit missing level,
+numeric association excludes missing numeric values from eta-squared but tests
+missing-versus-present association on the full protected-known population, and
+predictability uses the training-fold imputation/indicator contract below.
+
+The first release is strictly unweighted. An optional input weight may be
+retained only as provenance and must not affect eligibility, fitting, metrics,
+bootstrap sampling, thresholds, counts, or suppression. Configuration requesting
+weighted proxy evidence is invalid rather than silently treated as unweighted.
+Every result and trace records `weighting="unweighted"`; all denominators and
+minimum supports are raw distinct-entity counts.
+
+## Entity reduction and deterministic population
+
+Source records are not classifier rows. Before fold assignment, the caller must
+declare one versioned, candidate-specific entity reducer that uses only records
+available by `as_of_time`. The reducer and canonical candidate contract decide
+how multiple records become one value; AD-4 may not choose latest, average,
+maximum, or any other aggregation implicitly.
+
+After authoritative revision/reversal selection and reduction, there must be
+exactly one candidate value, protected value, baseline vector, provider/source
+assignment, coverage stratum, and population membership per entity per screen.
+Duplicate identical rows collapse once. Conflicting protected values,
+development/holdout membership, source scope, baseline values, or reducer
+outputs fail closed. Weights are never summed across duplicates. Canonical
+entity ordering is the UTF-8 byte ordering already used by the fold and numeric
+preprocessing contracts; input row order cannot change a fold, statistic,
+interval, trace, suppression decision, or serialized result.
+
 ## Candidate admission gate
 
 Every candidate is explicitly named and must be available no later than
@@ -116,6 +172,36 @@ baseline-plus-candidate use identical entities, folds, preprocessing rules, and
 hyperparameters. Incremental AUC is the latter minus the former; the candidate
 alone is never described as incremental evidence.
 
+## Metric populations, directions, and denominators
+
+All metrics are computed separately for development and temporal holdout
+populations. Higher eta-squared, Cramer's V, protected-group AUC, and incremental
+AUC mean stronger screening evidence; the contract never reverses their
+direction or interprets a lower value as proof of safety.
+
+- Numeric eta-squared uses distinct entities with known protected class and a
+  finite observed candidate value. Its denominator is `SS_total`, and its
+  support reports eligible protected-known entities, finite observed entities,
+  candidate-missing entities, and per-class observed counts.
+- Numeric missingness V uses every distinct protected-known entity, with exactly
+  two candidate states, `missing` and `present`. Its statistical denominator is
+  the contingency total `n`.
+- Categorical V uses every distinct protected-known entity, including candidate
+  `missing`, fold-trained `rare`, and held-out `unseen` levels where applicable.
+  Its denominator is the post-pruning contingency total `n`.
+- Binary/multiclass predictability AUC uses each distinct protected-known entity
+  with one held-out prediction. Its denominators are the positive and negative
+  raw entity counts for each one-vs-rest class.
+- Incremental AUC uses the exact paired entity set with both baseline and
+  baseline-plus-candidate held-out scores. A missing member of either pair makes
+  that entity set invalid; it is never repaired by using different denominators.
+
+Each evidence item carries population ID, window, metric and direction,
+eligible/excluded/missing counts, raw entity denominator, per-class support,
+point estimate, interval/reliability state, and stable reason codes. Undefined
+denominators, insufficient classes/folds, non-finite values, or unequal paired
+populations produce unavailable evidence with no point estimate or flag.
+
 ## Thresholds and flags
 
 Configuration must explicitly provide `association_threshold`,
@@ -134,6 +220,17 @@ resample the fixed out-of-fold entity labels/scores without refitting; for
 incremental AUC, resample paired baseline and baseline-plus-candidate scores
 together. A resample with an undefined class/statistic is invalid. Failure to
 reach `minimum_valid_resamples` makes evidence unreliable and forbids a flag.
+
+The AD-3 bootstrap contract is reused without a second RNG: domain-separated
+seed material includes protocol version, population/window, candidate,
+protected attribute, baseline identity, metric, class/aggregation, and stream
+role. Entity arrays are in canonical order before counter draws. Trace records
+the RNG identity, seed fingerprint, resamples, valid/invalid resamples,
+minimum-valid threshold, confidence level, Type 7 rule, point/interval
+applicability, and reliability reason, but no entity ID, raw protected value,
+prediction, coefficient, or resample array. When
+`valid_resamples < minimum_valid_resamples`, `reliable=false` and interval
+endpoints are null; a release model cannot re-inject them.
 
 A potential proxy-risk screening flag is emitted only when the corresponding
 point estimate meets or exceeds its inclusive threshold, its confidence lower
@@ -163,6 +260,70 @@ from sparse cells, coefficients, entity predictions, fold membership, or IDs.
 The alternative-data disclosure-suppression contract applies before typed result
 serialization. Suppressed or unreliable evidence cannot emit a flag.
 
+Every publishable proxy unit participates in the same AD-1 release-wide exact
+integer system as quality and risk evidence. Units include development/holdout,
+candidate, protected attribute, metric/class, provider, coverage stratum,
+baseline/incremental scope, eligible/excluded/missing support, contingency
+margins, AUC class supports, fold supports, flags, and associated bootstrap
+evidence. Historical equivalent releases are strong equations. Primary and
+complementary suppression are solved jointly across JSON, CSV, and HTML; proxy
+tables may not run a private suppression pass.
+
+When a proxy unit is primary- or complementary-suppressed, its point estimate,
+support, contingency components, interval, reliability details, threshold
+comparison, stability difference, flag, and bootstrap evidence are all hidden.
+The typed canonical JSON contains only the suppression state, safe count bucket,
+and true suppression reason. Renderers cannot receive exact hidden values.
+Before release, every hidden atomic entity-count variable must retain at least
+two feasible non-negative integer values under current and historical equations.
+
+The AD-3 trace/release boundary is reused: complete versioned configuration and
+non-sensitive calculation trace are required, unreliable intervals have null
+endpoints, and suppressed evidence never exposes count, weight, rate, value, or
+interval. Logs, exceptions, fingerprints, diagnostics, and metadata receive no
+entity ID, protected label, category value, fold membership, prediction,
+coefficient, hidden exact support, or seed material.
+
+The fixed logistic classifier is an internal diagnostic estimator of protected-
+group predictability only. AD-4 does not train, tune, select, persist, export, or
+recommend a credit model; it does not optimize an underwriting threshold or
+recommend candidate retention/removal. Its coefficients and per-entity scores
+are never public results.
+
+## Minimum hand-calculated and adversarial fixtures
+
+Fixtures are frozen, entity-level, order-permuted, and use no real consumer data:
+
+1. **Numeric association:** four protected-known entities have classes
+   `A,A,B,B` and candidate values `0,2,4,6`. Overall mean is `3`, class means are
+   `1` and `5`, `SS_between=16`, `SS_total=20`, and eta-squared is `0.8`.
+   Permuting input rows must reproduce every intermediate and result.
+2. **Binary AUC and increment:** labels `A,A,B,B` with candidate-model scores
+   `0.1,0.4,0.6,0.9` for class `B` yield AUC `1.0`; the intercept-only baseline
+   yields `0.5`; paired incremental AUC is `0.5`. Threshold and lower-bound
+   equality use inclusive comparison.
+3. **Missingness populations:** one numeric candidate is missing. Eta-squared
+   excludes that numeric value and reports its smaller observed support, while
+   missingness V and predictability retain the entity. A missing protected value
+   is excluded from all metrics for that protected screen with an explicit
+   exclusion count.
+4. **Entity conflict:** duplicate identical rows collapse once; conflicting
+   protected values and cross-window membership fail before fold assignment.
+   Row permutation cannot change the failure reason.
+5. **Reliability:** `0 < valid_resamples < minimum_valid_resamples` produces
+   `reliable=false`, null endpoints, and no flag. A one-class resample is invalid,
+   not silently omitted from the required valid count.
+6. **Joint disclosure:** an overall count of `20` and a published related count
+   of `19` would reveal a protected/candidate cell of `1`. The shared AD-1 system
+   must add complementary suppression; proxy point estimates, interval, flag,
+   trace evidence, and all renderers expose no exact hidden value. Repeating the
+   release with historical equations preserves at least two feasible values for
+   every hidden variable.
+7. **Scope guard:** attempts to supply outcome, decision, post-decision,
+   identifier, weight-enabled, or protected-derived candidates fail closed.
+   No fixture produces a causation, discrimination, legality, compliance,
+   creditworthiness, feature-removal, or threshold-recommendation statement.
+
 AD-4 fixtures must cover protected/identifier/leakage-field rejection, entity
 and time leakage, deterministic folds, binary and multiclass AUC, missing state,
 rare/unseen levels, high cardinality, non-convergence, baseline equality,
@@ -176,3 +337,19 @@ post-imputation vector, `math.fsum` mean, `ddof=0` variance/std, standardized
 training and held-out values, missing indicators, and a zero-variance column.
 The contingency fixture includes zero-marginal rows/columns plus positive
 `rare` and `unseen` levels and fixes the table after pruning and final V.
+
+## AD-4 implementation and release acceptance
+
+AD-4 implementation is limited to typed screening inputs/results, deterministic
+entity reduction validation, the fixed association/predictability diagnostics,
+bootstrap/reliability evidence, joint suppression integration, and canonical
+JSON with matching CSV/HTML renderers. Acceptance requires the fixtures above,
+full identifier-leakage tests for JSON/CSV/HTML/logs/exceptions/diagnostics,
+cross-runtime deterministic goldens, and complete architecture/discoverability
+tests.
+
+The slice explicitly excludes real-data connection, download execution, model
+training APIs, model/threshold recommendation, automated feature removal,
+production credit decisions, and any causal, discriminatory, lawful/unlawful,
+compliant/noncompliant, or consumer-creditworthiness conclusion. Adding any of
+those capabilities requires a separate contract and independent approval.
