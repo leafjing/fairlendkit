@@ -1,11 +1,17 @@
 # Milestone 4 Release Evidence
 
-## Candidate identity
+## Final release identity
 
 Milestone 4 adds the first installed command-line audit workflow and three
-renderer views of the existing `AuditResult` Schema 2.0. The implementation is
-carried by the `docs/milestone-4-user-workflow` branch and must be reviewed and
-merged before this evidence becomes release evidence for `main`.
+renderer views of the existing `AuditResult` Schema 2.0. The final reviewed
+candidate is `68448f56444dd29ee50a8b64770178fd5f1f4bd0`. PR #46 merged it to
+`main` as `2e1258fc6b970e982d663f4cc2f233b3a63efd17` on 2026-10-16.
+
+Independent review initially identified a cross-runtime one-ULP artifact
+divergence and requested changes at `99c506a`. After the deterministic summation
+fix, the independent reviewer re-reviewed `68448f5` and approved it, explicitly
+recording that the golden hash gate remained intact and both runtime jobs were
+green.
 
 ## Shipped surface
 
@@ -52,7 +58,7 @@ Automated tests cover:
 ./scripts/verify_milestone4_release.sh
 ```
 
-The clean Python 3.12 verification on the implementation candidate reports:
+The clean Python 3.12 verification on the implementation candidate reported:
 
 - exact locked dependency freeze;
 - all three workflow artifact hashes matched;
@@ -61,8 +67,25 @@ The clean Python 3.12 verification on the implementation candidate reports:
 - discoverability metadata and links verified; and
 - `git diff --check` clean.
 
-CI must independently run the same cumulative gate on Python 3.11 and 3.12
-before merge. A green local runtime is not a substitute for both CI jobs.
+## Independent approval and CI closure
+
+The PR #46 CI run `38854126556` completed successfully for both required jobs:
+
+- Python 3.11 job `116821664551`; and
+- Python 3.12 job `116821664324`.
+
+After merge, push run `38854319516` re-executed the complete Milestone 4 release
+verifier and Paper 2 execution-freeze check on merge commit `2e1258f`. Python
+3.11 job `116822270306` and Python 3.12 job `116822269903` both completed
+successfully. The final approval, merge identity, two-runtime pre-merge gate,
+and two-runtime post-merge gate therefore close Milestone 4; no candidate gate
+remains outstanding.
+
+Evidence URLs:
+
+- PR and final review: <https://github.com/leafjing/fairlendkit/pull/46>
+- pre-merge CI: <https://github.com/leafjing/fairlendkit/actions/runs/38854126556>
+- post-merge CI: <https://github.com/leafjing/fairlendkit/actions/runs/38854319516>
 
 ## Scope boundary
 

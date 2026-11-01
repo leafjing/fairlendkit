@@ -85,6 +85,13 @@ Screening flags use transparent, versioned rules and distinguish at least:
 
 Flags are prompts for human review, not automated compliance conclusions.
 
+The descriptive frontier and its CSV are part of Milestone 5. The
+`threshold-sensitive result` screening flag remains a V1 requirement but is
+explicitly deferred beyond Milestone 5 Slices 5.0–5.4. It must not ship until a
+separate versioned contract defines the sensitivity statistic, materiality
+threshold, comparison basis, evidence links, and reliability behavior. Frontier
+membership or ineligibility alone is not that flag.
+
 ## Practitioner follow-up workflow
 
 For every notable finding, the report should present applicable, non-prescriptive

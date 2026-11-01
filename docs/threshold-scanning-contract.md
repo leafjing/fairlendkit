@@ -26,6 +26,9 @@ The feature is analysis, not mitigation or a legal/compliance conclusion.
   reused without reinterpretation.
 - Renderers consume typed scan results and never recompute thresholds, metrics,
   dominance, or flags.
+- The initial Milestone 5 release does not create threshold-sensitivity
+  screening flags. Frontier membership and ineligibility are typed analytical
+  states, not screening flags.
 
 ## Candidate set
 
@@ -177,13 +180,49 @@ so omission is not a second representation of disabled scanning. Strict Schema
 does not infer counterfactual results. Schema 1.0 continues through the existing
 1.0-to-2.0 migration before the mechanical 2.0-to-2.1 step.
 
-Canonical JSON includes the full typed section. The metrics CSV gains
-threshold-scoped rows and explicit `analysis_scope`, `threshold`, and
-`threshold_identity` columns in Slice 5.3; ordinary rows use
-`analysis_scope=observed` and empty threshold cells. HTML labels the section
-“Counterfactual threshold analysis” and keeps it visually separate from the
-ordinary audit. Renderers must show ineligible points and reasons rather than
-dropping them.
+Canonical JSON includes the full typed section. `metrics.csv` remains the
+ordinary observed-metric export and does not mix in counterfactual rows.
+Slice 5.3 adds `threshold_frontier.csv` as a fourth, independent artifact when
+scanning is enabled. Selecting CSV output produces both CSV artifacts for a
+scan-enabled run; when scanning is disabled, it produces only `metrics.csv`.
+Overwrite checks and atomic publication cover the complete selected artifact
+set, including `threshold_frontier.csv` when applicable.
+
+`threshold_frontier.csv` contains one row per point metric in canonical point
+and metric order, with these fixed columns:
+
+```text
+threshold_identity,threshold,operator,frontier_status,
+frontier_ineligibility_reasons,metric_key,metric,value,undefined_reason,
+reliability,sample_count,group,comparison_group,reference_group,
+interval_lower,interval_upper,confidence_level
+```
+
+The ineligibility-reason cell is a compact JSON array in canonical reason order;
+group cells use the existing compact sorted-key JSON representation. Undefined
+numeric cells are empty. Point fields repeat on each metric row so consumers do
+not need to infer row groups. The file is UTF-8, uses RFC 4180 quoting, and ends
+with one newline. A scan-enabled result always emits the file, including when
+all points are frontier-ineligible.
+
+HTML labels the section “Counterfactual threshold analysis” and keeps it
+visually separate from the ordinary audit. Both renderers show ineligible
+points and reasons rather than dropping them.
+
+## Sensitivity-flag decision
+
+Threshold-sensitivity screening flags are explicitly deferred from Milestone 5
+Slices 5.0–5.4. This milestone has no materiality rule for deciding that a
+result is “threshold-sensitive,” so emitting such a flag would introduce an
+undocumented policy threshold. Existing `screening_flags` remain based only on
+the ordinary configured decision source and must not reference scan metrics.
+
+The V1 product requirement for a `threshold-sensitive result` flag remains
+open. A later, separately reviewed V1 contract must define its statistic,
+materiality threshold, comparison basis, stable code, supporting metric keys,
+reliability behavior, and user language before implementation. Adding that
+contract is additive to Schema 2.1; it must not reinterpret frontier status or
+silently convert an ineligibility reason into a flag.
 
 ## Package and dependency shape
 
@@ -205,7 +244,7 @@ JSON, CSV, and HTML render that section from the same typed result.
 3. **5.2 — frontier:** deterministic multi-axis dominance and explicit
    ineligibility reasons.
 4. **5.3 — integration:** `run_audit`, public API, canonical JSON, metrics CSV,
-   self-contained HTML, and CLI workflow.
+   independent threshold-frontier CSV, self-contained HTML, and CLI workflow.
 5. **5.4 — release gate:** hand-calculated fixture, direction reversal,
    reference reversal, weights, ties, sparse groups, undefined/reliability,
    deterministic ordering, architecture checks, golden artifacts, and Python
