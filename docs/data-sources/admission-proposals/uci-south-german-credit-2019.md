@@ -123,15 +123,12 @@ The only permitted live invocation after a separate authorization is:
 
 ```text
 python3 scripts/retrieve_uci_south_german_credit.py retrieve \
-  --run-id <authorization-issued-run-id> \
-  --quarantine-root <approved-absolute-non-repository-path> \
-  --audit-root <approved-absolute-non-repository-path>
+  --authorization-file <approved-absolute-read-only-json-path>
 ```
 
 The URL, host allowlist, expected sizes, member allowlist, and limits in this
-proposal are compiled constants, not caller-overridable flags. `retrieve`
-requires an authorization-issued run ID recorded in the independent approval;
-there is no retry or resume mode. Before authorization, reviewers run only:
+proposal are compiled constants, not caller-overridable flags. There is no retry
+or resume mode. Before authorization, reviewers run only:
 
 ```text
 python3 -m pytest tests/test_uci_south_german_credit_retrieval.py -q
@@ -148,6 +145,33 @@ payload, missing member, unexpected member, and exact-size mismatch. Each
 failure assertion also proves no source byte remains and no second attempt with
 the same run ID can start.
 
+### Authorization binding
+
+The reviewer-issued JSON is created only after the harness commit passes review.
+It is an absolute, regular, non-symlink file with mode `0400`, outside the
+repository and quarantine. Its strict schema contains no unknown fields and
+binds all of the following:
+
+- authorization ID, single-use run ID, issue time, UTC expiry no later than 24
+  hours after issue, candidate ID, and `max_attempts=1`;
+- exact package URL, allowed redirect host `archive.ics.uci.edu`, HTTPS-only
+  policy, maximum five redirects, expected final `Content-Length=13130`, maximum
+  streamed bytes `16384`, and allowed final media types `application/zip`,
+  `application/x-zip-compressed`, or `application/octet-stream`;
+- exact three-member names and sizes, expected total uncompressed bytes `58644`,
+  maximum uncompressed bytes `65536`, member count `3`, and compression-ratio
+  ceiling `100`;
+- reviewed harness Git commit, SHA-256 of the harness file, and SHA-256 of its
+  test file; and
+- exact absolute quarantine and audit roots.
+
+Before any network access, the harness validates the authorization file mode,
+schema, expiry, run ID, roots, compiled constants, its own file SHA-256, test-file
+SHA-256, and reviewed Git commit. Any difference, dirty harness/test file, expired
+record, missing field, or prior `.spent` tombstone fails closed and requires a
+new independent authorization. The authorization record is an approval artifact,
+not a caller-editable configuration file.
+
 ### Network controls
 
 - Initial URL must exactly match the official HTTPS package URL above.
@@ -155,12 +179,17 @@ the same run ID can start.
   ignored certificate errors, credentials, cookies, query tokens, and proxy-
   supplied authentication are prohibited.
 - Permit at most five redirects, each to HTTPS on `archive.ics.uci.edu`; reject
-  every other hostname, IP-literal target, port, scheme, or embedded credential.
+  every other hostname, IP-literal target, port, scheme, embedded credential,
+  query string, or fragment.
 - Require a final `Content-Length` of exactly 13,130 bytes when supplied and
   enforce an absolute streamed-byte ceiling of 16,384 bytes regardless of the
   header. Timeout, truncation, excess bytes, or content mutation fails closed.
-- Record redirect chain, final URL, retrieval UTC time, HTTP validators, media
-  type, compressed byte count, and SHA-256; do not log response content.
+- Record only redirect scheme/host/path, final scheme/host/path, retrieval UTC
+  time, safe HTTP validators, media type, compressed byte count, and SHA-256.
+  Audit records never contain query strings, fragments, credentials, cookies,
+  authorization headers, signed URL parameters, response content, or member
+  content. The fixed package URL contains no query, and any redirect that adds
+  one is rejected rather than redacted and followed.
 
 ### Container controls
 
@@ -228,14 +257,11 @@ the same run ID can start.
   `succeeded`. It remains `0400`/`0700` and inaccessible to product code. If the
   follow-up review has not approved promotion by the deadline, the cleanup
   command deletes all source/member bytes and marks the audit `cleaned`.
-- The prepared harness must expose a non-network cleanup command scoped to one
 - The only cleanup invocation is:
 
   ```text
   python3 scripts/retrieve_uci_south_german_credit.py cleanup \
-    --run-id <authorization-issued-run-id> \
-    --quarantine-root <same-approved-absolute-path> \
-    --audit-root <same-approved-absolute-path>
+    --authorization-file <same-approved-absolute-read-only-json-path>
   ```
 
   It performs no network operation, is scoped to the exact run ID, preserves
