@@ -73,7 +73,10 @@ For an `r` by `k` contingency table with total `n`, compute Pearson
 `k_corrected=k-((k-1)^2/(n-1))`. Bias-corrected Cramer's V is
 `sqrt(phi2_corrected / min(k_corrected-1, r_corrected-1))`. It is undefined for
 `n<=1`, a non-positive corrected denominator, or fewer than two nonempty rows or
-columns. Missing is one explicit row/column.
+columns. Before defining `r` and `k`, computing expected counts, or applying any
+correction, delete every zero-marginal row and column; repeat until none remain.
+Missing, `rare`, and `unseen` are explicit levels when their margins are
+positive. They are not dropped merely because of their names.
 
 Binary AUC is the unweighted probability that a randomly chosen positive-class
 entity has a higher held-out score than a negative-class entity, with ties worth
@@ -81,9 +84,15 @@ entity has a higher held-out score than a negative-class entity, with ties worth
 canonical typed-label order and takes their unweighted arithmetic mean. A class
 without both sides is undefined; it is not omitted from the macro mean.
 
-Predictability uses one fixed pipeline. Numeric features use training-fold median
-plus missing indicator, then training-fold mean/standard-deviation scaling
-(zero-variance observed columns become zero). Categorical features use
+Predictability uses one fixed pipeline. Within each fold, order training entities
+by canonical `entity_id` before all reductions. Numeric features use the
+training-fold median, averaging the two middle finite values with `math.fsum`
+when count is even, plus a missing indicator. Impute missing values with that
+median, then compute post-imputation mean with `math.fsum(values)/n` and
+population variance with `math.fsum((x-mean)^2)/n` (`ddof=0`). Standard deviation
+is the non-negative square root. If variance is exactly zero, every standardized
+value is exactly `0.0`; otherwise standardize as `(x-mean)/std`. No BLAS/vector
+reduction order may replace these canonical scalar reductions. Categorical features use
 training-fold one-hot encoding in canonical label order. The classifier is the
 FairLendKit full-batch L2 logistic reference implementation, not a caller-chosen
 library solver. It minimizes mean negative log likelihood plus
@@ -161,4 +170,9 @@ incremental evidence, threshold equality, unstable holdout behavior, and
 suppression. Golden fixtures include the exact length-prefixed fold bytes,
 SHA-256 digest, digest integer, modulo result, eta/contingency components,
 Cramer's V correction, per-class AUCs, Type 7 interval endpoints, optimization
-iterations/logits, and the absolute development-holdout difference.
+iterations/logits, and the absolute development-holdout difference. The
+preprocessing fixture records sorted training IDs, finite values, median,
+post-imputation vector, `math.fsum` mean, `ddof=0` variance/std, standardized
+training and held-out values, missing indicators, and a zero-variance column.
+The contingency fixture includes zero-marginal rows/columns plus positive
+`rare` and `unseen` levels and fixes the table after pruning and final V.

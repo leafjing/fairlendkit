@@ -6,8 +6,11 @@ intervals are inclusive; outcome evidence begins strictly after `A`.
 
 ```text
 feature_start <= feature_end <= A < performance_start <= performance_end
-performance_end <= label_maturity_time <= X
+performance_end <= label_maturity_time
 ```
+
+The label is usable only when `label_maturity_time <= X`; a later maturity time
+is valid configuration whose result is unavailable.
 
 | Evidence | Boundary combination | Authoritative behavior | Disposition/code |
 |---|---|---|---|
@@ -27,15 +30,18 @@ performance_end <= label_maturity_time <= X
 | Outcome event/period | starts `> A`, ends in performance window, `O <= X` | May enter labels only, never features. | eligible outcome evidence |
 | Outcome event/period | outside configured performance window | Exclude from this label. | exclude / `ad_outcome_outside_window` |
 | Outcome evidence | `O > X` | Unavailable to this run. | error / `ad_future_timestamp` |
-| Label | `X < label_maturity_time` | Partial events cannot make it mature. | unavailable / `ad_label_immature` |
+| Label | `X < label_maturity_time` | A future configured maturity date is valid; partial events cannot make the label mature. | unavailable / `ad_label_immature` only |
+| Claimed mature evidence | evidence is asserted observed, but its `observed_at > X` | The run falsely claims knowledge not yet observed. | error / `ad_future_timestamp` |
 | Mature label | raw value outside binary mapping | Cannot be inferred as good or bad. | error / `ad_unrecognized_outcome_label` |
 | Completed source snapshot | `coverage_end > X` | Future completion claim is invalid. | error / `ad_future_timestamp` |
 | Ongoing source | declared `coverage_end=null` | Metadata only; records still need individual eligibility. | valid metadata |
 
 `ad_future_timestamp` applies to timestamps asserting knowledge or completed
-events: record event/period end, `observed_at`, revision, reversal, label-maturity
-evidence, and completed source coverage. It does not reject explicitly planned
-future metadata, which cannot enter analytical evidence.
+events: record event/period end, `observed_at`, revision, reversal, evidence
+claimed as already mature, and completed source coverage. A configured
+`label_maturity_time > X` is legitimate future metadata and produces only
+`ad_label_immature`; it is never itself `ad_future_timestamp`. Planned future
+metadata cannot enter analytical evidence.
 
 ## Authoritative version algorithm
 
@@ -53,4 +59,6 @@ The AD-0 oracle contains every table case and equality at each boundary:
 `feature_end == A`, `performance_start == A`, `O == A`, `O == X`, and
 `label_maturity_time == X`. It includes a pre-decision original with a
 post-decision revision and reversal, an equal-observation-time conflict, and an
-outcome event valid for labeling but forbidden from features.
+outcome event valid for labeling but forbidden from features. It separately
+tests `label_maturity_time > X` as only immature and claimed mature evidence
+with `observed_at > X` as future timestamp.

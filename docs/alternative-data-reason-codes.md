@@ -50,7 +50,7 @@ Disposition meanings:
 | `ad_non_monotonic_history` | error | Revision/reversal chain moves backward, cycles, or targets a later record. |
 | `ad_period_overlap` | observe | Same source/entity has overlapping asserted coverage periods. |
 | `ad_temporal_gap` | observe | Declared cadence expects but does not observe a period. |
-| `ad_future_timestamp` | error | An evidence or completed-event timestamp asserts knowledge after run execution. |
+| `ad_future_timestamp` | error | Evidence claimed as observed or completed asserts knowledge after run execution; a future configured label-maturity date does not trigger this code. |
 
 ## Amount and linkage codes
 
