@@ -294,6 +294,10 @@ class ReleasedBootstrapEvidence(StrictModel):
         elif self.state == "published":
             if self.valid_resamples is None or self.reliable is None or self.reason_code is not None:
                 raise ValueError("published bootstrap evidence requires exact metadata only")
+            if not self.reliable and (self.lower is not None or self.upper is not None):
+                raise ValueError("unreliable bootstrap evidence cannot publish an interval")
+            if self.reliable and (self.lower is None or self.upper is None):
+                raise ValueError("reliable bootstrap evidence requires an interval")
         else:
             raise ValueError("bootstrap release state must be published or suppressed")
         return self
@@ -683,12 +687,14 @@ def _evaluate_risk_diagnostics(
     good_count = len(positive) - bad_count
     class_ready = total_weight > 0 and bad_count > 0 and good_count > 0
     bands = _bands(weighted, config.score_band_edges)
-    if config.score_type == ScoreType.PROBABILITY and total_weight:
+    if config.score_type == ScoreType.PROBABILITY and class_ready:
         mean_p = sum(score * weight for _, score, _, weight in positive) / total_weight
         mean_y = bad_weight / total_weight
         calibration = _available(mean_p - mean_y)
         brier = _available(sum(weight * (score - bad) ** 2 for _, score, bad, weight in positive) / total_weight)
-        slope = _calibration_slope(positive, config.calibration_epsilon) if class_ready else _undefined("one_outcome_class")
+        slope = _calibration_slope(positive, config.calibration_epsilon)
+    elif config.score_type == ScoreType.PROBABILITY and total_weight:
+        calibration = brier = slope = _undefined("one_outcome_class")
     elif config.score_type == ScoreType.RANKING:
         calibration = brier = slope = MetricValue(state="not_applicable", reason="ranking_score")
     else:
@@ -922,10 +928,12 @@ def _bootstrap_evidence(rows, config):
     output = []
     for key in sorted(values):
         samples = sorted(values[key])
+        reliable = len(samples) >= config.minimum_valid_resamples
         output.append(BootstrapEvidence(
             metric_key=key, valid_resamples=len(samples),
-            reliable=len(samples) >= config.minimum_valid_resamples,
-            lower=_type7(samples, 0.025), upper=_type7(samples, 0.975),
+            reliable=reliable,
+            lower=_type7(samples, 0.025) if reliable else None,
+            upper=_type7(samples, 0.975) if reliable else None,
         ))
     return tuple(output)
 

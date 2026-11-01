@@ -7,7 +7,11 @@ from fairlendkit.alternative_data import (
     RiskEvaluationConfig,
     build_risk_diagnostic_release,
 )
-from fairlendkit.alternative_data.risk import _calibration_slope, _evaluate_risk_diagnostics
+from fairlendkit.alternative_data.risk import (
+    ReleasedBootstrapEvidence,
+    _calibration_slope,
+    _evaluate_risk_diagnostics,
+)
 from fairlendkit.metrics.bootstrap import RNG_NAME, bootstrap_index_draws
 
 
@@ -143,13 +147,17 @@ def test_typed_outcomes_entity_uniqueness_and_input_gates_fail_closed():
 
 
 def test_one_class_separation_empty_bands_and_determinism():
-    one_class = _evaluate_risk_diagnostics(
-        (entity("a", 0.2, "good"), entity("b", 0.4, "good")), configuration()
-    )
-    assert one_class.ks.state == "unavailable"
-    assert one_class.risk_auc.state == "unavailable"
-    assert one_class.calibration_slope.state == "unavailable"
-    assert one_class.reliable is False
+    for outcome in ("good", "bad"):
+        one_class = _evaluate_risk_diagnostics(
+            (entity("a", 0.2, outcome), entity("b", 0.4, outcome)),
+            configuration(),
+        )
+        assert one_class.ks.state == "unavailable"
+        assert one_class.risk_auc.state == "unavailable"
+        assert one_class.calibration_slope.reason == "one_outcome_class"
+        assert one_class.brier_score.reason == "one_outcome_class"
+        assert one_class.calibration_in_the_large.reason == "one_outcome_class"
+        assert one_class.reliable is False
 
     separated_rows = (
         entity("a", 0.01, "good"), entity("b", 0.02, "good"),
@@ -188,6 +196,29 @@ def test_one_class_separation_empty_bands_and_determinism():
     assert zero_weight.normalized_weight_total == 0
     assert zero_weight.ks.state == "unavailable"
     assert zero_weight.brier_score.reason == "zero_total_weight"
+
+
+def test_partial_bootstrap_validity_never_publishes_an_interval():
+    result = _evaluate_risk_diagnostics(
+        (
+            entity("g-low", 0.2, "good"),
+            entity("b-low", 0.3, "bad"),
+            entity("g-high", 0.7, "good"),
+            entity("b-high", 0.8, "bad"),
+        ),
+        configuration(bootstrap_resamples=20, minimum_valid_resamples=20),
+    )
+    evidence = next(
+        item for item in result.bootstrap if item.metric_key == "calibration_slope"
+    )
+    assert 0 < evidence.valid_resamples < 20
+    assert evidence.reliable is False
+    assert evidence.lower is None and evidence.upper is None
+    released = ReleasedBootstrapEvidence(
+        state="published", **evidence.model_dump()
+    )
+    payload = released.model_dump(mode="json")
+    assert payload["lower"] is None and payload["upper"] is None
 
 
 def test_ks_preserves_all_maximizing_thresholds_and_canonical_smallest():
