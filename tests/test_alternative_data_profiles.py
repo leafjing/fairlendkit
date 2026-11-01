@@ -1,6 +1,4 @@
 from decimal import Decimal
-import csv
-import io
 import json
 import warnings
 
@@ -21,6 +19,8 @@ from fairlendkit.alternative_data.profiles import (
     _calculate_rent_profile,
     _calculate_utility_profile,
 )
+from fairlendkit.report.csv import render_metrics_csv
+from fairlendkit.report.html import render_html
 
 
 def source(family):
@@ -113,14 +113,29 @@ def test_cash_flow_oracle_uses_decimal_reversals_and_period_denominators():
     profile = _calculate_cash_flow_profile(rows, config=config("cash_flow"))
 
     assert profile.inflow_total == Decimal("6700")
+    assert profile.state == "available"
+    assert profile.calendar_period_count == 3
+    assert profile.observed_period_count == 3
+    assert profile.missing_period_count == 0
     assert profile.outflow_total == Decimal("4300")
+    assert profile.fee_total == Decimal("25")
     assert profile.net_cash_flow == Decimal("2375")
     assert profile.mean_monthly_inflow == Decimal("6700") / Decimal(3)
-    assert abs(profile.monthly_inflow_population_stddev - Decimal("205.48046676563254")) < Decimal("1e-14")
+    assert profile.monthly_inflow_population_stddev == Decimal(
+        "205.4804667656325483416730793818082"
+    )
+    assert profile.monthly_inflow_coefficient_of_variation == Decimal(
+        "0.09200617914879069328731630421454191"
+    )
+    assert profile.balance_observation_count == 3
     assert profile.reversal_count == 1
     assert profile.reversed_amount == Decimal("100")
     assert profile.balance_availability_rate == Decimal(1)
+    assert profile.negative_balance_count == 0
+    assert profile.negative_balance_rate == Decimal(0)
     assert profile.internal_transfer_count == 1
+    assert profile.uncertain_transfer_count == 0
+    assert profile.fee_event_count == 1
     assert set(profile.reason_codes) == {
         "ad_cashflow_category_unresolved",
         "ad_cashflow_reversal_observed",
@@ -150,15 +165,23 @@ def test_rent_oracle_excludes_nonparticipating_period_from_behavior():
         period_record("rent", "gap", "reporting_unavailable", "2025-03-01", "2025-03-31", status="unavailable"),
     )
     profile = _calculate_rent_profile(rows, config=config("rent"), grace_days=5)
+    assert profile.state == "available"
     assert profile.scheduled_obligation_count == 3
     assert profile.scheduled_amount == Decimal("3000")
     assert profile.observable_obligation_count == 2
     assert profile.provider_coverage_rate == Decimal(2) / Decimal(3)
     assert profile.fully_paid_rate == Decimal(1)
+    assert profile.fully_paid_count == 2
     assert profile.timely_paid_rate == Decimal(1) / Decimal(2)
+    assert profile.timely_paid_count == 1
     assert profile.partial_payment_rate == Decimal(1) / Decimal(2)
+    assert profile.partial_payment_count == 1
+    assert profile.observable_obligation_amount == Decimal("2000")
+    assert profile.linked_payment_amount == Decimal("2000")
     assert profile.amount_coverage_rate == Decimal(1)
+    assert profile.reversal_count == 0
     assert profile.reporting_gap_count == 1
+    assert profile.grace_days == 5
     assert set(profile.reason_codes) == {
         "ad_provider_nonparticipation",
         "ad_provider_reporting_gap",
@@ -178,16 +201,33 @@ def test_utility_oracle_uses_linked_adjustments_and_explicit_payments():
         record("utility", "p3", "payment", "2025-03-31", "60", obligation_id="m3"),
     )
     profile = _calculate_utility_profile(rows, config=config("utility"))
+    assert profile.state == "available"
+    assert profile.scheduled_obligation_count == 3
+    assert profile.scheduled_amount == Decimal("300")
+    assert profile.observable_obligation_count == 3
+    assert profile.provider_coverage_rate == Decimal(1)
+    assert profile.fully_paid_count == 3
+    assert profile.timely_paid_count == 2
+    assert profile.partial_payment_count == 1
+    assert profile.observable_obligation_amount == Decimal("280")
     assert profile.original_billed_amount == Decimal("300")
     assert profile.adjustment_total == Decimal("-20")
     # Decimal arithmetic matches the corrected normative oracle.
     assert profile.net_adjusted_obligation == Decimal("280")
     assert profile.linked_payment_amount == Decimal("280")
+    assert profile.amount_coverage_rate == Decimal(1)
+    assert profile.reversal_count == 0
+    assert profile.reporting_gap_count == 0
     assert profile.fully_paid_rate == Decimal(1)
     assert profile.timely_paid_rate == Decimal(2) / Decimal(3)
     assert profile.partial_payment_rate == Decimal(1) / Decimal(3)
     assert profile.estimated_bill_rate == Decimal(1) / Decimal(3)
     assert profile.adjustment_rate == Decimal(1) / Decimal(3)
+    assert profile.estimated_bill_count == 1
+    assert profile.adjustment_count == 1
+    assert profile.service_interruption_count == 0
+    assert profile.provider_count == 1
+    assert profile.service_type_count == 1
     assert set(profile.reason_codes) == {
         "ad_utility_adjustment_observed",
         "ad_utility_estimated_bill_observed",
@@ -326,7 +366,7 @@ def test_profile_mutations_fail_closed_or_remain_unavailable_without_adverse_inf
     assert "ad_unmatched_obligation" in utility_unmatched.reason_codes
 
 
-def test_profiles_are_order_independent_and_identifiers_do_not_leak(caplog):
+def test_profiles_are_order_independent_and_public_boundaries_do_not_leak(caplog):
     rows = (
         record("cash_flow", "secret-record-a", "inflow", "2025-01-01T00:00:00Z", "100"),
         record("cash_flow", "secret-record-b", "inflow", "2025-02-01T00:00:00Z", "200"),
@@ -337,28 +377,17 @@ def test_profiles_are_order_independent_and_identifiers_do_not_leak(caplog):
     assert first == second
 
     payload = first.model_dump(mode="json")
-    json_text = json.dumps(payload, sort_keys=True)
-    csv_buffer = io.StringIO()
-    writer = csv.writer(csv_buffer)
-    writer.writerows(sorted((key, value) for key, value in payload.items()))
-    html_text = "".join(
-        f"<dt>{key}</dt><dd>{value}</dd>" for key, value in sorted(payload.items())
-    )
-    diagnostics = repr(first)
-    with warnings.catch_warnings(record=True) as captured:
-        warnings.simplefilter("always")
-        warnings.warn("generic diagnostic", UserWarning)
-    with pytest.raises(Exception) as report_error:
-        AggregateReportRelease.model_validate(payload)
-    artifacts = (
-        json_text,
-        csv_buffer.getvalue(),
-        html_text,
-        diagnostics,
-        caplog.text,
-        " ".join(str(item.message) for item in captured),
-        str(report_error.value),
-    )
+    failures = []
+    for boundary, argument in (
+        (AggregateReportRelease.model_validate, payload),
+        (render_metrics_csv, first),
+        (render_html, first),
+    ):
+        with pytest.raises(Exception) as error:
+            boundary(argument)
+        failures.append(str(error.value))
+    diagnostics = (json.dumps(payload, sort_keys=True), repr(first), caplog.text, *failures)
+    assert caplog.records == []
     for secret in (
         "secret-entity",
         "secret-record-a",
@@ -366,4 +395,57 @@ def test_profiles_are_order_independent_and_identifiers_do_not_leak(caplog):
         "secret-record-c",
         "permission-ref",
     ):
-        assert all(secret not in artifact for artifact in artifacts)
+        assert all(secret not in artifact for artifact in diagnostics)
+
+
+def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
+    secrets = (
+        "account-secret-447",
+        "obligation-secret-448",
+        "address-secret-449",
+        "meter-secret-450",
+        "permission-secret-451",
+    )
+    base = {
+        "consumer": secrets[0],
+        "id": "r1",
+        "kind": "inflow",
+        "when": "not-a-date-" + secrets[2],
+        "seen": "2025-01-01T00:00:00Z",
+        "amount": "1.25",
+        "currency": "USD",
+        "status": "posted",
+    }
+    mapping = SignalRecordFieldMap(
+        fields={
+            "entity_id": "consumer",
+            "record_id": "id",
+            "event_type": "kind",
+            "event_time": "when",
+            "observed_at": "seen",
+            "amount": "amount",
+            "currency": "currency",
+            "status": "status",
+        }
+    )
+    with warnings.catch_warnings(record=True) as emitted_warnings:
+        warnings.simplefilter("always")
+        with pytest.raises(ValueError) as error:
+            adapt_cash_flow_records((base,), mapping=mapping, source=source("cash_flow"))
+    assert str(error.value) == "ad_missing_required_field"
+    assert emitted_warnings == []
+
+    for external_secret in secrets[1:]:
+        with pytest.raises(ValueError) as unknown_error:
+            adapt_cash_flow_records(
+                ({**base, "when": "2025-01-01T00:00:00Z", external_secret: external_secret},),
+                mapping=mapping,
+                source=source("cash_flow"),
+            )
+        assert str(unknown_error.value) == "ad_unknown_field"
+        assert external_secret not in str(unknown_error.value)
+    assert caplog.records == []
+    for secret in secrets:
+        assert secret not in str(error.value)
+        assert secret not in caplog.text
+        assert all(secret not in str(item.message) for item in emitted_warnings)

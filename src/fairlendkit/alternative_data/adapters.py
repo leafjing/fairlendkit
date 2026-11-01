@@ -97,21 +97,30 @@ def _adapt(
         try:
             records.append(SignalRecord.model_validate(payload))
         except ValidationError as error:
-            event_errors = {
-                tuple(item["loc"])
-                for item in error.errors(include_input=False, include_url=False)
-            }
-            messages = " ".join(
-                str(item["msg"])
-                for item in error.errors(include_input=False, include_url=False)
-            )
-            if ("event_type",) in event_errors:
+            errors = error.errors(include_input=False, include_url=False)
+            locations = {tuple(item["loc"]) for item in errors}
+            if ("event_type",) in locations:
                 code = AlternativeDataReasonCode.UNSUPPORTED_EVENT_TYPE
-            elif "require" in messages or "missing" in messages:
-                code = AlternativeDataReasonCode.MISSING_REQUIRED_FIELD
-            elif "amount" in messages:
+            elif ("amount",) in locations:
                 code = AlternativeDataReasonCode.INVALID_AMOUNT
+            elif ("currency",) in locations:
+                code = AlternativeDataReasonCode.CURRENCY_MISSING
+            elif locations & {
+                ("entity_id",),
+                ("record_id",),
+                ("source_id",),
+                ("source_version",),
+                ("revision_of",),
+                ("reversal_of",),
+                ("category_id",),
+                ("obligation_id",),
+                ("provider_id",),
+                ("service_type",),
+            }:
+                code = AlternativeDataReasonCode.INVALID_IDENTIFIER
             else:
-                raise
+                # Root/conditional validation errors are deliberately collapsed to
+                # one stable code. Never expose Pydantic's input_value rendering.
+                code = AlternativeDataReasonCode.MISSING_REQUIRED_FIELD
             raise ValueError(code.value) from None
     return tuple(records)
