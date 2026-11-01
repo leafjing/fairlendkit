@@ -19,12 +19,15 @@ candidate Markdown file. Unknown fields are rejected.
   "canonical_landing_url": "",
   "persistent_identifier": null,
   "release_id": "",
-  "release_date": "YYYY-MM-DD",
+  "release_date": null,
   "retrieved_at": null,
   "license_id": "",
   "license_url": "",
   "terms_url": null,
   "redistribution": "unverified",
+  "package_url": null,
+  "expected_uncompressed_bytes": null,
+  "expected_compressed_bytes": null,
   "files": [],
   "documentation": [],
   "review_state": "evidence_incomplete"
@@ -35,6 +38,10 @@ Allowed `redistribution` values are `permitted`, `prohibited`, and `unverified`.
 Allowed `review_state` values are `evidence_incomplete`, `verified`, `rejected`,
 and `superseded`. Pending candidates use `unverified` and
 `evidence_incomplete`; absence of license text never becomes `permitted`.
+`release_date` is an ISO date when official evidence agrees and null while a
+documented discrepancy remains. `package_url` is the official package URL or
+null. Expected package byte totals are non-negative integers or null and do not
+replace member-level sizes and hashes.
 
 ## File entry
 

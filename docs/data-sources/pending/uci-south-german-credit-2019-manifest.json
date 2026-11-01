@@ -1,0 +1,60 @@
+{
+  "manifest_version": "1.0",
+  "candidate_id": "uci-south-german-credit-2019",
+  "publisher_legal_name": "University of California, Irvine",
+  "canonical_landing_url": "https://archive.ics.uci.edu/dataset/522/south+german+credit",
+  "persistent_identifier": "doi:10.24432/C5X89F",
+  "release_id": "uci-dataset-522-2019",
+  "release_date": null,
+  "retrieved_at": null,
+  "license_id": "CC-BY-4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+  "terms_url": null,
+  "redistribution": "permitted",
+  "package_url": "https://archive.ics.uci.edu/static/public/522/south+german+credit.zip",
+  "expected_uncompressed_bytes": 58644,
+  "expected_compressed_bytes": 13130,
+  "files": [
+    {
+      "path": "SouthGermanCredit.asc",
+      "media_type": "text/plain",
+      "expected_bytes": 47940,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "data",
+      "contains_row_level_data": true,
+      "unit_of_observation": "one historical credit case",
+      "expected_columns": [],
+      "redistribution_scope": "repository"
+    },
+    {
+      "path": "read_SouthGermanCredit.R",
+      "media_type": "text/plain",
+      "expected_bytes": 7550,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "codebook",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "repository"
+    },
+    {
+      "path": "codetable.txt",
+      "media_type": "text/plain",
+      "expected_bytes": 3154,
+      "publisher_checksum": null,
+      "repository_sha256": null,
+      "role": "codebook",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "repository"
+    }
+  ],
+  "documentation": [
+    "https://archive.ics.uci.edu/dataset/522/south+german+credit",
+    "https://doi.org/10.24432/C5X89F"
+  ],
+  "review_state": "evidence_incomplete"
+}

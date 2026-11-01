@@ -10,7 +10,9 @@
 - Canonical page:
   <https://archive.ics.uci.edu/dataset/522/south+german+credit>
 - DOI: <https://doi.org/10.24432/C5X89F>
-- Repository release: donated 2019-11-28; exact package revision not pinned
+- Repository release: the rendered page says donated 2019-11-28, while embedded
+  official metadata reports `2019-11-29T00:00:00Z`; the one-day discrepancy is
+  unresolved and `release_date` remains null in the manifest
 - License: CC BY 4.0, linked by UCI:
   <https://creativecommons.org/licenses/by/4.0/legalcode>
 - Redistribution: appears permitted with attribution, subject to package,
@@ -32,6 +34,36 @@ Required evidence: official members/sizes/R documentation/hash, attribution,
 original collection and label horizon, sampling, time semantics, and privacy
 review. Any approval is limited to generic risk-metric mechanics, not modern
 population or alternative-signal claims.
+
+## Verified official metadata snapshot
+
+Checked against the canonical UCI page on 2026-11-01 without downloading the
+package:
+
+- package URL:
+  <https://archive.ics.uci.edu/static/public/522/south+german+credit.zip>;
+- `SouthGermanCredit.asc`: 47,940 bytes;
+- `read_SouthGermanCredit.R`: 7,550 bytes;
+- `codetable.txt`: 3,154 bytes;
+- total uncompressed size: 58,644 bytes;
+- total compressed size: 13,130 bytes;
+- official abstract: 1,000 cases, 700 good and 300 bad, 20 predictors, collected
+  1973–1975, with bad credits heavily oversampled;
+- target description: whether the credit contract was complied with (`good`) or
+  not (`bad`); and
+- official license presentation: CC BY 4.0 permits sharing and adaptation with
+  attribution.
+
+The metadata-only
+[`uci-south-german-credit-2019-manifest.json`](uci-south-german-credit-2019-manifest.json)
+pins these claims. Publisher checksums and repository SHA-256 values remain null
+because data retrieval is not authorized by this documentation change.
+
+Remaining admission work is narrower but material: resolve the release-date
+discrepancy through UCI's official <https://archive.ics.uci.edu/contact> route,
+confirm whether the archive has a stable revision identity/checksum, verify the
+original collection/label horizon, and complete privacy plus benchmark-scope
+review. Candidate status remains `evidence_incomplete`.
 
 ## Enablement plan
 
