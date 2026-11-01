@@ -1,8 +1,11 @@
 from decimal import Decimal
 import json
+from pathlib import Path
 import warnings
 
 import pytest
+
+from fairlendkit import AuditResultV2
 
 from fairlendkit.alternative_data import (
     AlternativeDataConfig,
@@ -140,6 +143,34 @@ def test_cash_flow_oracle_uses_decimal_reversals_and_period_denominators():
         "ad_cashflow_category_unresolved",
         "ad_cashflow_reversal_observed",
     }
+    expected = {
+        "state": "available",
+        "calendar_period_count": 3,
+        "observed_period_count": 3,
+        "missing_period_count": 0,
+        "inflow_total": "6700",
+        "outflow_total": "4300",
+        "fee_total": "25",
+        "net_cash_flow": "2375",
+        "mean_monthly_inflow": "2233.333333333333333333333333",
+        "monthly_inflow_population_stddev": "205.4804667656325483416730793818082",
+        "monthly_inflow_coefficient_of_variation": "0.09200617914879069328731630421454191",
+        "balance_observation_count": 3,
+        "balance_availability_rate": "1",
+        "negative_balance_count": 0,
+        "negative_balance_rate": "0",
+        "internal_transfer_count": 1,
+        "uncertain_transfer_count": 0,
+        "fee_event_count": 1,
+        "reversal_count": 1,
+        "reversed_amount": "100",
+        "reason_codes": [
+            "ad_cashflow_category_unresolved",
+            "ad_cashflow_reversal_observed",
+        ],
+    }
+    assert set(expected) == set(profile.__class__.model_fields)
+    assert profile.model_dump(mode="json") == expected
 
 
 def test_cash_flow_reporting_gap_never_invents_zero_behavior():
@@ -187,6 +218,32 @@ def test_rent_oracle_excludes_nonparticipating_period_from_behavior():
         "ad_provider_reporting_gap",
         "ad_rent_partial_payment_observed",
     }
+    expected = {
+        "state": "available",
+        "scheduled_obligation_count": 3,
+        "scheduled_amount": "3000",
+        "observable_obligation_count": 2,
+        "provider_coverage_rate": "0.6666666666666666666666666667",
+        "fully_paid_count": 2,
+        "fully_paid_rate": "1",
+        "timely_paid_count": 1,
+        "timely_paid_rate": "0.5",
+        "partial_payment_count": 1,
+        "partial_payment_rate": "0.5",
+        "observable_obligation_amount": "2000",
+        "linked_payment_amount": "2000",
+        "amount_coverage_rate": "1",
+        "reversal_count": 0,
+        "reporting_gap_count": 1,
+        "reason_codes": [
+            "ad_provider_nonparticipation",
+            "ad_provider_reporting_gap",
+            "ad_rent_partial_payment_observed",
+        ],
+        "grace_days": 5,
+    }
+    assert set(expected) == set(profile.__class__.model_fields)
+    assert profile.model_dump(mode="json") == expected
 
 
 def test_utility_oracle_uses_linked_adjustments_and_explicit_payments():
@@ -232,6 +289,40 @@ def test_utility_oracle_uses_linked_adjustments_and_explicit_payments():
         "ad_utility_adjustment_observed",
         "ad_utility_estimated_bill_observed",
     }
+    expected = {
+        "state": "available",
+        "scheduled_obligation_count": 3,
+        "scheduled_amount": "300",
+        "observable_obligation_count": 3,
+        "provider_coverage_rate": "1",
+        "fully_paid_count": 3,
+        "fully_paid_rate": "1",
+        "timely_paid_count": 2,
+        "timely_paid_rate": "0.6666666666666666666666666667",
+        "partial_payment_count": 1,
+        "partial_payment_rate": "0.3333333333333333333333333333",
+        "observable_obligation_amount": "280",
+        "linked_payment_amount": "280",
+        "amount_coverage_rate": "1",
+        "reversal_count": 0,
+        "reporting_gap_count": 0,
+        "reason_codes": [
+            "ad_utility_adjustment_observed",
+            "ad_utility_estimated_bill_observed",
+        ],
+        "original_billed_amount": "300",
+        "adjustment_total": "-20",
+        "net_adjusted_obligation": "280",
+        "estimated_bill_count": 1,
+        "estimated_bill_rate": "0.3333333333333333333333333333",
+        "adjustment_count": 1,
+        "adjustment_rate": "0.3333333333333333333333333333",
+        "service_interruption_count": 0,
+        "provider_count": 1,
+        "service_type_count": 1,
+    }
+    assert set(expected) == set(profile.__class__.model_fields)
+    assert profile.model_dump(mode="json") == expected
 
 
 def test_explicit_adapter_rejects_unmapped_and_unknown_categories():
@@ -388,6 +479,15 @@ def test_profiles_are_order_independent_and_public_boundaries_do_not_leak(caplog
         failures.append(str(error.value))
     diagnostics = (json.dumps(payload, sort_keys=True), repr(first), caplog.text, *failures)
     assert caplog.records == []
+
+    safe_result = AuditResultV2.model_validate_json(
+        (Path(__file__).parents[1] / "examples/synthetic/audit-result-v2.json").read_bytes()
+    )
+    safe_artifacts = (
+        safe_result.model_dump_json(),
+        render_metrics_csv(safe_result).decode("utf-8"),
+        render_html(safe_result).decode("utf-8"),
+    )
     for secret in (
         "secret-entity",
         "secret-record-a",
@@ -396,6 +496,7 @@ def test_profiles_are_order_independent_and_public_boundaries_do_not_leak(caplog
         "permission-ref",
     ):
         assert all(secret not in artifact for artifact in diagnostics)
+        assert all(secret not in artifact for artifact in safe_artifacts)
 
 
 def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
@@ -405,6 +506,10 @@ def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
         "address-secret-449",
         "meter-secret-450",
         "permission-secret-451",
+        "record-secret-currency",
+        "record-secret-reversal",
+        "record-secret-obligation",
+        "account-secret-missing-target",
     )
     base = {
         "consumer": secrets[0],
@@ -435,6 +540,22 @@ def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
     assert str(error.value) == "ad_missing_required_field"
     assert emitted_warnings == []
 
+    failure_texts = [str(error.value)]
+    missing = dict(base)
+    missing.pop("status")
+    with pytest.raises(ValueError) as missing_error:
+        adapt_cash_flow_records((missing,), mapping=mapping, source=source("cash_flow"))
+    assert str(missing_error.value) == "ad_missing_required_field"
+    failure_texts.append(str(missing_error.value))
+
+    invalid_amount = {**base, "when": "2025-01-01T00:00:00Z", "amount": secrets[4]}
+    with pytest.raises(ValueError) as amount_error:
+        adapt_cash_flow_records(
+            (invalid_amount,), mapping=mapping, source=source("cash_flow")
+        )
+    assert str(amount_error.value) == "ad_invalid_amount"
+    failure_texts.append(str(amount_error.value))
+
     for external_secret in secrets[1:]:
         with pytest.raises(ValueError) as unknown_error:
             adapt_cash_flow_records(
@@ -444,8 +565,62 @@ def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
             )
         assert str(unknown_error.value) == "ad_unknown_field"
         assert external_secret not in str(unknown_error.value)
+        failure_texts.append(str(unknown_error.value))
+
+    with pytest.raises(ValueError) as currency_error:
+        _calculate_cash_flow_profile(
+            (
+                record(
+                    "cash_flow",
+                    "record-secret-currency",
+                    "inflow",
+                    "2025-01-01T00:00:00Z",
+                    "100",
+                    currency="EUR",
+                ),
+            ),
+            config=config("cash_flow"),
+        )
+    assert str(currency_error.value) == "ad_currency_inconsistent"
+    failure_texts.append(str(currency_error.value))
+
+    with pytest.raises(ValueError) as reversal_error:
+        _calculate_cash_flow_profile(
+            (
+                record(
+                    "cash_flow",
+                    "record-secret-reversal",
+                    "reversal",
+                    "2025-01-02T00:00:00Z",
+                    None,
+                    currency="USD",
+                    reversal_of="account-secret-missing-target",
+                ),
+            ),
+            config=config("cash_flow"),
+        )
+    assert str(reversal_error.value) == "ad_reversal_target_missing"
+    failure_texts.append(str(reversal_error.value))
+
+    unmatched = _calculate_rent_profile(
+        (
+            record(
+                "rent",
+                "record-secret-obligation",
+                "payment",
+                "2025-01-05",
+                "100",
+                obligation_id="obligation-secret-448",
+            ),
+        ),
+        config=config("rent"),
+        grace_days=5,
+    )
+    assert unmatched.state == "unavailable"
+    assert "ad_unmatched_obligation" in unmatched.reason_codes
+    failure_texts.append(unmatched.model_dump_json())
     assert caplog.records == []
     for secret in secrets:
-        assert secret not in str(error.value)
+        assert all(secret not in text for text in failure_texts)
         assert secret not in caplog.text
         assert all(secret not in str(item.message) for item in emitted_warnings)
