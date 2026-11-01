@@ -51,8 +51,9 @@ edge cases, tests, report representation, and limitations are documented.
   release verifier green on Python 3.11 and 3.12.
   Threshold scanning, proxy screening, governance integration, and mitigation
   remain later milestones.
-- Milestone 4: user workflow and reports — implementation candidate complete;
-  independent review and two-runtime CI are the remaining closure gates. The
+- Milestone 4: user workflow and reports — complete and closed. Independent
+  review approved the final candidate at `68448f5`; Python 3.11 and 3.12 CI
+  both passed, and PR #46 merged as `2e1258f` with post-merge CI green. The
   contract is defined in
   [`milestone-4-user-workflow.md`](milestone-4-user-workflow.md). Delivery order
   is CLI plus canonical JSON, metrics CSV, self-contained HTML, then the
@@ -62,8 +63,10 @@ edge cases, tests, report representation, and limitations are documented.
 Milestone 4 deliberately pulls the stable reporting subset of Epic 5 ahead of
 Epic 4 threshold sensitivity. This produces a usable audit workflow without
 coupling report delivery to new analytical behavior. Threshold scanning remains
-the next analytical epic and will extend the versioned result contract before
-threshold sections can appear in reports.
+the next analytical epic. Milestone 5 is now active under the
+[`threshold-scanning-contract.md`](threshold-scanning-contract.md) delivery
+contract and will extend the versioned result contract before threshold
+sections can appear in reports.
 
 ## V1.1 — Mitigation experiments
 
