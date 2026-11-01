@@ -4,6 +4,8 @@ This directory contains metadata and review evidence only. It must not contain
 raw, sampled, transformed, or row-level third-party data.
 
 - `pending/` holds unverified candidate records.
+- `admission-proposals/` holds independently reviewable proposals; a proposal
+  is not an admission decision or download authorization.
 - Approved/rejected registers are created only after independent review under
   the [AD-D0 admission contract](../alternative-data-source-admission.md).
 

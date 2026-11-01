@@ -73,6 +73,11 @@ An explicitly unsent request is prepared at
 It is a review artifact only and must not be sent without custice's explicit
 authorization.
 
+The independently reviewable AD-D1-UCI proposal is recorded at
+[`../admission-proposals/uci-south-german-credit-2019.md`](../admission-proposals/uci-south-german-credit-2019.md).
+It proposes a bounded one-time retrieval gate; it does not authorize retrieval,
+populate hashes, or change this candidate's pending state.
+
 ## Enablement plan
 
 - Target: `repository` as the first directly included risk-metric benchmark,
