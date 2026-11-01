@@ -85,6 +85,7 @@ Disposition meanings:
 | `ad_high_cardinality_unsupported` | unavailable | Candidate categories exceed the configured supported maximum after rare-level mapping. |
 | `ad_proxy_model_nonconvergence` | unavailable | The versioned proxy-screening model did not converge. |
 | `ad_proxy_holdout_unstable` | observe | Temporal-holdout evidence exceeds the configured stability tolerance. |
+| `ad_proxy_strata_not_comparable` | unavailable | Provider or coverage stability lacks at least two nonempty supported strata in both development and holdout. |
 | `ad_proxy_stratum_support` | unavailable | A required provider or coverage stratum lacks configured entity, class, or bootstrap support. |
 | `ad_proxy_stratum_unstable` | observe | Supported provider or coverage evidence exceeds the configured stability tolerance. |
 

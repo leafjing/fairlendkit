@@ -239,14 +239,16 @@ distinct entities before any derived evidence.
 Every eligible entity maps to exactly one declared provider stratum and one
 declared coverage stratum; an explicitly declared `other` stratum closes each
 vocabulary. Stratum labels are contract IDs, not raw provider/category values.
-When a dimension has at least two nonempty strata, compute the same metric and
-interval separately for every stratum in both development and holdout. Every
+Provider and coverage dimensions must each contain at least two nonempty,
+comparable, supported strata in both development and holdout. Otherwise the
+screen records `ad_proxy_strata_not_comparable` and cannot emit a flag. Compute
+the same metric and interval separately for every stratum in both windows. Every
 stratum must meet `minimum_stratum_entities`, contain all protected classes
 required by the metric, reach `minimum_valid_resamples`, and use the same metric,
 preprocessing isolation, direction, and reliability rules as the overall result.
-Insufficient support produces `ad_proxy_stratum_support` and no flag. A dimension
-with exactly one nonempty declared stratum records stability as not applicable;
-it does not fabricate a comparison.
+Insufficient support in an otherwise comparable dimension produces
+`ad_proxy_stratum_support` and no flag. Stability is never silently marked not
+applicable for either required dimension.
 
 Association statistics are recomputed from the entities inside each stratum.
 Predictability and incremental AUC reuse the already frozen overall-window
@@ -279,8 +281,9 @@ same metric, class aggregation, paired entity definition, and inclusive threshol
 `reliable=true AND point>=T AND lower>=T`. The temporal comparison must satisfy
 `abs(holdout_point-development_point)<=stability_tolerance`.
 
-For each provider and coverage dimension with at least two nonempty strata,
-every required stratum must be reliable in both windows and must satisfy
+For each provider and coverage dimension, at least two nonempty supported strata
+must exist in both windows. Every required stratum must be reliable in both
+windows and must satisfy
 `abs(stratum_point-window_overall_point)<=stability_tolerance` separately in
 development and holdout. Stratum point/lower values are stability evidence and
 do not separately have to meet `T`; the overall development and holdout results
@@ -290,10 +293,35 @@ tolerance yields `ad_proxy_stratum_unstable`. A temporal difference above
 tolerance yields `ad_proxy_holdout_unstable`. Every such failure emits no flag.
 
 Thus a flag is emitted only when all development, holdout, fold, bootstrap,
-pairing, provider, coverage, and disclosure gates pass. Every flag records rule
-ID/version, candidate ID, protected attribute,
-metric, threshold, point estimate, interval, baseline where applicable, fold
-support, populations, and neutral review prompt.
+pairing, provider, coverage, and disclosure gates pass.
+
+### Typed flag evidence references
+
+A published `ProxyScreeningFlag` contains `rule_id`, `rule_version`,
+`candidate_id`, `protected_attribute_id`, `metric`, `class_aggregation`,
+`baseline_id` when applicable, `threshold`, `stability_tolerance`, and a neutral
+review prompt. It never contains one ambiguous point estimate or interval.
+Instead it contains these exact typed references:
+
+- `threshold_evidence.development` and `threshold_evidence.holdout`, each a
+  deterministic `ProxyEvidenceKey` resolving to one published evidence item with
+  window, point, lower/upper interval, reliability, raw support bucket, and
+  threshold comparison;
+- `stability_evidence.temporal`, containing the two overall evidence keys,
+  absolute point difference, tolerance, and `passed=true`;
+- `stability_evidence.provider[]` and
+  `stability_evidence.coverage_stratum[]`, in canonical stratum-contract order,
+  each containing stratum contract ID, development stratum evidence key,
+  development-overall evidence key, holdout stratum evidence key,
+  holdout-overall evidence key, the two absolute differences, tolerance, and
+  `passed=true`; and
+- fold, bootstrap, pairing, and population contract references needed to resolve
+  the same evidence, never entity IDs, predictions, coefficients, or raw labels.
+
+`ProxyEvidenceKey` is derived only from versioned contract IDs, window, metric,
+class aggregation, baseline scope, and stratum scope. It contains no consumer or
+raw provider value. References must resolve within the same canonical release;
+missing, cross-release, duplicated, or mismatched references fail closed.
 
 ## High cardinality and sparse levels
 
@@ -329,6 +357,13 @@ The typed canonical JSON contains only the suppression state, safe count bucket,
 and true suppression reason. Renderers cannot receive exact hidden values.
 Before release, every hidden atomic entity-count variable must retain at least
 two feasible non-negative integer values under current and historical equations.
+
+Flag candidates and every referenced evidence unit enter joint suppression
+before serialization. If the flag unit or any threshold, temporal, provider, or
+coverage evidence it references is suppressed, unavailable, or unreliable, the
+flag serializes only as a suppressed/unavailable release unit with no evidence
+references, comparison values, or review prompt; it is not a published flag.
+There are no dangling references and no renderer may reconstruct them.
 
 The AD-3 trace/release boundary is reused: complete versioned configuration and
 non-sensitive calculation trace are required, unreliable intervals have null
@@ -401,6 +436,19 @@ Fixtures are frozen, entity-level, order-permuted, and use no real consumer data
     `ad_proxy_statistic_undefined`, and
     `ad_proxy_paired_population_mismatch`, including disposition and exact
     canonical message. Input-order permutations preserve each result.
+12. **Single-stratum prohibition:** a population with only one nonempty provider
+    stratum yields `ad_proxy_strata_not_comparable` and no flag; a separate
+    population with only one nonempty coverage stratum yields the same code and
+    no flag. Neither case is recorded as stability not applicable.
+13. **Typed flag rendering:** one passing flag references distinct development
+    and holdout threshold evidence plus temporal, two provider-stratum, and two
+    coverage-stratum stability evidence sets. Canonical JSON preserves the nested
+    reference structure. CSV emits one `proxy_flag` row for scalar fields and
+    deterministic `proxy_flag_evidence` rows keyed by flag ID, dimension,
+    canonical stratum order, window, and evidence key. HTML renders those same
+    normalized rows. The golden fixture normalizes all three renderers to the
+    identical tuple set. Suppressing each referenced unit in turn produces no
+    published flag, no dangling reference, and no numeric leakage in any format.
 
 AD-4 fixtures must cover protected/identifier/leakage-field rejection, entity
 and time leakage, deterministic folds, binary and multiclass AUC, missing state,
