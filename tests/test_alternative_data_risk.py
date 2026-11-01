@@ -210,10 +210,31 @@ def test_public_risk_release_suppresses_sparse_diagnostics_and_publishes_support
         AggregateReportRelease.model_validate(sparse.model_dump())
 
     supported = tuple(
-        entity(f"entity-{index}", 0.9 if index % 2 else 0.1, "bad" if index % 2 else "good")
-        for index in range(10)
+        entity(
+            f"entity-{index}",
+            0.1 if index == 0 else 0.9,
+            "bad" if index % 2 else "good",
+        )
+        for index in range(20)
     )
     published = build_risk_diagnostic_release(supported, configuration())
     assert published.state == "published"
-    assert published.entity_count == 10
+    assert published.entity_count == 20
     assert published.diagnostics is not None
+    low, middle_low, middle_high, high = published.diagnostics.bands
+    assert low.state == "suppressed"
+    assert low.entity_count is None and low.observed_bad_rate is None
+    assert low.count_bucket == "0..9" and low.reason_code == "ad_sparse_report_cell"
+    assert middle_low.state == "suppressed" and middle_high.state == "suppressed"
+    assert high.state == "published" and high.entity_count == 19
+    band_bootstrap = {
+        item.metric_key: item for item in published.diagnostics.bootstrap
+        if item.metric_key.startswith("band.")
+    }
+    assert band_bootstrap["band.0.observed_bad_rate"].state == "suppressed"
+    assert band_bootstrap["band.0.observed_bad_rate"].valid_resamples is None
+    assert band_bootstrap["band.3.observed_bad_rate"].state == "published"
+    assert set(low.model_dump(exclude_none=True)) == {
+        "state", "upper", "minimum_report_cell_count",
+        "count_bucket", "reason_code",
+    }

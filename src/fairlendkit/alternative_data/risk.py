@@ -119,6 +119,47 @@ class RiskBand(StrictModel):
     score_maximum: float | None
 
 
+class ReleasedRiskBand(StrictModel):
+    state: str
+    lower: float | None
+    upper: float | None
+    minimum_report_cell_count: int = Field(ge=10)
+    entity_count: int | None = None
+    normalized_weight: float | None = None
+    bad_count: int | None = None
+    bad_weight: float | None = None
+    good_count: int | None = None
+    good_weight: float | None = None
+    observed_bad_rate: MetricValue | None = None
+    score_minimum: float | None = None
+    score_maximum: float | None = None
+    count_bucket: str | None = None
+    reason_code: str | None = None
+
+    @model_validator(mode="after")
+    def validate_band_disclosure(self) -> "ReleasedRiskBand":
+        exact = (
+            self.entity_count, self.normalized_weight, self.bad_count,
+            self.bad_weight, self.good_count, self.good_weight,
+            self.observed_bad_rate, self.score_minimum, self.score_maximum,
+        )
+        if self.state == "suppressed":
+            if any(value is not None for value in exact):
+                raise ValueError("suppressed score band cannot expose exact evidence")
+            if self.count_bucket != f"0..{self.minimum_report_cell_count - 1}":
+                raise ValueError("suppressed score band requires canonical count bucket")
+            if self.reason_code != "ad_sparse_report_cell":
+                raise ValueError("suppressed score band requires canonical reason")
+        elif self.state == "published":
+            if self.entity_count is None or self.entity_count < self.minimum_report_cell_count:
+                raise ValueError("published score band must meet disclosure minimum")
+            if self.observed_bad_rate is None or self.count_bucket is not None or self.reason_code is not None:
+                raise ValueError("published score band requires exact evidence only")
+        else:
+            raise ValueError("score band release state must be published or suppressed")
+        return self
+
+
 class LiftCapture(StrictModel):
     requested_fraction: float
     achieved_weight_fraction: float
@@ -172,11 +213,41 @@ class BootstrapEvidence(StrictModel):
     upper: float | None
 
 
+class ReleasedBootstrapEvidence(StrictModel):
+    state: str
+    metric_key: str
+    valid_resamples: int | None = None
+    reliable: bool | None = None
+    lower: float | None = None
+    upper: float | None = None
+    reason_code: str | None = None
+
+    @model_validator(mode="after")
+    def validate_bootstrap_disclosure(self) -> "ReleasedBootstrapEvidence":
+        exact = (self.valid_resamples, self.reliable, self.lower, self.upper)
+        if self.state == "suppressed":
+            if any(value is not None for value in exact):
+                raise ValueError("suppressed bootstrap evidence cannot expose exact values")
+            if self.reason_code != "ad_sparse_report_cell":
+                raise ValueError("suppressed bootstrap evidence requires canonical reason")
+        elif self.state == "published":
+            if self.valid_resamples is None or self.reliable is None or self.reason_code is not None:
+                raise ValueError("published bootstrap evidence requires exact metadata only")
+        else:
+            raise ValueError("bootstrap release state must be published or suppressed")
+        return self
+
+
+class ReleasedRiskDiagnostics(RiskDiagnostics):
+    bands: tuple[ReleasedRiskBand, ...]
+    bootstrap: tuple[ReleasedBootstrapEvidence, ...]
+
+
 class RiskDiagnosticRelease(StrictModel):
     state: str
     minimum_report_cell_count: int = Field(ge=10)
     entity_count: int | None = None
-    diagnostics: RiskDiagnostics | None = None
+    diagnostics: ReleasedRiskDiagnostics | None = None
     count_bucket: str | None = None
     reason_code: str | None = None
 
@@ -212,12 +283,57 @@ def build_risk_diagnostic_release(
             count_bucket=f"0..{config.minimum_report_cell_count - 1}",
             reason_code="ad_sparse_report_cell",
         )
+    released_bands = tuple(
+        _release_band(band, config.minimum_report_cell_count)
+        for band in diagnostics.bands
+    )
+    released_bootstrap = tuple(
+        _release_bootstrap(item, released_bands) for item in diagnostics.bootstrap
+    )
+    released = ReleasedRiskDiagnostics(
+        **diagnostics.model_dump(exclude={"bands", "bootstrap"}),
+        bands=released_bands,
+        bootstrap=released_bootstrap,
+    )
     return RiskDiagnosticRelease(
         state="published",
         minimum_report_cell_count=config.minimum_report_cell_count,
         entity_count=len(entities),
-        diagnostics=diagnostics,
+        diagnostics=released,
     )
+
+
+def _release_band(band: RiskBand, minimum: int) -> ReleasedRiskBand:
+    if band.entity_count < minimum:
+        return ReleasedRiskBand(
+            state="suppressed", lower=band.lower, upper=band.upper,
+            minimum_report_cell_count=minimum,
+            count_bucket=f"0..{minimum - 1}", reason_code="ad_sparse_report_cell",
+        )
+    return ReleasedRiskBand(
+        state="published", lower=band.lower, upper=band.upper,
+        minimum_report_cell_count=minimum,
+        entity_count=band.entity_count, normalized_weight=band.normalized_weight,
+        bad_count=band.bad_count, bad_weight=band.bad_weight,
+        good_count=band.good_count, good_weight=band.good_weight,
+        observed_bad_rate=band.observed_bad_rate,
+        score_minimum=band.score_minimum, score_maximum=band.score_maximum,
+    )
+
+
+def _release_bootstrap(
+    evidence: BootstrapEvidence, bands: tuple[ReleasedRiskBand, ...]
+) -> ReleasedBootstrapEvidence:
+    parts = evidence.metric_key.split(".")
+    if len(parts) >= 3 and parts[0] == "band" and parts[1].isdigit():
+        index = int(parts[1])
+        if index < len(bands) and bands[index].state == "suppressed":
+            return ReleasedBootstrapEvidence(
+                state="suppressed",
+                metric_key=evidence.metric_key,
+                reason_code="ad_sparse_report_cell",
+            )
+    return ReleasedBootstrapEvidence(state="published", **evidence.model_dump())
 
 
 def _evaluate_risk_diagnostics(
