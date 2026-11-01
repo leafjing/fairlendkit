@@ -92,6 +92,7 @@ class _RentProfile(_ObligationProfile):
 
 class _UtilityProfile(_ObligationProfile):
     original_billed_amount: Decimal
+    adjustment_total: Decimal
     net_adjusted_obligation: Decimal
     estimated_bill_count: int = Field(ge=0)
     estimated_bill_rate: Decimal | None
@@ -236,12 +237,15 @@ def _calculate_utility_profile(
         item for item in selected if item.event_type == SignalEventType.ADJUSTMENT
     )
     original = sum((item.amount or Decimal(0) for item in bills), Decimal(0))
-    adjusted = original + sum((item.amount or Decimal(0) for item in adjustments), Decimal(0))
+    adjustment_total = sum(
+        (item.amount or Decimal(0) for item in adjustments), Decimal(0)
+    )
     count = len(bills)
     return _UtilityProfile(
         **common,
         original_billed_amount=original,
-        net_adjusted_obligation=adjusted,
+        adjustment_total=adjustment_total,
+        net_adjusted_obligation=original + adjustment_total,
         estimated_bill_count=sum(item.event_type == SignalEventType.ESTIMATED_BILL for item in bills),
         estimated_bill_rate=(
             Decimal(sum(item.event_type == SignalEventType.ESTIMATED_BILL for item in bills))
