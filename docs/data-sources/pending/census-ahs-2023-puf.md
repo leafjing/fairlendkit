@@ -55,5 +55,5 @@ The metadata-only
 [`census-ahs-2023-puf-manifest.json`](census-ahs-2023-puf-manifest.json)
 pins the version and artifacts. Dataset-level reuse/redistribution terms, archive
 members, publisher checksums, repository SHA-256, and version-control contents
-remain unverified, so members default to `external_only` and candidate status
-remains `evidence_incomplete`.
+remain unverified, so member redistribution scope remains `unverified` and
+candidate status remains `evidence_incomplete`.

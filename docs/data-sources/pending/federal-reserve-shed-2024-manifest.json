@@ -4,7 +4,7 @@
   "publisher_legal_name": "Board of Governors of the Federal Reserve System",
   "canonical_landing_url": "https://www.federalreserve.gov/consumerscommunities/shed_data.htm",
   "persistent_identifier": null,
-  "release_id": "shed-2024-public-use-current-2026-02-09",
+  "release_id": null,
   "release_date": null,
   "retrieved_at": null,
   "license_id": "UNVERIFIED",
@@ -25,7 +25,7 @@
       "contains_row_level_data": true,
       "unit_of_observation": "one 2024 SHED survey respondent",
       "expected_columns": [],
-      "redistribution_scope": "external_only"
+      "redistribution_scope": "unverified"
     },
     {
       "path": "SHED_2024codebook.pdf",
@@ -37,7 +37,7 @@
       "contains_row_level_data": false,
       "unit_of_observation": null,
       "expected_columns": [],
-      "redistribution_scope": "external_only"
+      "redistribution_scope": "unverified"
     }
   ],
   "documentation": [

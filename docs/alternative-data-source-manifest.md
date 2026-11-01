@@ -18,7 +18,7 @@ candidate Markdown file. Unknown fields are rejected.
   "publisher_legal_name": "",
   "canonical_landing_url": "",
   "persistent_identifier": null,
-  "release_id": "",
+  "release_id": null,
   "release_date": null,
   "retrieved_at": null,
   "license_id": "",
@@ -42,6 +42,9 @@ and `superseded`. Pending candidates use `unverified` and
 documented discrepancy remains. `package_url` is the official package URL or
 null. Expected package byte totals are non-negative integers or null and do not
 replace member-level sizes and hashes.
+`release_id` is a publisher-issued release identity or null. Project aliases and
+constructed snapshot labels belong in `candidate_id` or candidate prose and must
+not be represented as publisher-issued identities.
 
 ## File entry
 
@@ -58,7 +61,13 @@ Every expected source file has:
 - `contains_row_level_data`: boolean;
 - `unit_of_observation`: exact publisher description or null for documentation;
 - `expected_columns`: official names only, never values; and
-- `redistribution_scope`: `repository`, `external_only`, or `prohibited`.
+- `redistribution_scope`: `unverified`, `repository`, `external_only`, or
+  `prohibited`.
+
+Every file in an `evidence_incomplete` manifest uses
+`redistribution_scope="unverified"`. `repository`, `external_only`, and
+`prohibited` are admission decisions and may be assigned only after independent
+review changes the manifest out of the pending state.
 
 ZIP/tar containers and each consumed member receive separate entries and hashes.
 Hashing an archive alone is insufficient to pin extracted inputs. Case, Unicode

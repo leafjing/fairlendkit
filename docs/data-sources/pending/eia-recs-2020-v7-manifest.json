@@ -4,13 +4,13 @@
   "publisher_legal_name": "U.S. Energy Information Administration",
   "canonical_landing_url": "https://www.eia.gov/consumption/residential/data/2020/index.php?view=microdata",
   "persistent_identifier": null,
-  "release_id": "recs-2020-public-v7",
+  "release_id": null,
   "release_date": null,
   "retrieved_at": null,
   "license_id": "US-GOV-PUBLIC-DOMAIN-EIA",
   "license_url": "https://www.eia.gov/about/copyrights_reuse.php",
   "terms_url": "https://www.eia.gov/about/copyrights_reuse.php",
-  "redistribution": "permitted",
+  "redistribution": "unverified",
   "package_url": null,
   "expected_uncompressed_bytes": null,
   "expected_compressed_bytes": null,
@@ -25,7 +25,7 @@
       "contains_row_level_data": true,
       "unit_of_observation": "one sampled housing unit/household",
       "expected_columns": [],
-      "redistribution_scope": "repository"
+      "redistribution_scope": "unverified"
     },
     {
       "path": "xls/RECS 2020 Codebook for Public File - v7.xlsx",
@@ -37,7 +37,7 @@
       "contains_row_level_data": false,
       "unit_of_observation": null,
       "expected_columns": [],
-      "redistribution_scope": "repository"
+      "redistribution_scope": "unverified"
     },
     {
       "path": "pdf/microdata-guide.pdf",
@@ -49,7 +49,7 @@
       "contains_row_level_data": false,
       "unit_of_observation": null,
       "expected_columns": [],
-      "redistribution_scope": "repository"
+      "redistribution_scope": "unverified"
     }
   ],
   "documentation": [

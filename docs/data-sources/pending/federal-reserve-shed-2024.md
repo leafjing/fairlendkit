@@ -52,11 +52,12 @@ Official HEAD metadata checked 2026-11-01 without retrieving bodies:
 - current 2024 codebook: 848,401 bytes, last modified 2026-02-09; and
 - the canonical SHED page continues to expose both artifacts.
 
-Because a 2024 survey artifact was updated in 2026, the manifest identifies this
-snapshot as `shed-2024-public-use-current-2026-02-09`; “2024” alone is not a
+Because a 2024 survey artifact was updated in 2026, the candidate record retains
+the observed 2026-02-09 HTTP metadata, but `release_id` remains null until the
+publisher supplies an official package identity. “2024” alone is not a
 sufficient version. The Board linking-policy page only resolves third-party
 linked-content restrictions and is not yet affirmative dataset redistribution
 permission. The metadata-only
 [`federal-reserve-shed-2024-manifest.json`](federal-reserve-shed-2024-manifest.json)
-therefore remains `redistribution=unverified` and defaults members to
-`external_only` pending confirmation.
+therefore keeps both redistribution and member scope `unverified` pending
+confirmation.
