@@ -16,6 +16,12 @@ screenshots of records, access tokens, acceptance cookies, or executable downloa
 logic. Reviewers inspect source documentation and license text before any data
 handling decision.
 
+Every pending candidate also follows the
+[source manifest contract](alternative-data-source-manifest.md) and
+[outcome and temporal-fitness contract](alternative-data-outcome-contract.md).
+The pending pool rules are recorded in
+[`data-sources/pending/README.md`](data-sources/pending/README.md).
+
 ## Candidate record template
 
 Create one Markdown record per candidate under
