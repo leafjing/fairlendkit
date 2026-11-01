@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from collections import defaultdict
 from enum import StrEnum
-import hashlib
 import math
-import random
 from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 
 from fairlendkit.alternative_data.contracts import StrictModel
+from fairlendkit.alternative_data.suppression import _CountCell, _apply_suppression
+from fairlendkit.metrics.bootstrap import bootstrap_index_draws
 
 
 class ScoreType(StrEnum):
@@ -146,9 +146,16 @@ class ReleasedRiskBand(StrictModel):
         if self.state == "suppressed":
             if any(value is not None for value in exact):
                 raise ValueError("suppressed score band cannot expose exact evidence")
-            if self.count_bucket != f"0..{self.minimum_report_cell_count - 1}":
+            expected_bucket = (
+                f"0..{self.minimum_report_cell_count - 1}"
+                if self.reason_code == "ad_sparse_report_cell"
+                else "hidden"
+            )
+            if self.count_bucket != expected_bucket:
                 raise ValueError("suppressed score band requires canonical count bucket")
-            if self.reason_code != "ad_sparse_report_cell":
+            if self.reason_code not in {
+                "ad_sparse_report_cell", "ad_complementary_suppression"
+            }:
                 raise ValueError("suppressed score band requires canonical reason")
         elif self.state == "published":
             if self.entity_count is None or self.entity_count < self.minimum_report_cell_count:
@@ -167,6 +174,45 @@ class LiftCapture(StrictModel):
     bad_capture: MetricValue
     selected_bad_rate: MetricValue
     lift: MetricValue
+
+
+class ReleasedLiftCapture(StrictModel):
+    state: str
+    requested_fraction: float
+    minimum_report_cell_count: int = Field(ge=10)
+    achieved_weight_fraction: float | None = None
+    entity_count: int | None = None
+    bad_capture: MetricValue | None = None
+    selected_bad_rate: MetricValue | None = None
+    lift: MetricValue | None = None
+    count_bucket: str | None = None
+    reason_code: str | None = None
+
+    @model_validator(mode="after")
+    def validate_disclosure(self) -> "ReleasedLiftCapture":
+        exact = (
+            self.achieved_weight_fraction, self.entity_count, self.bad_capture,
+            self.selected_bad_rate, self.lift,
+        )
+        if self.state == "suppressed":
+            if any(value is not None for value in exact):
+                raise ValueError("suppressed lift evidence cannot expose exact values")
+            if self.count_bucket not in {
+                f"0..{self.minimum_report_cell_count - 1}", "hidden"
+            }:
+                raise ValueError("suppressed lift evidence requires canonical bucket")
+            if self.reason_code not in {
+                "ad_sparse_report_cell", "ad_complementary_suppression"
+            }:
+                raise ValueError("suppressed lift evidence requires canonical reason")
+        elif self.state == "published":
+            if self.entity_count is None or self.entity_count < self.minimum_report_cell_count:
+                raise ValueError("published lift evidence must meet disclosure minimum")
+            if self.count_bucket is not None or self.reason_code is not None:
+                raise ValueError("published lift evidence cannot carry suppression metadata")
+        else:
+            raise ValueError("lift release state must be published or suppressed")
+        return self
 
 
 class RiskDiagnostics(StrictModel):
@@ -240,6 +286,7 @@ class ReleasedBootstrapEvidence(StrictModel):
 
 class ReleasedRiskDiagnostics(RiskDiagnostics):
     bands: tuple[ReleasedRiskBand, ...]
+    lift_capture: tuple[ReleasedLiftCapture, ...]
     bootstrap: tuple[ReleasedBootstrapEvidence, ...]
 
 
@@ -283,16 +330,23 @@ def build_risk_diagnostic_release(
             count_bucket=f"0..{config.minimum_report_cell_count - 1}",
             reason_code="ad_sparse_report_cell",
         )
+    band_disclosure, lift_disclosure = _risk_disclosure(entities, config)
     released_bands = tuple(
-        _release_band(band, config.minimum_report_cell_count)
-        for band in diagnostics.bands
+        _release_band(band, band_disclosure[index], config.minimum_report_cell_count)
+        for index, band in enumerate(diagnostics.bands)
+    )
+    released_lift = tuple(
+        _release_lift(item, lift_disclosure[index], config.minimum_report_cell_count)
+        for index, item in enumerate(diagnostics.lift_capture)
     )
     released_bootstrap = tuple(
-        _release_bootstrap(item, released_bands) for item in diagnostics.bootstrap
+        _release_bootstrap(item, released_bands, released_lift)
+        for item in diagnostics.bootstrap
     )
     released = ReleasedRiskDiagnostics(
-        **diagnostics.model_dump(exclude={"bands", "bootstrap"}),
+        **diagnostics.model_dump(exclude={"bands", "lift_capture", "bootstrap"}),
         bands=released_bands,
+        lift_capture=released_lift,
         bootstrap=released_bootstrap,
     )
     return RiskDiagnosticRelease(
@@ -303,12 +357,12 @@ def build_risk_diagnostic_release(
     )
 
 
-def _release_band(band: RiskBand, minimum: int) -> ReleasedRiskBand:
-    if band.entity_count < minimum:
+def _release_band(band: RiskBand, evidence, minimum: int) -> ReleasedRiskBand:
+    if evidence.state.value == "suppressed":
         return ReleasedRiskBand(
             state="suppressed", lower=band.lower, upper=band.upper,
             minimum_report_cell_count=minimum,
-            count_bucket=f"0..{minimum - 1}", reason_code="ad_sparse_report_cell",
+            count_bucket=evidence.count_bucket, reason_code=evidence.reason_code,
         )
     return ReleasedRiskBand(
         state="published", lower=band.lower, upper=band.upper,
@@ -321,8 +375,79 @@ def _release_band(band: RiskBand, minimum: int) -> ReleasedRiskBand:
     )
 
 
+def _release_lift(item, evidence, minimum):
+    if evidence.state.value == "suppressed":
+        return ReleasedLiftCapture(
+            state="suppressed", requested_fraction=item.requested_fraction,
+            minimum_report_cell_count=minimum, count_bucket=evidence.count_bucket,
+            reason_code=evidence.reason_code,
+        )
+    return ReleasedLiftCapture(
+        state="published", minimum_report_cell_count=minimum, **item.model_dump()
+    )
+
+
+def _risk_disclosure(entities, config):
+    """Reuse AD-1's joint equations across bands and lift/capture views."""
+
+    overall = frozenset(item.entity_id for item in entities)
+    buckets = [set() for _ in range(len(config.score_band_edges) + 1)]
+    favorable = {(type(value), value) for value in config.favorable_outcome_labels}
+    unfavorable = {(type(value), value) for value in config.unfavorable_outcome_labels}
+    prepared = []
+    for item in entities:
+        if not item.label_mature or item.censored:
+            continue
+        if (type(item.outcome), item.outcome) not in favorable | unfavorable:
+            continue
+        risk = item.score if config.score_target == ScoreTarget.UNFAVORABLE else (
+            1 - item.score if config.score_type == ScoreType.PROBABILITY else -item.score
+        )
+        index = 0
+        while index < len(config.score_band_edges) and risk >= config.score_band_edges[index]:
+            index += 1
+        buckets[index].add(item.entity_id)
+        if item.weight > 0:
+            prepared.append((item.entity_id, risk, item.weight))
+    lift_members = []
+    total_weight = sum(row[2] for row in prepared)
+    groups = defaultdict(list)
+    for row in prepared:
+        groups[row[1]].append(row)
+    ordered = [groups[score] for score in sorted(groups, reverse=True)]
+    for fraction in config.top_fractions:
+        selected = []
+        cumulative = 0.0
+        for block in ordered:
+            selected.extend(block)
+            cumulative += sum(row[2] for row in block)
+            if cumulative >= fraction * total_weight:
+                break
+        lift_members.append(frozenset(row[0] for row in selected))
+    cells = (_CountCell("risk.population", "overall", overall, True),) + tuple(
+        _CountCell("risk.score_band", str(index), frozenset(members))
+        for index, members in enumerate(buckets)
+    ) + tuple(
+        _CountCell("risk.lift_capture", str(index), members)
+        for index, members in enumerate(lift_members)
+    )
+    release = _apply_suppression(
+        cells, config.minimum_report_cell_count, frozenset()
+    )
+    by_identity = {(item.table_id, item.cell_id): item for item in release.cells}
+    band_release = tuple(
+        by_identity[("risk.score_band", str(index))] for index in range(len(buckets))
+    )
+    lift_release = tuple(
+        by_identity[("risk.lift_capture", str(index))]
+        for index in range(len(lift_members))
+    )
+    return band_release, lift_release
+
+
 def _release_bootstrap(
-    evidence: BootstrapEvidence, bands: tuple[ReleasedRiskBand, ...]
+    evidence: BootstrapEvidence, bands: tuple[ReleasedRiskBand, ...],
+    lift: tuple[ReleasedLiftCapture, ...],
 ) -> ReleasedBootstrapEvidence:
     parts = evidence.metric_key.split(".")
     if len(parts) >= 3 and parts[0] == "band" and parts[1].isdigit():
@@ -331,6 +456,14 @@ def _release_bootstrap(
             return ReleasedBootstrapEvidence(
                 state="suppressed",
                 metric_key=evidence.metric_key,
+                reason_code="ad_sparse_report_cell",
+            )
+    if len(parts) >= 3 and parts[0] == "top":
+        requested = float(parts[1])
+        item = next((value for value in lift if value.requested_fraction == requested), None)
+        if item is not None and item.state == "suppressed":
+            return ReleasedBootstrapEvidence(
+                state="suppressed", metric_key=evidence.metric_key,
                 reason_code="ad_sparse_report_cell",
             )
     return ReleasedBootstrapEvidence(state="published", **evidence.model_dump())
@@ -563,10 +696,19 @@ def _bootstrap_evidence(rows, config):
     for fraction in config.top_fractions:
         for suffix in ("bad_capture", "selected_bad_rate", "lift"):
             values[f"top.{fraction:g}.{suffix}"]
+    bad_draws = bootstrap_index_draws(
+        len(bad), config.bootstrap_resamples, seed=config.bootstrap_seed,
+        metric_key="ad3.entity_stratified", stream_role="comparison",
+    )
+    good_draws = bootstrap_index_draws(
+        len(good), config.bootstrap_resamples, seed=config.bootstrap_seed,
+        metric_key="ad3.entity_stratified", stream_role="reference",
+    )
     for replicate in range(config.bootstrap_resamples):
-        digest = hashlib.sha256(f"ad3|{config.bootstrap_seed}|{replicate}".encode()).digest()
-        rng = random.Random(int.from_bytes(digest, "big"))
-        sample = [rng.choice(bad) for _ in bad] + [rng.choice(good) for _ in good]
+        sample = (
+            [bad[index] for index in bad_draws[replicate]]
+            + [good[index] for index in good_draws[replicate]]
+        )
         sample_bad = sum(row[3] for row in sample if row[2])
         sample_good = sum(row[3] for row in sample if not row[2])
         if not sample or sample_bad <= 0 or sample_good <= 0:
