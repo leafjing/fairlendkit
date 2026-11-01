@@ -49,14 +49,26 @@ reproducibility still depends on preserving the exact input data and config.
 
 ## Does FairLendKit include threshold optimization or mitigation?
 
-No. Threshold scanning, fairness-performance frontiers, mitigation,
-reweighing, threshold recommendations, and model retraining remain outside the
-implemented core.
+No. Milestone 5 is implementing a descriptive scan of explicitly configured
+candidate thresholds and a fairness-accuracy frontier, but it will not optimize,
+recommend, or deploy a threshold. Mitigation, reweighing, threshold
+recommendations, and model retraining remain outside the implemented core.
+
+## How should I interpret a threshold scan?
+
+Each candidate applies the configured inclusive score direction to the same
+validated audit population, then recomputes counterfactual decision metrics.
+The ordinary audit still uses its configured observed or derived decision
+source. A frontier point shows a non-dominated trade-off among the contract's
+fixed accuracy and disparity axes; it does not mean “best,” “fair,” lawful, or
+appropriate for production. Undefined and unreliable points remain visible but
+are ineligible for the frontier.
 
 ## Does it provide HTML reports, CSV reports, or a CLI?
 
-No. The current public API returns a renderer-neutral typed result and canonical
-JSON. HTML/CSV renderers and a command-line interface are roadmap items.
+Yes. The `fairlendkit audit` command writes canonical JSON, metrics CSV, and a
+self-contained HTML report from one typed audit result. These formats present
+the same analysis and do not independently recompute metrics.
 
 ## How should I cite it?
 
