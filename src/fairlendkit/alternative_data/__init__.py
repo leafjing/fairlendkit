@@ -34,6 +34,15 @@ from fairlendkit.alternative_data.reasons import (
     AlternativeDataReasonCode,
     make_evidence,
 )
+from fairlendkit.alternative_data.quality import (
+    AlternativeDataQualityResult,
+    ProviderCoverage,
+    QualityPopulationEntity,
+    QualityReasonCount,
+    QualityScopeKind,
+    QualityScopeResult,
+    calculate_quality_evidence,
+)
 
 __all__ = [
     "AcquisitionMethod",
@@ -43,6 +52,7 @@ __all__ = [
     "AlternativeDataConfig",
     "AlternativeDataEvidence",
     "AlternativeDataReasonCode",
+    "AlternativeDataQualityResult",
     "AlternativeDataSource",
     "CashFlowEventType",
     "CreditCoverage",
@@ -50,6 +60,11 @@ __all__ = [
     "GateDisposition",
     "LeakageDecision",
     "ObservationWindow",
+    "ProviderCoverage",
+    "QualityPopulationEntity",
+    "QualityReasonCount",
+    "QualityScopeKind",
+    "QualityScopeResult",
     "RecordStatus",
     "RentEventType",
     "DisclosureState",
@@ -62,6 +77,7 @@ __all__ = [
     "evaluate_credit_coverage",
     "evaluate_outcome_record",
     "evaluate_source_completion",
+    "calculate_quality_evidence",
     "make_evidence",
     "select_authoritative_feature_records",
 ]

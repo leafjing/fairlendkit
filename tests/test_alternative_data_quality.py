@@ -1,0 +1,261 @@
+from datetime import UTC, datetime
+
+import pytest
+
+from fairlendkit.alternative_data import (
+    AlternativeDataConfig,
+    AlternativeDataReasonCode,
+    AlternativeDataSource,
+    CreditCoverage,
+    ObservationWindow,
+    QualityPopulationEntity,
+    SignalRecord,
+    calculate_quality_evidence,
+)
+
+
+def source(**overrides):
+    values = {
+        "source_id": "cash-source",
+        "signal_family": "cash_flow",
+        "provider_id": "provider-a",
+        "acquisition_method": "consumer_permissioned",
+        "permission_reference": "governance-reference",
+        "coverage_start": "2025-01-01T00:00:00Z",
+        "coverage_end": "2026-01-01T00:00:00Z",
+        "refresh_cadence": "P1D",
+        "source_timezone": "UTC",
+        "currency_policy": "single_currency",
+        "default_currency": "USD",
+        "source_version": "v1",
+    }
+    values.update(overrides)
+    return AlternativeDataSource(**values)
+
+
+def config(**overrides):
+    values = {
+        "sources": (source(),),
+        "observation_window": ObservationWindow(
+            as_of_time="2026-01-01T00:00:00Z",
+            feature_start="2025-01-01T00:00:00Z",
+            feature_end="2026-01-01T00:00:00Z",
+            performance_start="2026-01-02T00:00:00Z",
+            performance_end="2026-01-31T00:00:00Z",
+            label_maturity_time="2026-02-01T00:00:00Z",
+            outcome_definition="Explicit observed outcome",
+        ),
+        "execution_time": "2026-02-01T00:00:00Z",
+        "allowed_coverage_strata": ("limited", "established"),
+        "minimum_report_cell_count": 10,
+    }
+    values.update(overrides)
+    return AlternativeDataConfig(**values)
+
+
+def entity(entity_id, group):
+    return QualityPopulationEntity(
+        entity_id=entity_id,
+        audit_groups={"audit_group": group},
+    )
+
+
+def coverage(entity_id, stratum="limited", **overrides):
+    values = {
+        "entity_id": entity_id,
+        "coverage_stratum": stratum,
+        "definition_id": "coverage-v1",
+        "assessed_at": "2025-12-01T00:00:00Z",
+        "evidence_available": True,
+    }
+    values.update(overrides)
+    return CreditCoverage(**values)
+
+
+def record(record_id, **overrides):
+    values = {
+        "entity_id": "entity-secret-1",
+        "record_id": record_id,
+        "source_id": "cash-source",
+        "signal_family": "cash_flow",
+        "event_type": "inflow",
+        "event_time": "2025-12-01T00:00:00Z",
+        "observed_at": "2025-12-01T00:00:00Z",
+        "amount": "100.00",
+        "currency": "USD",
+        "status": "posted",
+        "source_version": "v1",
+    }
+    values.update(overrides)
+    return SignalRecord(**values)
+
+
+def reason_map(scope):
+    return {reason.code: reason.count for reason in scope.reasons}
+
+
+def test_quality_engine_assembles_eligibility_coverage_and_group_evidence():
+    entities = (
+        entity("entity-secret-1", "A"),
+        entity("entity-secret-2", "B"),
+    )
+    records = (
+        record("original"),
+        record(
+            "revision",
+            revision_of="original",
+            observed_at="2025-12-02T00:00:00Z",
+        ),
+        record("pending", status="pending"),
+        record("late", observed_at="2026-01-02T00:00:00Z"),
+        record("wrong-currency", currency="EUR"),
+    )
+    result = calculate_quality_evidence(
+        entities=entities,
+        records=records,
+        coverages=(coverage("entity-secret-1"),),
+        config=config(),
+    )
+
+    overall = result.scopes[0]
+    assert result.population_count == 2
+    assert overall.input_record_count == 5
+    assert overall.authoritative_record_count == 1
+    assert overall.eligible_record_count == 2
+    assert overall.excluded_record_count == 2
+    assert overall.unavailable_record_count == 1
+    assert overall.unavailable_entity_count == 1
+    assert overall.revision_count == 1
+    assert overall.providers[0].entity_coverage_rate == 0.5
+    assert overall.providers[0].source_id == "cash-source"
+    assert overall.providers[0].signal_family == "cash_flow"
+    assert overall.observation_start == datetime(2025, 12, 1, tzinfo=UTC)
+    assert overall.refresh_lag_seconds == 30 * 24 * 60 * 60
+
+    reasons = reason_map(overall)
+    assert reasons[AlternativeDataReasonCode.OBSERVED_AFTER_DECISION] == 1
+    assert reasons[AlternativeDataReasonCode.CURRENCY_INCONSISTENT] == 1
+    assert reasons[AlternativeDataReasonCode.PENDING_RECORD] == 1
+    assert reasons[AlternativeDataReasonCode.SIGNAL_NOT_PROVIDED] == 1
+    assert reasons[AlternativeDataReasonCode.COVERAGE_STRATUM_UNAVAILABLE] == 1
+
+    scope_keys = tuple(scope.scope_key for scope in result.scopes)
+    assert scope_keys[0] == "overall"
+    assert len([key for key in scope_keys if key.startswith("coverage.")]) == 3
+    assert len([key for key in scope_keys if key.startswith("group.")]) == 2
+
+
+def test_missing_signal_is_unavailable_and_never_becomes_adverse_behavior():
+    result = calculate_quality_evidence(
+        entities=(entity("entity-secret-2", "B"),),
+        records=(),
+        coverages=(),
+        config=config(),
+    )
+    overall = result.scopes[0]
+
+    assert overall.input_record_count == 0
+    assert overall.eligible_record_count == 0
+    assert overall.excluded_record_count == 0
+    assert overall.unavailable_record_count == 0
+    assert overall.unavailable_entity_count == 1
+    assert set(reason_map(overall)) == {
+        AlternativeDataReasonCode.COVERAGE_STRATUM_UNAVAILABLE,
+        AlternativeDataReasonCode.SIGNAL_NOT_PROVIDED,
+    }
+
+
+def test_record_with_multiple_exclusion_reasons_counts_once():
+    item = record(
+        "late-wrong-currency",
+        observed_at="2026-01-02T00:00:00Z",
+        currency="EUR",
+    )
+    result = calculate_quality_evidence(
+        entities=(entity("entity-secret-1", "A"),),
+        records=(item,),
+        coverages=(coverage("entity-secret-1"),),
+        config=config(),
+    )
+    overall = result.scopes[0]
+
+    assert overall.excluded_record_count == 1
+    assert reason_map(overall)[AlternativeDataReasonCode.CURRENCY_INCONSISTENT] == 1
+    assert reason_map(overall)[AlternativeDataReasonCode.OBSERVED_AFTER_DECISION] == 1
+
+
+def test_period_overlap_and_gap_are_typed_observations():
+    records = (
+        record(
+            "period-1",
+            event_time=None,
+            period_start="2025-01-01T00:00:00Z",
+            period_end="2025-01-31T00:00:00Z",
+        ),
+        record(
+            "period-overlap",
+            event_time=None,
+            period_start="2025-01-15T00:00:00Z",
+            period_end="2025-02-15T00:00:00Z",
+        ),
+        record(
+            "period-gap",
+            event_time=None,
+            period_start="2025-03-01T00:00:00Z",
+            period_end="2025-03-31T00:00:00Z",
+        ),
+    )
+    result = calculate_quality_evidence(
+        entities=(entity("entity-secret-1", "A"),),
+        records=records,
+        coverages=(coverage("entity-secret-1"),),
+        config=config(),
+    )
+    reasons = reason_map(result.scopes[0])
+
+    assert reasons[AlternativeDataReasonCode.PERIOD_OVERLAP] == 2
+    assert reasons[AlternativeDataReasonCode.TEMPORAL_GAP] == 1
+    assert result.scopes[0].excluded_record_count == 0
+
+
+def test_quality_output_is_deterministic_and_contains_no_consumer_identity():
+    entities = (
+        entity("entity-secret-1", "A"),
+        entity("entity-secret-2", "B"),
+    )
+    records = (record("one"),)
+    coverages = (coverage("entity-secret-1"),)
+    first = calculate_quality_evidence(
+        entities=entities,
+        records=records,
+        coverages=coverages,
+        config=config(),
+    )
+    second = calculate_quality_evidence(
+        entities=reversed(entities),
+        records=reversed(records),
+        coverages=reversed(coverages),
+        config=config(),
+    )
+
+    assert first.model_dump_json() == second.model_dump_json()
+    serialized = first.model_dump_json()
+    assert "entity-secret-1" not in serialized
+    assert "entity-secret-2" not in serialized
+    assert "record_id" not in serialized
+
+
+def test_quality_engine_fails_closed_on_future_evidence():
+    with pytest.raises(ValueError, match="ad_future_timestamp"):
+        calculate_quality_evidence(
+            entities=(entity("entity-secret-1", "A"),),
+            records=(
+                record(
+                    "future",
+                    event_time="2026-02-02T00:00:00Z",
+                    observed_at="2026-02-02T00:00:00Z",
+                ),
+            ),
+            coverages=(coverage("entity-secret-1"),),
+            config=config(),
+        )
