@@ -189,9 +189,9 @@ def _retrieve_once(
         "states": [{"state": "prepared", "at": timestamp.isoformat()}],
     }
     _exclusive_json(audit_path, audit)
-    run_dir.mkdir(mode=0o700)
     partial = run_dir / "package.zip.partial"
     try:
+        run_dir.mkdir(mode=0o700)
         _transition(audit_path, audit, "started", timestamp)
         metadata = _download(partial, transport, policy)
         members = _validate_and_extract(partial, run_dir, policy)
@@ -208,11 +208,26 @@ def _retrieve_once(
         _transition(audit_path, audit, "succeeded", timestamp)
         return result
     except BaseException as error:
-        _remove_run_bytes(run_dir)
         audit["failure_reason"] = _safe_failure(error)
-        audit["cleanup_completed"] = not run_dir.exists()
         audit["retention_deadline"] = (timestamp + timedelta(days=30)).isoformat()
+        try:
+            _remove_run_bytes(run_dir)
+            audit["cleanup_completed"] = not run_dir.exists()
+            audit["remaining_bytes_state"] = (
+                "absent" if audit["cleanup_completed"] else "present"
+            )
+        except BaseException as cleanup_error:
+            audit["cleanup_completed"] = False
+            audit["cleanup_failure_reason"] = _safe_failure(cleanup_error)
+            try:
+                audit["remaining_bytes_state"] = (
+                    "present" if run_dir.exists() else "absent"
+                )
+            except BaseException:
+                audit["remaining_bytes_state"] = "unknown"
         _transition(audit_path, audit, "failed", timestamp)
+        if audit["cleanup_completed"]:
+            _transition(audit_path, audit, "cleaned", timestamp)
         raise
 
 

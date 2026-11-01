@@ -94,7 +94,10 @@ def assert_failed_once(tmp_path, *, data=None, responses=None, test_policy=None,
         )
     assert not (quarantine / run_id).exists()
     assert (audit / f"{run_id}.spent").stat().st_mode & 0o777 == 0o400
-    assert json.loads((audit / f"{run_id}.json").read_text())["states"][-1]["state"] == "failed"
+    payload = json.loads((audit / f"{run_id}.json").read_text())
+    assert [item["state"] for item in payload["states"]][-2:] == ["failed", "cleaned"]
+    assert payload["cleanup_completed"] is True
+    assert payload["remaining_bytes_state"] == "absent"
     calls = len(transport.calls)
     with pytest.raises(FileExistsError):
         harness._retrieve_once(
@@ -336,6 +339,72 @@ def test_roots_and_run_ids_fail_before_network(tmp_path):
             policy=policy(data),
         )
     assert transport.calls == []
+
+
+def test_cleanup_failure_preserves_original_failure_and_audits_remaining_bytes(
+    tmp_path, monkeypatch
+):
+    data = archive_bytes()
+    quarantine, audit = roots(tmp_path)
+    transport = FakeTransport([RuntimeError("original download failure")])
+
+    def fail_cleanup(run_dir):
+        raise OSError("injected cleanup failure")
+
+    monkeypatch.setattr(harness, "_remove_run_bytes", fail_cleanup)
+    with pytest.raises(RuntimeError, match="original download failure"):
+        harness._retrieve_once(
+            run_id="cleanup-failure",
+            quarantine_root=quarantine,
+            audit_root=audit,
+            transport=transport,
+            policy=policy(data),
+        )
+
+    payload = json.loads((audit / "cleanup-failure.json").read_text())
+    assert payload["states"][-1]["state"] == "failed"
+    assert payload["failure_reason"] == "RuntimeError: original download failure"
+    assert payload["cleanup_completed"] is False
+    assert payload["cleanup_failure_reason"] == "OSError: injected cleanup failure"
+    assert payload["remaining_bytes_state"] == "present"
+    assert (quarantine / "cleanup-failure").is_dir()
+    assert (audit / "cleanup-failure.spent").is_file()
+
+
+def test_run_directory_creation_failure_reaches_cleaned_terminal_state(
+    tmp_path, monkeypatch
+):
+    data = archive_bytes()
+    quarantine, audit = roots(tmp_path)
+    transport = FakeTransport([response(data)])
+    run_dir = quarantine / "mkdir-failure"
+    original_mkdir = Path.mkdir
+
+    def fail_target_mkdir(path, *args, **kwargs):
+        if path == run_dir:
+            raise OSError("injected mkdir failure")
+        return original_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", fail_target_mkdir)
+    with pytest.raises(OSError, match="injected mkdir failure"):
+        harness._retrieve_once(
+            run_id="mkdir-failure",
+            quarantine_root=quarantine,
+            audit_root=audit,
+            transport=transport,
+            policy=policy(data),
+        )
+
+    payload = json.loads((audit / "mkdir-failure.json").read_text())
+    assert [item["state"] for item in payload["states"]] == [
+        "prepared",
+        "failed",
+        "cleaned",
+    ]
+    assert payload["cleanup_completed"] is True
+    assert payload["remaining_bytes_state"] == "absent"
+    assert transport.calls == []
+    assert (audit / "mkdir-failure.spent").is_file()
 
 
 class FakeInspector:
