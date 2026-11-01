@@ -163,8 +163,7 @@ def test_utility_oracle_uses_linked_adjustments_and_explicit_payments():
     )
     profile = _calculate_utility_profile(rows, config=config("utility"))
     assert profile.original_billed_amount == Decimal("300")
-    # The architecture example currently contains a documented arithmetic typo:
-    # 100 + 120 + (80 - 20) is 280, not 260.
+    # Decimal arithmetic matches the corrected normative oracle.
     assert profile.net_adjusted_obligation == Decimal("280")
     assert profile.linked_payment_amount == Decimal("280")
     assert profile.fully_paid_rate == Decimal(1)
