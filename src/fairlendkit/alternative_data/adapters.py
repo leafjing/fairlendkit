@@ -94,17 +94,18 @@ def _adapt(
             supplied = payload.setdefault(name, expected)
             if supplied != expected:
                 raise ValueError(f"adapter {name} must match its source contract")
+        validation_code: AlternativeDataReasonCode | None = None
         try:
             records.append(SignalRecord.model_validate(payload))
         except ValidationError as error:
             errors = error.errors(include_input=False, include_url=False)
             locations = {tuple(item["loc"]) for item in errors}
             if ("event_type",) in locations:
-                code = AlternativeDataReasonCode.UNSUPPORTED_EVENT_TYPE
+                validation_code = AlternativeDataReasonCode.UNSUPPORTED_EVENT_TYPE
             elif ("amount",) in locations:
-                code = AlternativeDataReasonCode.INVALID_AMOUNT
+                validation_code = AlternativeDataReasonCode.INVALID_AMOUNT
             elif ("currency",) in locations:
-                code = AlternativeDataReasonCode.CURRENCY_MISSING
+                validation_code = AlternativeDataReasonCode.CURRENCY_MISSING
             elif locations & {
                 ("entity_id",),
                 ("record_id",),
@@ -117,10 +118,13 @@ def _adapt(
                 ("provider_id",),
                 ("service_type",),
             }:
-                code = AlternativeDataReasonCode.INVALID_IDENTIFIER
+                validation_code = AlternativeDataReasonCode.INVALID_IDENTIFIER
             else:
                 # Root/conditional validation errors are deliberately collapsed to
                 # one stable code. Never expose Pydantic's input_value rendering.
-                code = AlternativeDataReasonCode.MISSING_REQUIRED_FIELD
-            raise ValueError(code.value) from None
+                validation_code = AlternativeDataReasonCode.MISSING_REQUIRED_FIELD
+        # Raise outside the except suite so neither __cause__ nor __context__ can
+        # retain Pydantic's input-bearing ValidationError.
+        if validation_code is not None:
+            raise ValueError(validation_code.value)
     return tuple(records)

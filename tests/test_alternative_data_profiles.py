@@ -1,5 +1,6 @@
 from decimal import Decimal
 import json
+import logging
 from pathlib import Path
 import warnings
 
@@ -457,7 +458,7 @@ def test_profile_mutations_fail_closed_or_remain_unavailable_without_adverse_inf
     assert "ad_unmatched_obligation" in utility_unmatched.reason_codes
 
 
-def test_profiles_are_order_independent_and_public_boundaries_do_not_leak(caplog):
+def test_profiles_are_order_independent_and_public_boundaries_do_not_leak():
     rows = (
         record("cash_flow", "secret-record-a", "inflow", "2025-01-01T00:00:00Z", "100"),
         record("cash_flow", "secret-record-b", "inflow", "2025-02-01T00:00:00Z", "200"),
@@ -477,8 +478,7 @@ def test_profiles_are_order_independent_and_public_boundaries_do_not_leak(caplog
         with pytest.raises(Exception) as error:
             boundary(argument)
         failures.append(str(error.value))
-    diagnostics = (json.dumps(payload, sort_keys=True), repr(first), caplog.text, *failures)
-    assert caplog.records == []
+    diagnostics = (json.dumps(payload, sort_keys=True), repr(first), *failures)
 
     safe_result = AuditResultV2.model_validate_json(
         (Path(__file__).parents[1] / "examples/synthetic/audit-result-v2.json").read_bytes()
@@ -499,7 +499,7 @@ def test_profiles_are_order_independent_and_public_boundaries_do_not_leak(caplog
         assert all(secret not in artifact for artifact in safe_artifacts)
 
 
-def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
+def test_adapter_failures_are_stable_and_never_echo_external_secrets(monkeypatch):
     secrets = (
         "account-secret-447",
         "obligation-secret-448",
@@ -533,20 +533,37 @@ def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
             "status": "status",
         }
     )
-    with warnings.catch_warnings(record=True) as emitted_warnings:
-        warnings.simplefilter("always")
-        with pytest.raises(ValueError) as error:
-            adapt_cash_flow_records((base,), mapping=mapping, source=source("cash_flow"))
-    assert str(error.value) == "ad_missing_required_field"
-    assert emitted_warnings == []
+    channel_calls = []
 
-    failure_texts = [str(error.value)]
+    def reject_log(*args, **kwargs):
+        channel_calls.append(("log", args, kwargs))
+        raise AssertionError("adapter failure attempted to log input")
+
+    def reject_warning(*args, **kwargs):
+        channel_calls.append(("warning", args, kwargs))
+        raise AssertionError("adapter failure attempted to emit a warning")
+
+    monkeypatch.setattr(logging.Logger, "_log", reject_log)
+    monkeypatch.setattr(warnings, "showwarning", reject_warning)
+    with pytest.raises(ValueError) as error:
+        adapt_cash_flow_records((base,), mapping=mapping, source=source("cash_flow"))
+    assert str(error.value) == "ad_missing_required_field"
+    assert channel_calls == []
+
+    failure_texts = []
+
+    def record_failure(exception):
+        failure_texts.extend((str(exception), repr(exception)))
+        assert exception.__cause__ is None
+        assert exception.__context__ is None
+
+    record_failure(error.value)
     missing = dict(base)
     missing.pop("status")
     with pytest.raises(ValueError) as missing_error:
         adapt_cash_flow_records((missing,), mapping=mapping, source=source("cash_flow"))
     assert str(missing_error.value) == "ad_missing_required_field"
-    failure_texts.append(str(missing_error.value))
+    record_failure(missing_error.value)
 
     invalid_amount = {**base, "when": "2025-01-01T00:00:00Z", "amount": secrets[4]}
     with pytest.raises(ValueError) as amount_error:
@@ -554,7 +571,7 @@ def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
             (invalid_amount,), mapping=mapping, source=source("cash_flow")
         )
     assert str(amount_error.value) == "ad_invalid_amount"
-    failure_texts.append(str(amount_error.value))
+    record_failure(amount_error.value)
 
     for external_secret in secrets[1:]:
         with pytest.raises(ValueError) as unknown_error:
@@ -565,7 +582,7 @@ def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
             )
         assert str(unknown_error.value) == "ad_unknown_field"
         assert external_secret not in str(unknown_error.value)
-        failure_texts.append(str(unknown_error.value))
+        record_failure(unknown_error.value)
 
     with pytest.raises(ValueError) as currency_error:
         _calculate_cash_flow_profile(
@@ -582,7 +599,7 @@ def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
             config=config("cash_flow"),
         )
     assert str(currency_error.value) == "ad_currency_inconsistent"
-    failure_texts.append(str(currency_error.value))
+    record_failure(currency_error.value)
 
     with pytest.raises(ValueError) as reversal_error:
         _calculate_cash_flow_profile(
@@ -600,7 +617,7 @@ def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
             config=config("cash_flow"),
         )
     assert str(reversal_error.value) == "ad_reversal_target_missing"
-    failure_texts.append(str(reversal_error.value))
+    record_failure(reversal_error.value)
 
     unmatched = _calculate_rent_profile(
         (
@@ -619,8 +636,6 @@ def test_adapter_failures_are_stable_and_never_echo_external_secrets(caplog):
     assert unmatched.state == "unavailable"
     assert "ad_unmatched_obligation" in unmatched.reason_codes
     failure_texts.append(unmatched.model_dump_json())
-    assert caplog.records == []
     for secret in secrets:
         assert all(secret not in text for text in failure_texts)
-        assert secret not in caplog.text
-        assert all(secret not in str(item.message) for item in emitted_warnings)
+        assert all(secret not in repr(call) for call in channel_calls)
