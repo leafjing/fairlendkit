@@ -64,6 +64,23 @@ and other direct identifiers are not required by the analytical contract and
 must not appear in report artifacts. Reports retain aggregate evidence and
 source/provenance references only.
 
+### Disclosure suppression
+
+`minimum_report_cell_count` is required and must be at least `10`. It applies to
+raw distinct-entity counts, regardless of weights. Any group, intersection,
+provider, coverage-stratum, score-band, or proxy cell below the threshold is
+serialized with `state="suppressed"`, null value/numerator/denominator/interval,
+and reason `ad_sparse_report_cell`; only the bucket
+`0..minimum_report_cell_count-1` is exposed, not the exact count.
+
+If totals and remaining cells could reveal a suppressed value by subtraction,
+the smallest otherwise publishable sibling is also suppressed with
+`ad_complementary_suppression`; ties use canonical group order. Suppression is
+applied to canonical JSON before CSV/HTML rendering, so no renderer has access
+to the hidden values. Suppressed evidence cannot create a screening flag or a
+reliability pass. Internal calculation may support testing but must not be
+logged, placed in exceptions, fingerprints, or report metadata.
+
 ## Common data-quality evidence
 
 Each signal family reports, overall and by declared credit-coverage and audit
@@ -146,6 +163,10 @@ maturity, censoring/unavailable counts, and population denominators. It does not
 compare models trained on different populations without an explicit compatible
 evaluation population.
 
+The normative [alternative-data credit-risk metric contract](alternative-data-risk-metrics.md)
+fixes applicability, direction, weighting, ties, formulas, and gates. AD-3 must
+not begin until that independent contract is approved.
+
 ## Fairness and coverage analysis
 
 Fairness evidence covers three distinct stages and never collapses them:
@@ -184,6 +205,11 @@ The first contract must include:
 No single association statistic is labeled a proxy verdict. Features derived
 from geography, service availability, payment channel, household context, or
 provider identity require explicit contextual limitations.
+
+The normative [potential proxy-risk screening contract](alternative-data-proxy-screening.md)
+fixes candidate exclusions, entity/time isolation, baselines, metrics,
+thresholds, folds, high-cardinality behavior, and flags. AD-4 proxy work must
+not begin until that independent contract is approved.
 
 ## Result and reporting boundary
 

@@ -6,11 +6,12 @@ FairLendKit is an open-source, credit-specific audit framework for examining gro
 
 FairLendKit exists because general-purpose fairness libraries expose useful metrics but do not, by themselves, provide the semantic checks, credit-specific workflow, uncertainty context, provenance, and reporting boundaries needed for a defensible practitioner review. The project connects those pieces without turning a statistical screen into a legal conclusion.
 
-Milestone 5 prioritizes alternative-data credit assessment for consumers with
-limited traditional credit-file coverage. It adds explicit support for
+Milestone 5 is developing alternative-data credit assessment for consumers with
+limited traditional credit-file coverage. It will add explicit support for
 cash-flow, rent, and utility-payment evidence, including longitudinal data
 quality, leakage-safe performance evaluation, coverage fairness, and potential
-proxy-risk screening. Missing alternative-data coverage is not treated as
+proxy-risk screening. These are not yet released capabilities. The governing
+contract requires that missing alternative-data coverage is never treated as
 negative consumer behavior.
 
 ## Intended users

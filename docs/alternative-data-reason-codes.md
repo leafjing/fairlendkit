@@ -77,6 +77,12 @@ Disposition meanings:
 | `ad_provider_nonparticipation` | unavailable | Provider/landlord does not supply the relevant period. |
 | `ad_pending_record` | unavailable | Record is pending at `as_of_time` and cannot enter behavior totals. |
 | `ad_small_group` | observe | Group support is below the configured reliability minimum. |
+| `ad_sparse_report_cell` | unavailable | Distinct-entity count is below the configured disclosure minimum. |
+| `ad_complementary_suppression` | unavailable | An additional cell is hidden to prevent recovery of a sparse value. |
+| `ad_insufficient_fold_support` | unavailable | Proxy-screening folds do not meet configured entity and class support. |
+| `ad_high_cardinality_unsupported` | unavailable | Candidate categories exceed the configured supported maximum after rare-level mapping. |
+| `ad_proxy_model_nonconvergence` | unavailable | The versioned proxy-screening model did not converge. |
+| `ad_proxy_holdout_unstable` | observe | Temporal-holdout evidence exceeds the configured stability tolerance. |
 
 `ad_signal_not_provided`, `ad_provider_nonparticipation`, and
 `ad_provider_reporting_gap` are availability facts. They must not increment a

@@ -128,8 +128,9 @@ require an explicit `obligation_id`. `service_interruption` and
 
 ## Report-safe projection
 
-Reports may retain source ID/version, provider ID, family, configured category,
-time-window boundaries, aggregate counts, and aggregate metrics. They must drop
+Subject to disclosure suppression, reports may retain source ID/version,
+provider ID, family, configured category, time-window boundaries, aggregate
+count buckets, and aggregate metrics. They must drop
 entity, record, account, obligation-linkage, address, meter, raw description,
 permission token, and free-text fields. Privacy tests must search every JSON,
 CSV, HTML, log, warning, and exception artifact for fixture identifiers.

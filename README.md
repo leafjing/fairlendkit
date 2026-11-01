@@ -138,10 +138,11 @@ Implementation is tracked as ordered, testable work packages in the
 ## Status
 
 Pre-alpha. Milestone 3 core audit engine and reliability contracts are
-implemented. The Milestone 4 candidate adds the installed CLI and JSON, CSV,
-and HTML reporting workflow; it remains subject to independent review and green
-Python 3.11/3.12 CI before closure. Threshold sensitivity and the remaining V1
-workflow are still under development.
+implemented. Milestone 4 is closed: the installed CLI and JSON, CSV, and HTML
+reporting workflow passed independent review and Python 3.11/3.12 CI before PR
+#46 merged. Alternative-data validation, risk analysis, fairness, and
+potential-proxy screening are under active contract development and are not yet
+public capabilities.
 
 ## Milestone 3 release evidence
 
@@ -161,7 +162,7 @@ workflow are still under development.
 The complete checked-in verification record is
 [`docs/milestone-3-release-evidence.md`](docs/milestone-3-release-evidence.md).
 
-The Milestone 4 candidate evidence is recorded in
+The Milestone 4 closure evidence is recorded in
 [`docs/milestone-4-release-evidence.md`](docs/milestone-4-release-evidence.md).
 
 ## Citation

@@ -1,11 +1,15 @@
 # Milestone 4 Release Evidence
 
-## Candidate identity
+## Final release identity
 
 Milestone 4 adds the first installed command-line audit workflow and three
-renderer views of the existing `AuditResult` Schema 2.0. The implementation is
-carried by the `docs/milestone-4-user-workflow` branch and must be reviewed and
-merged before this evidence becomes release evidence for `main`.
+renderer views of the existing `AuditResult` Schema 2.0. The final reviewed
+candidate is `68448f56444dd29ee50a8b64770178fd5f1f4bd0`. PR #46 merged it to
+`main` as `2e1258fc6b970e982d663f4cc2f233b3a63efd17` on 2026-10-16.
+
+Independent review initially requested changes for a cross-runtime one-ULP
+artifact divergence at `99c506a`. Re-review approved `68448f5` after the
+deterministic summation fix and recorded that the golden gate remained intact.
 
 ## Shipped surface
 
@@ -61,8 +65,16 @@ The clean Python 3.12 verification on the implementation candidate reports:
 - discoverability metadata and links verified; and
 - `git diff --check` clean.
 
-CI must independently run the same cumulative gate on Python 3.11 and 3.12
-before merge. A green local runtime is not a substitute for both CI jobs.
+## Independent approval and CI closure
+
+PR run `38854126556` passed jobs `test (3.11)` and `test (3.12)`. After merge,
+push run `38854319516` re-executed the Milestone 4 verifier and Paper 2 freeze
+gate on `2e1258f`; both runtime jobs passed. These approval, merge, and
+pre/post-merge results close Milestone 4.
+
+- PR and review: <https://github.com/leafjing/fairlendkit/pull/46>
+- pre-merge CI: <https://github.com/leafjing/fairlendkit/actions/runs/38854126556>
+- post-merge CI: <https://github.com/leafjing/fairlendkit/actions/runs/38854319516>
 
 ## Scope boundary
 
