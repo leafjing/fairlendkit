@@ -113,6 +113,28 @@ def test_product_packages_do_not_depend_on_research_artifacts():
         ), f"{source_path} imports research-only code"
 
 
+def test_alternative_data_domain_is_dataframe_and_renderer_independent():
+    for source_path in Path("src/fairlendkit/alternative_data").glob("*.py"):
+        tree = ast.parse(source_path.read_text())
+        imported_modules = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+        }
+        imported_modules.update(
+            name.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for name in node.names
+        )
+        forbidden = {"pandas", "numpy", "fairlendkit.cli", "fairlendkit.report"}
+        assert not any(
+            module == root or module.startswith(f"{root}.")
+            for module in imported_modules
+            for root in forbidden
+        ), f"{source_path} imports an outer alternative-data dependency"
+
+
 def test_paper2_execution_gate_cannot_compute_dgp_or_statistics():
     source = Path("src/fairlendkit/research/paper2/execution.py").read_text()
 
