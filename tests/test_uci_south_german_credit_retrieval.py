@@ -466,3 +466,62 @@ def test_expired_dirty_and_writable_authorizations_fail_before_network(tmp_path)
             inspector=FakeInspector(),
         )
     assert transport.calls == []
+
+
+def test_authorization_expired_over_24_hours_allows_cleanup_but_never_network_or_retry(
+    tmp_path,
+):
+    quarantine, audit = roots(tmp_path)
+    now = harness.datetime.now(harness.UTC)
+    issued = now - harness.timedelta(hours=27)
+    payload = authorization_payload(quarantine, audit, issued)
+    payload["expires_at"] = (issued + harness.timedelta(hours=1)).isoformat()
+    authorization = write_authorization(tmp_path, payload)
+
+    run_id = payload["run_id"]
+    run_dir = quarantine / run_id
+    run_dir.mkdir(mode=0o700)
+    retained = run_dir / "package.zip"
+    retained.write_bytes(b"quarantined fixture")
+    os.chmod(retained, 0o400)
+    (audit / f"{run_id}.spent").write_text("spent\n", encoding="utf-8")
+    os.chmod(audit / f"{run_id}.spent", 0o400)
+    (audit / f"{run_id}.json").write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "retention_deadline": (now - harness.timedelta(seconds=1)).isoformat(),
+                "states": [{"state": "succeeded", "at": issued.isoformat()}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    os.chmod(audit / f"{run_id}.json", 0o600)
+
+    harness.cleanup_authorized(
+        authorization_file=authorization,
+        now=now,
+        inspector=FakeInspector(dirty=True),
+    )
+    assert not run_dir.exists()
+    assert (audit / f"{run_id}.spent").is_file()
+    assert json.loads((audit / f"{run_id}.json").read_text())["states"][-1][
+        "state"
+    ] == "cleaned"
+
+    transport = FakeTransport([])
+    with pytest.raises(ValueError, match="currently valid"):
+        harness.retrieve_authorized(
+            authorization_file=authorization,
+            transport=transport,
+            now=now,
+            inspector=FakeInspector(),
+        )
+    with pytest.raises(FileExistsError):
+        harness._retrieve_once(
+            run_id=run_id,
+            quarantine_root=quarantine,
+            audit_root=audit,
+            transport=transport,
+        )
+    assert transport.calls == []
