@@ -44,11 +44,13 @@ Disposition meanings:
 | `ad_observed_after_decision` | exclude | A pre-decision event version first became observable after `as_of_time`. |
 | `ad_revision_after_decision` | exclude | A revision was first observable after `as_of_time`; the last eligible prior version remains authoritative. |
 | `ad_outcome_not_post_decision` | error | Outcome evidence starts at or before `as_of_time`. |
+| `ad_outcome_outside_window` | exclude | Outcome evidence falls outside the configured performance window. |
 | `ad_label_immature` | unavailable | Execution precedes `label_maturity_time`. |
+| `ad_unrecognized_outcome_label` | error | Mature outcome value is outside the explicit binary label mapping. |
 | `ad_non_monotonic_history` | error | Revision/reversal chain moves backward, cycles, or targets a later record. |
 | `ad_period_overlap` | observe | Same source/entity has overlapping asserted coverage periods. |
 | `ad_temporal_gap` | observe | Declared cadence expects but does not observe a period. |
-| `ad_future_timestamp` | error | Any timestamp is later than the run execution time. |
+| `ad_future_timestamp` | error | An evidence or completed-event timestamp asserts knowledge after run execution. |
 
 ## Amount and linkage codes
 

@@ -6,11 +6,16 @@ review. AD-0 through AD-2 do not implement these metrics.
 
 ## Population and direction
 
-Every metric uses one leakage-safe, label-mature evaluation population. Define
-`bad = 1` exactly when the observed outcome is not the configured
-`favorable_label`; otherwise `bad = 0`. Reports display the user-supplied
-outcome definition and this direction. Missing, censored, or immature outcomes
-are unavailable, never good or bad.
+Every metric uses one leakage-safe, label-mature evaluation population. The
+configuration supplies two non-empty, typed, disjoint tuples:
+`favorable_outcome_labels` and `unfavorable_outcome_labels`. After typed label
+comparison, every mature eligible value must belong to exactly one tuple;
+otherwise the run fails with `ad_unrecognized_outcome_label`. A value in the
+unfavorable tuple maps to `bad=1`, and a value in the favorable tuple maps to
+`bad=0`. Boolean, integer, and string labels are not mutually coerced. Missing,
+censored, pending, unknown, third-category, or immature outcomes are never
+mapped by negating favorable membership. Reports preserve both tuples and the
+user-supplied outcome definition.
 
 The configuration declares whether the supplied score targets the favorable or
 unfavorable outcome. Calculation normalizes it to `risk_score`, where larger
@@ -88,12 +93,25 @@ computed from rounded AUC.
 ## Lift and capture
 
 `top_fractions` is a strictly increasing tuple in `(0, 1]`. Entities are sorted
-by descending normalized risk. A requested cutoff includes the entire tie block
-that crosses `fraction * total_weight`; ties are never split. Each result records
+by descending normalized risk. Zero-weight entities do not contribute to total
+weight, target, selected count, or metrics; their raw excluded count is reported.
+For positive total weight `W` and fraction `f`, target `T=f*W`. Traverse complete
+equal-score blocks. Select the first block for which cumulative positive weight
+after the block is `>= T`; if it equals `T`, stop exactly there. If cumulative
+weight before a block is `< T` and after it is `> T`, include the whole crossing
+block. Never split a tie. At `f=1`, select every positive-weight entity. Each
+result records
 requested fraction, achieved weight fraction, raw entity count, bad capture
 `captured_bad_weight / total_bad_weight`, selected bad rate, and lift
 `selected_bad_rate / overall_bad_rate`. A zero selected or total bad weight is
 undefined with a stable reason, never zero.
+
+The cutoff fixture has tie blocks `(risk, weight, bad)` of `(0.9,2,1)`,
+`(0.8,1,0)`, `(0.8,1,1)`, and `(0.7,0,1)`. Thus `W=4`. At `f=0.5`, `T=2` and
+selection stops after the first block with achieved fraction `0.5`. At `f=0.75`,
+the complete `0.8` tie block is included, achieved fraction is `1.0`, bad capture
+is `1.0`, selected bad rate is `3/4`, overall bad rate is `3/4`, and lift is
+`1.0`; the zero-weight entity contributes to none of these values.
 
 ## Uncertainty, comparison, and fixtures
 

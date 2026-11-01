@@ -34,6 +34,7 @@ page for each topic; it does not replace the normative contracts.
 - [AD-D0 outcome and temporal-fitness contract](alternative-data-outcome-contract.md)
 - [Alternative-data field dictionary](alternative-data-field-dictionary.md)
 - [Alternative-data reason codes](alternative-data-reason-codes.md)
+- [Alternative-data leakage truth table](alternative-data-leakage-truth-table.md)
 - [Alternative-data hand-calculated examples](alternative-data-hand-calculated-examples.md)
 - [Alternative-data credit-risk metrics](alternative-data-risk-metrics.md)
 - [Alternative-data potential proxy-risk screening](alternative-data-proxy-screening.md)

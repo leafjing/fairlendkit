@@ -35,6 +35,10 @@ and non-monotonic event histories fail closed or are explicitly excluded with
 stable reason codes. The library never converts missing signal coverage into an
 unfavorable credit outcome or decision.
 
+The complete equality boundaries, future-time scope, and authoritative
+revision/reversal selection are fixed by the
+[leakage truth table](alternative-data-leakage-truth-table.md).
+
 ## Canonical input boundary
 
 The domain owns framework-neutral contracts for:
@@ -73,13 +77,32 @@ serialized with `state="suppressed"`, null value/numerator/denominator/interval,
 and reason `ad_sparse_report_cell`; only the bucket
 `0..minimum_report_cell_count-1` is exposed, not the exact count.
 
-If totals and remaining cells could reveal a suppressed value by subtraction,
-the smallest otherwise publishable sibling is also suppressed with
-`ad_complementary_suppression`; ties use canonical group order. Suppression is
-applied to canonical JSON before CSV/HTML rendering, so no renderer has access
-to the hidden values. Suppressed evidence cannot create a screening flag or a
-reliability pass. Internal calculation may support testing but must not be
-logged, placed in exceptions, fingerprints, or report metadata.
+Complementary suppression is computed jointly across the complete release, not
+one table at a time. Build one exact integer linear system whose variables are
+all atomic entity-count cells and whose equations are every proposed table cell,
+total, margin, provider view, coverage-stratum view, protected-group view, and
+intersection published in JSON, CSV, or HTML. Previously released equivalent
+counts supplied to the run are equations too.
+
+Hide primary sparse variables, then row-reduce the proposed published system
+over exact rationals. A hidden variable is unsafe when it has one unique value
+over the non-negative integer solutions. While any is unsafe, suppress the
+smallest publishable non-total cell participating in an independent equation
+that constrains it; ties use canonical metric/scope/group order. Mark it
+`ad_complementary_suppression`, remove its equation, and repeat. If none exists,
+suppress the constraining margin or total. Stop only when every hidden variable
+has at least two feasible integer values. Suppress derived rates, weights,
+intervals, and flags whenever their release adds an equation or reveals a hidden
+count.
+
+Suppression is applied to canonical JSON before CSV/HTML rendering. Suppressed
+evidence cannot create a flag or reliability pass. Hidden values must not enter
+logs, exceptions, fingerprints, or metadata. The privacy fixture uses one shared
+sparse cell exposed through provider-by-coverage, protected-group margins, and
+an intersection table. It proves sibling-only suppression is uniquely solvable,
+then verifies the iterative algorithm leaves at least two feasible integer
+values for every hidden cell. A second fixture requires total suppression when
+no safe non-total complement exists.
 
 ## Common data-quality evidence
 

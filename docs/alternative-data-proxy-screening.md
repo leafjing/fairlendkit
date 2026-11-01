@@ -25,10 +25,15 @@ explicit category/indicator and is never mean-imputed into invisibility.
 
 ## Entity and time isolation
 
-All rows for an entity belong to exactly one fold. Fold assignment is
-`sha256(protocol_version || seed || entity_id)` reduced to the configured fold
-count; the raw ID and digest are not reported. Preprocessing, rare-level mapping,
-and model fitting use training folds only.
+All rows for an entity belong to exactly one fold. Fold assignment uses these
+exact bytes: ASCII `fairlendkit-proxy-fold-v1`, then each UTF-8 string
+(`protocol_version`, `entity_id`) as an unsigned 32-bit big-endian byte length
+followed by its bytes, with `seed` between them as one unsigned 64-bit big-endian
+integer. Reject strings longer than `2^32-1` bytes. Compute SHA-256, interpret
+all 32 digest bytes as one unsigned big-endian integer, and assign
+`integer % fold_count`. Fold numbers are zero-based. This length-prefixed tuple
+encoding prevents field-boundary collisions; raw IDs and digests are not
+reported. Preprocessing, rare-level mapping, and fitting use training folds only.
 
 Evaluation also requires a forward temporal holdout whose feature window begins
 after the development window ends. No entity may cross development and holdout
@@ -53,11 +58,47 @@ The first release supports:
 3. Protected-group predictability: out-of-fold AUC for binary protected targets
    or macro one-vs-rest AUC for multiclass targets. Every class is reported.
 
-Predictability uses one version-pinned preprocessing and classifier pipeline:
-training-fold median plus missing indicator for numeric features, training-fold
-one-hot encoding for categorical features, and L2-regularized logistic
-regression with declared solver, tolerance, maximum iterations, and fixed
-regularization strength. Non-convergence is unavailable, not a usable score.
+The first release is unweighted: survey/sample weights are neither predictors
+nor fitting/metric weights. For numeric values `x` and protected classes `g`,
+eta-squared is `SS_between / SS_total`, where `SS_between = sum_g n_g *
+(mean_g - mean)^2` and `SS_total = sum_i (x_i - mean)^2`, using observed numeric
+values only. It is undefined when fewer than two classes remain or
+`SS_total=0`. Candidate missingness is separately cross-tabulated as
+missing/present.
+
+For an `r` by `k` contingency table with total `n`, compute Pearson
+`chi2 = sum((observed-expected)^2/expected)` over positive expected cells,
+`phi2=chi2/n`, `phi2_corrected=max(0, phi2-((k-1)*(r-1))/(n-1))`,
+`r_corrected=r-((r-1)^2/(n-1))`, and
+`k_corrected=k-((k-1)^2/(n-1))`. Bias-corrected Cramer's V is
+`sqrt(phi2_corrected / min(k_corrected-1, r_corrected-1))`. It is undefined for
+`n<=1`, a non-positive corrected denominator, or fewer than two nonempty rows or
+columns. Missing is one explicit row/column.
+
+Binary AUC is the unweighted probability that a randomly chosen positive-class
+entity has a higher held-out score than a negative-class entity, with ties worth
+`0.5`. Multiclass AUC computes that formula one-vs-rest for every class in
+canonical typed-label order and takes their unweighted arithmetic mean. A class
+without both sides is undefined; it is not omitted from the macro mean.
+
+Predictability uses one fixed pipeline. Numeric features use training-fold median
+plus missing indicator, then training-fold mean/standard-deviation scaling
+(zero-variance observed columns become zero). Categorical features use
+training-fold one-hot encoding in canonical label order. The classifier is the
+FairLendKit full-batch L2 logistic reference implementation, not a caller-chosen
+library solver. It minimizes mean negative log likelihood plus
+`0.5 * lambda * ||beta_non_intercept||^2`, with `lambda=1.0`; the intercept is
+unpenalized. Binary logistic uses one logit. Multiclass uses softmax with the
+first canonical class as the zero-coefficient reference.
+
+Optimization starts at all-zero coefficients, uses double-precision damped
+Newton steps and Cholesky solution, and halves the step until the objective does
+not increase. It stops only when both maximum absolute gradient and coefficient
+change are `<=1e-10`, with at most 100 iterations and 60 halvings per iteration.
+Singular Hessian, failed Cholesky, non-finite arithmetic, exhausted halvings, or
+iteration limit is `ad_proxy_model_nonconvergence`; no coefficients or score are
+used. The implementation and golden logits are release-pinned; an alternative
+classifier or numerical optimizer is a new contract version.
 
 The mandatory null baseline is an intercept-only protected-group model; its AUC
 is `0.5` where defined. Incremental screening is performed only when the caller
@@ -70,15 +111,28 @@ alone is never described as incremental evidence.
 
 Configuration must explicitly provide `association_threshold`,
 `predictability_auc_threshold`, `incremental_auc_threshold`, confidence level,
-fold count, minimum valid folds, per-fold class minimum, and stability tolerance.
-All thresholds are finite and versioned; there are no hidden defaults.
+fold count, minimum valid folds, per-fold class minimum, stability tolerance,
+bootstrap seed/resamples, and minimum valid resamples. Association thresholds
+are in `[0,1]`, predictability AUC thresholds in `[0.5,1]`, incremental AUC
+thresholds in `[0,1]`, and stability tolerance in `[0,1]`. Fold count is at
+least 2; minimum valid folds is between 2 and fold count. There are no hidden
+defaults.
+
+Intervals use the existing SHA-256 counter bootstrap and Hyndman-Fan Type 7
+percentiles. Resampling is at entity level, stratified by protected class. For
+association metrics, recompute the statistic per resample. For predictability,
+resample the fixed out-of-fold entity labels/scores without refitting; for
+incremental AUC, resample paired baseline and baseline-plus-candidate scores
+together. A resample with an undefined class/statistic is invalid. Failure to
+reach `minimum_valid_resamples` makes evidence unreliable and forbids a flag.
 
 A potential proxy-risk screening flag is emitted only when the corresponding
 point estimate meets or exceeds its inclusive threshold, its confidence lower
 bound also meets the threshold, all fold/reliability gates pass, and the
-temporal-holdout estimate differs from the development estimate by no more than
-the stability tolerance. Failure of stability produces a limitation, not a
-flag. Every flag records rule ID/version, candidate ID, protected attribute,
+absolute difference `abs(holdout - development)` is no more than the stability
+tolerance for the same metric and class aggregation. Failure of stability
+produces `ad_proxy_holdout_unstable`, not a flag. Every flag records rule
+ID/version, candidate ID, protected attribute,
 metric, threshold, point estimate, interval, baseline where applicable, fold
 support, populations, and neutral review prompt.
 
@@ -104,4 +158,7 @@ AD-4 fixtures must cover protected/identifier/leakage-field rejection, entity
 and time leakage, deterministic folds, binary and multiclass AUC, missing state,
 rare/unseen levels, high cardinality, non-convergence, baseline equality,
 incremental evidence, threshold equality, unstable holdout behavior, and
-suppression.
+suppression. Golden fixtures include the exact length-prefixed fold bytes,
+SHA-256 digest, digest integer, modulo result, eta/contingency components,
+Cramer's V correction, per-class AUCs, Type 7 interval endpoints, optimization
+iterations/logits, and the absolute development-holdout difference.
