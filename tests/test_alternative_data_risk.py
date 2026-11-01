@@ -8,6 +8,7 @@ from fairlendkit.alternative_data import (
     build_risk_diagnostic_release,
 )
 from fairlendkit.alternative_data.risk import _calibration_slope, _evaluate_risk_diagnostics
+from fairlendkit.metrics.bootstrap import RNG_NAME, bootstrap_index_draws
 
 
 def configuration(**overrides):
@@ -67,6 +68,15 @@ def test_weighted_oracle_bands_ks_auc_gini_and_lift_ties():
     assert result.reliable is True
     assert result.trace.outcome_definition == "explicit observed credit outcome"
     assert result.trace.score_type == "probability"
+    assert result.trace.bootstrap_seed == 7
+    assert result.trace.bootstrap_resamples == 20
+    assert result.trace.minimum_valid_resamples == 20
+    assert result.trace.minimum_total_entities == 1
+    assert result.trace.minimum_bad_entities == 1
+    assert result.trace.minimum_good_entities == 1
+    assert result.trace.minimum_report_cell_count == 10
+    assert result.trace.weight_normalization == "divide_by_maximum_positive_weight"
+    assert result.trace.rng_identity == RNG_NAME
     assert {item.metric_key for item in result.bootstrap} >= {
         "ks", "risk_auc", "gini", "brier_score", "calibration_in_the_large",
         "band.0.observed_bad_rate", "top.0.5.bad_capture", "top.0.75.lift",
@@ -195,6 +205,17 @@ def test_ks_preserves_all_maximizing_thresholds_and_canonical_smallest():
     assert result.ks_canonical_threshold == 0.8
 
 
+def test_ad3_bootstrap_counter_stream_golden_draws():
+    assert bootstrap_index_draws(
+        3, 4, seed=7, metric_key="ad3.entity_stratified",
+        stream_role="comparison",
+    ) == ((0, 1, 2), (2, 0, 0), (0, 2, 2), (1, 2, 0))
+    assert bootstrap_index_draws(
+        2, 4, seed=7, metric_key="ad3.entity_stratified",
+        stream_role="reference",
+    ) == ((1, 0), (0, 0), (1, 1), (1, 1))
+
+
 def test_public_risk_release_suppresses_sparse_diagnostics_and_publishes_supported():
     sparse = build_risk_diagnostic_release(
         (entity("secret-a", 0.8, "bad"), entity("secret-b", 0.2, "good")),
@@ -230,6 +251,17 @@ def test_public_risk_release_suppresses_sparse_diagnostics_and_publishes_support
     assert diagnostics.ks.reason == "ad_complementary_suppression"
     assert all(item.state == "suppressed" for item in diagnostics.lift_capture)
     assert all(item.state == "suppressed" for item in diagnostics.bootstrap)
+    assert next(
+        item for item in diagnostics.bootstrap
+        if item.metric_key == "band.3.observed_bad_rate"
+    ).reason_code == "ad_complementary_suppression"
     serialized = protected.model_dump_json()
     for exact in ('"entity_count":19', '"normalized_weight":19.0'):
         assert exact not in serialized
+
+    changed = list(supported)
+    changed[0] = changed[0].model_copy(update={"censored": True})
+    with pytest.raises(ValueError, match="previously published exact value"):
+        build_risk_diagnostic_release(
+            tuple(changed), configuration(), previous_release=protected
+        )

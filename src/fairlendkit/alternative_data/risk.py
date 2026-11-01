@@ -15,7 +15,7 @@ from fairlendkit.alternative_data.contracts import (
     StrictModel,
 )
 from fairlendkit.alternative_data.suppression import _CountCell, _apply_suppression
-from fairlendkit.metrics.bootstrap import bootstrap_index_draws
+from fairlendkit.metrics.bootstrap import RNG_NAME, bootstrap_index_draws
 
 
 class ScoreType(StrEnum):
@@ -253,6 +253,15 @@ class RiskTrace(StrictModel):
     score_band_edges: tuple[float, ...]
     top_fractions: tuple[float, ...]
     calibration_epsilon: float
+    bootstrap_seed: int
+    bootstrap_resamples: int
+    minimum_valid_resamples: int
+    minimum_total_entities: int
+    minimum_bad_entities: int
+    minimum_good_entities: int
+    minimum_report_cell_count: int
+    weight_normalization: str
+    rng_identity: str
 
 
 class BootstrapEvidence(StrictModel):
@@ -278,7 +287,9 @@ class ReleasedBootstrapEvidence(StrictModel):
         if self.state == "suppressed":
             if any(value is not None for value in exact):
                 raise ValueError("suppressed bootstrap evidence cannot expose exact values")
-            if self.reason_code != "ad_sparse_report_cell":
+            if self.reason_code not in {
+                "ad_sparse_report_cell", "ad_complementary_suppression"
+            }:
                 raise ValueError("suppressed bootstrap evidence requires canonical reason")
         elif self.state == "published":
             if self.valid_resamples is None or self.reliable is None or self.reason_code is not None:
@@ -347,11 +358,19 @@ class RiskDiagnosticRelease(StrictModel):
 
 
 def build_risk_diagnostic_release(
-    entities: tuple[RiskEntity, ...], config: RiskEvaluationConfig
+    entities: tuple[RiskEntity, ...], config: RiskEvaluationConfig,
+    previous_release: RiskDiagnosticRelease | None = None,
 ) -> RiskDiagnosticRelease:
     if len({item.entity_id for item in entities}) != len(entities):
         raise ValueError("risk evaluation requires one row per entity")
     diagnostics = _evaluate_risk_diagnostics(entities, config)
+    if (
+        previous_release is not None
+        and previous_release.state == "published"
+        and previous_release.diagnostics is not None
+        and previous_release.diagnostics.trace != diagnostics.trace
+    ):
+        raise ValueError("risk release configuration conflicts with previous publication")
     if len(entities) < config.minimum_report_cell_count:
         return RiskDiagnosticRelease(
             state="suppressed",
@@ -359,7 +378,7 @@ def build_risk_diagnostic_release(
             count_bucket=f"0..{config.minimum_report_cell_count - 1}",
             reason_code="ad_sparse_report_cell",
         )
-    disclosure = _risk_disclosure(entities, config)
+    disclosure = _risk_disclosure(entities, config, previous_release)
     if disclosure["overall"].state.value == "suppressed":
         return RiskDiagnosticRelease(
             state="suppressed",
@@ -456,7 +475,7 @@ def _release_lift(item, evidence, minimum, core_published):
     )
 
 
-def _risk_disclosure(entities, config):
+def _risk_disclosure(entities, config, previous_release=None):
     """Reuse AD-1's joint equations across bands and lift/capture views."""
 
     overall = frozenset(item.entity_id for item in entities)
@@ -527,7 +546,14 @@ def _risk_disclosure(entities, config):
         for index, members in enumerate(lift_members)
     )
     nonempty = tuple(cell for cell in cells if cell.entities)
-    release = _apply_suppression(nonempty, config.minimum_report_cell_count, frozenset())
+    counts = {cell.identity: len(cell.entities) for cell in nonempty}
+    locked = _previous_exact_counts(previous_release)
+    for identity, previous_count in locked.items():
+        if identity not in counts or counts[identity] != previous_count:
+            raise ValueError("current risk cell conflicts with a previously published exact value")
+    release = _apply_suppression(
+        nonempty, config.minimum_report_cell_count, frozenset(locked)
+    )
     by_identity = {(item.table_id, item.cell_id): item for item in release.cells}
     for cell in cells:
         if cell.entities:
@@ -554,6 +580,37 @@ def _risk_disclosure(entities, config):
     }
 
 
+def _previous_exact_counts(previous_release):
+    if previous_release is None or previous_release.state != "published":
+        return {}
+    diagnostics = previous_release.diagnostics
+    if diagnostics is None or previous_release.entity_count is None:
+        raise ValueError("published historical risk release requires exact evidence")
+    result = {("risk.population", "overall"): previous_release.entity_count}
+    scalar = {
+        ("risk.population", "eligible"): diagnostics.eligible_entity_count,
+        ("risk.population", "immature"): diagnostics.immature_excluded_count,
+        ("risk.population", "censored"): diagnostics.censored_excluded_count,
+        ("risk.weight", "zero"): diagnostics.zero_weight_excluded_count,
+        ("risk.outcome", "bad"): diagnostics.bad_entity_count,
+        ("risk.outcome", "good"): diagnostics.good_entity_count,
+    }
+    for identity, value in scalar.items():
+        if value is not None:
+            result[identity] = value
+    if diagnostics.normalized_weight_total is not None:
+        # The positive-weight cell publishes a count only through dependent
+        # released views; do not mistake a normalized weight for that count.
+        pass
+    for index, band in enumerate(diagnostics.bands):
+        if band.state == "published" and band.entity_count is not None:
+            result[("risk.score_band", str(index))] = band.entity_count
+    for index, item in enumerate(diagnostics.lift_capture):
+        if item.state == "published" and item.entity_count is not None:
+            result[("risk.lift_capture", str(index))] = item.entity_count
+    return result
+
+
 def _release_bootstrap(
     evidence: BootstrapEvidence, bands: tuple[ReleasedRiskBand, ...],
     lift: tuple[ReleasedLiftCapture, ...],
@@ -566,7 +623,7 @@ def _release_bootstrap(
             return ReleasedBootstrapEvidence(
                 state="suppressed",
                 metric_key=evidence.metric_key,
-                reason_code="ad_sparse_report_cell",
+                reason_code=bands[index].reason_code,
             )
     if parts[0] == "top":
         item = next(
@@ -579,7 +636,7 @@ def _release_bootstrap(
         if item is not None and item.state == "suppressed":
             return ReleasedBootstrapEvidence(
                 state="suppressed", metric_key=evidence.metric_key,
-                reason_code="ad_sparse_report_cell",
+                reason_code=item.reason_code,
             )
     if parts[0] not in {"band", "top"} and not core_published:
         return ReleasedBootstrapEvidence(
@@ -674,6 +731,15 @@ def _evaluate_risk_diagnostics(
             score_type=config.score_type, score_target=config.score_target,
             score_band_edges=config.score_band_edges, top_fractions=config.top_fractions,
             calibration_epsilon=config.calibration_epsilon,
+            bootstrap_seed=config.bootstrap_seed,
+            bootstrap_resamples=config.bootstrap_resamples,
+            minimum_valid_resamples=config.minimum_valid_resamples,
+            minimum_total_entities=config.minimum_total_entities,
+            minimum_bad_entities=config.minimum_bad_entities,
+            minimum_good_entities=config.minimum_good_entities,
+            minimum_report_cell_count=config.minimum_report_cell_count,
+            weight_normalization="divide_by_maximum_positive_weight",
+            rng_identity=RNG_NAME,
         ),
         bootstrap=bootstrap, bootstrap_valid_resamples=valid, reliable=reliable,
     )
