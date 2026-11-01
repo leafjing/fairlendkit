@@ -32,3 +32,16 @@ unit of observation. The project must not reshape them into fictitious
 transaction histories. Utility or rent hardship, arrears, missed bills, or
 service interruption must not be renamed as loan default. Only the publisher's
 documented credit outcome may satisfy the risk-outcome contract.
+
+## Current priority queue
+
+1. [CTU/Berka PKDD'99](ctu-berka-pkdd-1999.md)
+2. [CFPB Making Ends Meet](cfpb-making-ends-meet.md)
+3. [Federal Reserve SHED 2024](federal-reserve-shed-2024.md)
+4. [Census HTOPS/HPS](census-htops-hps.md)
+5. [EIA RECS 2020 v7](eia-recs-2020-v7.md)
+6. [Census/HUD AHS 2023 PUF](census-ahs-2023-puf.md)
+7. [UCI South German Credit](uci-south-german-credit-2019.md)
+
+Every record remains `evidence_incomplete`. Priority controls investigation
+order, not trust, admission, or preferred analytical conclusion.
