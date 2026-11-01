@@ -44,6 +44,11 @@ class QualityScopeKind(StrEnum):
     AUDIT_GROUP = "audit_group"
 
 
+class QualityEvidenceUnit(StrEnum):
+    RECORD = "record"
+    ENTITY = "entity"
+
+
 class QualityPopulationEntity(StrictModel):
     """Sensitive run input; the entity identity never enters quality results."""
 
@@ -69,12 +74,22 @@ class QualityReasonCount(StrictModel):
     code: AlternativeDataReasonCode
     disposition: AlternativeDataDisposition
     count: int = Field(ge=1)
+    unit: QualityEvidenceUnit
+    denominator: int = Field(ge=1)
+    signal_family: SignalFamily | None = None
     message: str = Field(min_length=1)
 
     @model_validator(mode="after")
     def validate_disposition(self) -> "QualityReasonCount":
         if REASON_CONTRACT[self.code] != (self.disposition, self.message):
             raise ValueError("reason disposition and message must match the contract")
+        if self.count > self.denominator:
+            raise ValueError("reason count cannot exceed its explicit denominator")
+        if (
+            self.code == AlternativeDataReasonCode.SIGNAL_NOT_PROVIDED
+            and self.signal_family is None
+        ):
+            raise ValueError("signal-not-provided evidence requires signal_family")
         return self
 
 
@@ -436,10 +451,17 @@ def _assemble_scope(
     authoritative = tuple(
         record for record in scoped if _record_identity(record) in authoritative_ids
     )
+    record_denominators = {
+        signal_family: sum(record.signal_family == signal_family for record in scoped)
+        for signal_family in SignalFamily
+    }
     eligible = 0
     excluded = 0
     unavailable = 0
-    reason_counts: dict[AlternativeDataReasonCode, int] = {}
+    reason_counts: dict[
+        tuple[AlternativeDataReasonCode, SignalFamily | None, QualityEvidenceUnit],
+        int,
+    ] = {}
     for record in scoped:
         dispositions = {
             REASON_CONTRACT[code][0]
@@ -452,7 +474,8 @@ def _assemble_scope(
         else:
             eligible += 1
         for code in record_reasons[_record_identity(record)]:
-            reason_counts[code] = reason_counts.get(code, 0) + 1
+            reason_key = (code, record.signal_family, QualityEvidenceUnit.RECORD)
+            reason_counts[reason_key] = reason_counts.get(reason_key, 0) + 1
     excluded_entities = 0
     unavailable_entities = 0
     for entity_id in members:
@@ -469,8 +492,11 @@ def _assemble_scope(
             for code in codes
         ):
             unavailable_entities += 1
-        for code in codes:
-            reason_counts[code] = reason_counts.get(code, 0) + 1
+        for code, reason_family in entity_reasons[entity_id]:
+            if family is not None and reason_family not in (None, family):
+                continue
+            reason_key = (code, reason_family, QualityEvidenceUnit.ENTITY)
+            reason_counts[reason_key] = reason_counts.get(reason_key, 0) + 1
 
     starts = tuple(_instant(record.evidence_start) for record in authoritative)
     ends = tuple(_instant(record.evidence_end, end_of_day=True) for record in authoritative)
@@ -519,12 +545,28 @@ def _assemble_scope(
 
     reasons = tuple(
         QualityReasonCount(
-            code=code,
-            disposition=REASON_CONTRACT[code][0],
+            code=key[0],
+            disposition=REASON_CONTRACT[key[0]][0],
             count=count,
-            message=REASON_CONTRACT[code][1],
+            unit=key[2],
+            denominator=(
+                record_denominators[key[1]]
+                if key[2] == QualityEvidenceUnit.RECORD and key[1] is not None
+                else len(scoped)
+                if key[2] == QualityEvidenceUnit.RECORD
+                else len(members)
+            ),
+            signal_family=key[1],
+            message=REASON_CONTRACT[key[0]][1],
         )
-        for code, count in sorted(reason_counts.items(), key=lambda item: item[0].value)
+        for key, count in sorted(
+            reason_counts.items(),
+            key=lambda item: (
+                item[0][0].value,
+                "" if item[0][1] is None else item[0][1].value,
+                item[0][2].value,
+            ),
+        )
     )
     return QualityScopeResult(
         scope_key=key,

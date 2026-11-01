@@ -139,6 +139,14 @@ def test_quality_engine_assembles_eligibility_coverage_and_group_evidence():
     assert reasons[AlternativeDataReasonCode.PENDING_RECORD] == 1
     assert reasons[AlternativeDataReasonCode.SIGNAL_NOT_PROVIDED] == 1
     assert reasons[AlternativeDataReasonCode.COVERAGE_STRATUM_UNAVAILABLE] == 1
+    pending_reason = next(
+        item
+        for item in overall.reasons
+        if item.code == AlternativeDataReasonCode.PENDING_RECORD
+    )
+    assert pending_reason.unit == "record"
+    assert pending_reason.denominator == 5
+    assert pending_reason.signal_family == "cash_flow"
 
     scope_keys = tuple(scope.scope_key for scope in result.scopes)
     assert scope_keys[0] == "overall"
@@ -168,6 +176,39 @@ def test_missing_signal_is_unavailable_and_never_becomes_adverse_behavior():
         AlternativeDataReasonCode.COVERAGE_STRATUM_UNAVAILABLE,
         AlternativeDataReasonCode.SIGNAL_NOT_PROVIDED,
     }
+
+
+def test_missing_signal_reasons_are_separate_by_family_with_entity_denominators():
+    multi_config = config(
+        sources=(
+            source(),
+            source(
+                source_id="rent-source",
+                signal_family="rent",
+                provider_id="rent-provider",
+            ),
+            source(
+                source_id="utility-source",
+                signal_family="utility",
+                provider_id="utility-provider",
+            ),
+        )
+    )
+    result = calculate_quality_evidence(
+        entities=(entity("entity-secret-1", "A"),),
+        records=(record("cash-record"),),
+        coverages=(coverage("entity-secret-1"),),
+        config=multi_config,
+    )
+    missing = tuple(
+        reason
+        for reason in result.scopes[0].reasons
+        if reason.code == AlternativeDataReasonCode.SIGNAL_NOT_PROVIDED
+    )
+
+    assert tuple(reason.signal_family for reason in missing) == ("rent", "utility")
+    assert all(reason.unit == "entity" for reason in missing)
+    assert all(reason.count == 1 and reason.denominator == 1 for reason in missing)
 
 
 def test_record_with_multiple_exclusion_reasons_counts_once():
