@@ -2,16 +2,19 @@ from decimal import Decimal
 import csv
 import io
 import json
+import warnings
 
 import pytest
 
 from fairlendkit.alternative_data import (
     AlternativeDataConfig,
+    AggregateReportRelease,
     AlternativeDataSource,
     ObservationWindow,
     SignalRecord,
     SignalRecordFieldMap,
     adapt_cash_flow_records,
+    adapt_rent_records,
 )
 from fairlendkit.alternative_data.profiles import (
     _calculate_cash_flow_profile,
@@ -215,10 +218,29 @@ def test_explicit_adapter_rejects_unmapped_and_unknown_categories():
         "status": "posted",
     }
     assert adapt_cash_flow_records((row,), mapping=mapping, source=source("cash_flow"))[0].amount == Decimal("1.25")
-    with pytest.raises(ValueError, match="unmapped external field"):
+    with pytest.raises(ValueError, match="ad_unknown_field"):
         adapt_cash_flow_records(({**row, "description": "private"},), mapping=mapping, source=source("cash_flow"))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="ad_unsupported_event_type"):
         adapt_cash_flow_records(({**row, "kind": "mystery"},), mapping=mapping, source=source("cash_flow"))
+
+    rent_row = {
+        "entity_id": "secret",
+        "record_id": "rent-obligation",
+        "event_type": "obligation",
+        "event_time": "2025-01-01",
+        "observed_at": "2025-01-01T00:00:00Z",
+        "amount": "100",
+        "currency": "USD",
+        "status": "posted",
+        "obligation_id": "obligation-secret",
+    }
+    rent_mapping = SignalRecordFieldMap(
+        fields={name: name for name in rent_row}
+    )
+    with pytest.raises(ValueError, match="ad_missing_required_field"):
+        adapt_rent_records(
+            (rent_row,), mapping=rent_mapping, source=source("rent")
+        )
 
 
 def test_profile_mutations_fail_closed_or_remain_unavailable_without_adverse_inference():
@@ -286,6 +308,23 @@ def test_profile_mutations_fail_closed_or_remain_unavailable_without_adverse_inf
         "ad_unmatched_obligation",
     }
 
+    utility_unmatched = _calculate_utility_profile(
+        (
+            record(
+                "utility",
+                "orphan-utility-payment",
+                "payment",
+                "2025-01-05",
+                "100",
+                obligation_id="missing-utility-obligation",
+            ),
+        ),
+        config=config("utility"),
+    )
+    assert utility_unmatched.state == "unavailable"
+    assert utility_unmatched.timely_paid_count == 0
+    assert "ad_unmatched_obligation" in utility_unmatched.reason_codes
+
 
 def test_profiles_are_order_independent_and_identifiers_do_not_leak(caplog):
     rows = (
@@ -306,7 +345,20 @@ def test_profiles_are_order_independent_and_identifiers_do_not_leak(caplog):
         f"<dt>{key}</dt><dd>{value}</dd>" for key, value in sorted(payload.items())
     )
     diagnostics = repr(first)
-    artifacts = (json_text, csv_buffer.getvalue(), html_text, diagnostics, caplog.text)
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        warnings.warn("generic diagnostic", UserWarning)
+    with pytest.raises(Exception) as report_error:
+        AggregateReportRelease.model_validate(payload)
+    artifacts = (
+        json_text,
+        csv_buffer.getvalue(),
+        html_text,
+        diagnostics,
+        caplog.text,
+        " ".join(str(item.message) for item in captured),
+        str(report_error.value),
+    )
     for secret in (
         "secret-entity",
         "secret-record-a",

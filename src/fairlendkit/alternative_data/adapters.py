@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import Field, ValidationError, model_validator
 
 from fairlendkit.alternative_data.contracts import (
     AlternativeDataSource,
@@ -13,6 +13,7 @@ from fairlendkit.alternative_data.contracts import (
     SignalRecord,
     StrictModel,
 )
+from fairlendkit.alternative_data.reasons import AlternativeDataReasonCode
 
 
 class SignalRecordFieldMap(StrictModel):
@@ -78,8 +79,8 @@ def _adapt(
         if keys != expected_external:
             missing = expected_external - keys
             if missing:
-                raise ValueError("adapter row is missing an explicitly mapped field")
-            raise ValueError("adapter row contains an unmapped external field")
+                raise ValueError(AlternativeDataReasonCode.MISSING_REQUIRED_FIELD.value)
+            raise ValueError(AlternativeDataReasonCode.UNKNOWN_FIELD.value)
         payload = {
             canonical: row[external]
             for canonical, external in mapping.fields.items()
@@ -93,5 +94,24 @@ def _adapt(
             supplied = payload.setdefault(name, expected)
             if supplied != expected:
                 raise ValueError(f"adapter {name} must match its source contract")
-        records.append(SignalRecord.model_validate(payload))
+        try:
+            records.append(SignalRecord.model_validate(payload))
+        except ValidationError as error:
+            event_errors = {
+                tuple(item["loc"])
+                for item in error.errors(include_input=False, include_url=False)
+            }
+            messages = " ".join(
+                str(item["msg"])
+                for item in error.errors(include_input=False, include_url=False)
+            )
+            if ("event_type",) in event_errors:
+                code = AlternativeDataReasonCode.UNSUPPORTED_EVENT_TYPE
+            elif "require" in messages or "missing" in messages:
+                code = AlternativeDataReasonCode.MISSING_REQUIRED_FIELD
+            elif "amount" in messages:
+                code = AlternativeDataReasonCode.INVALID_AMOUNT
+            else:
+                raise
+            raise ValueError(code.value) from None
     return tuple(records)
