@@ -31,6 +31,7 @@ class MetricState(StrEnum):
 
 
 class RiskEvaluationConfig(StrictModel):
+    outcome_definition: str = Field(default="explicit observed credit outcome", min_length=1)
     favorable_outcome_labels: tuple[Any, ...] = Field(min_length=1)
     unfavorable_outcome_labels: tuple[Any, ...] = Field(min_length=1)
     score_type: ScoreType
@@ -129,6 +130,9 @@ class LiftCapture(StrictModel):
 
 class RiskDiagnostics(StrictModel):
     raw_entity_count: int
+    eligible_entity_count: int
+    immature_excluded_count: int
+    censored_excluded_count: int
     normalized_weight_total: float
     bad_entity_count: int
     good_entity_count: int
@@ -143,8 +147,29 @@ class RiskDiagnostics(StrictModel):
     risk_auc: MetricValue
     gini: MetricValue
     lift_capture: tuple[LiftCapture, ...]
+    trace: "RiskTrace"
+    bootstrap: tuple["BootstrapEvidence", ...]
     bootstrap_valid_resamples: int
     reliable: bool
+
+
+class RiskTrace(StrictModel):
+    outcome_definition: str
+    favorable_outcome_labels: tuple[Any, ...]
+    unfavorable_outcome_labels: tuple[Any, ...]
+    score_type: ScoreType
+    score_target: ScoreTarget
+    score_band_edges: tuple[float, ...]
+    top_fractions: tuple[float, ...]
+    calibration_epsilon: float
+
+
+class BootstrapEvidence(StrictModel):
+    metric_key: str
+    valid_resamples: int
+    reliable: bool
+    lower: float | None
+    upper: float | None
 
 
 class RiskDiagnosticRelease(StrictModel):
@@ -203,9 +228,14 @@ def _evaluate_risk_diagnostics(
     typed_good = {(type(value), value) for value in config.favorable_outcome_labels}
     typed_bad = {(type(value), value) for value in config.unfavorable_outcome_labels}
     prepared = []
+    immature = censored = 0
     for item in entities:
-        if not item.label_mature or item.censored:
-            raise ValueError("ad_label_immature" if not item.label_mature else "ad_unrecognized_outcome_label")
+        if not item.label_mature:
+            immature += 1
+            continue
+        if item.censored:
+            censored += 1
+            continue
         key = (type(item.outcome), item.outcome)
         if key not in typed_good | typed_bad:
             raise ValueError("ad_unrecognized_outcome_label")
@@ -233,12 +263,21 @@ def _evaluate_risk_diagnostics(
         calibration = _available(mean_p - mean_y)
         brier = _available(sum(weight * (score - bad) ** 2 for _, score, bad, weight in positive) / total_weight)
         slope = _calibration_slope(positive, config.calibration_epsilon) if class_ready else _undefined("one_outcome_class")
-    else:
+    elif config.score_type == ScoreType.RANKING:
         calibration = brier = slope = MetricValue(state="not_applicable", reason="ranking_score")
+    else:
+        calibration = brier = slope = _undefined("zero_total_weight")
     ks_value, thresholds = _ks(positive, bad_weight, good_weight) if class_ready else (None, ())
     auc_value = _auc(positive, bad_weight, good_weight) if class_ready else None
     lifts = _lift_capture(positive, config.top_fractions, total_weight, bad_weight)
-    valid = _bootstrap_valid_count(positive, config) if class_ready else 0
+    bootstrap = _bootstrap_evidence(positive, config) if class_ready else ()
+    core_keys = {"ks", "risk_auc", "gini"}
+    if config.score_type == ScoreType.PROBABILITY:
+        core_keys |= {"brier_score", "calibration_in_the_large"}
+    valid = min(
+        (item.valid_resamples for item in bootstrap if item.metric_key in core_keys),
+        default=0,
+    )
     reliable = (
         len(positive) >= config.minimum_total_entities
         and bad_count >= config.minimum_bad_entities
@@ -246,7 +285,9 @@ def _evaluate_risk_diagnostics(
         and valid >= config.minimum_valid_resamples
     )
     return RiskDiagnostics(
-        raw_entity_count=len(entities), normalized_weight_total=total_weight,
+        raw_entity_count=len(entities), eligible_entity_count=len(prepared),
+        immature_excluded_count=immature, censored_excluded_count=censored,
+        normalized_weight_total=total_weight,
         bad_entity_count=bad_count, good_entity_count=good_count,
         zero_weight_excluded_count=len(weighted) - len(positive), bands=bands,
         calibration_in_the_large=calibration, brier_score=brier,
@@ -256,7 +297,16 @@ def _evaluate_risk_diagnostics(
         ks_canonical_threshold=min(thresholds) if thresholds else None,
         risk_auc=_available(auc_value) if auc_value is not None else _undefined("class_support_unavailable"),
         gini=_available(2 * auc_value - 1) if auc_value is not None else _undefined("class_support_unavailable"),
-        lift_capture=lifts, bootstrap_valid_resamples=valid, reliable=reliable,
+        lift_capture=lifts,
+        trace=RiskTrace(
+            outcome_definition=config.outcome_definition,
+            favorable_outcome_labels=config.favorable_outcome_labels,
+            unfavorable_outcome_labels=config.unfavorable_outcome_labels,
+            score_type=config.score_type, score_target=config.score_target,
+            score_band_edges=config.score_band_edges, top_fractions=config.top_fractions,
+            calibration_epsilon=config.calibration_epsilon,
+        ),
+        bootstrap=bootstrap, bootstrap_valid_resamples=valid, reliable=reliable,
     )
 
 
@@ -352,12 +402,16 @@ def _lift_capture(rows, fractions, total_weight, total_bad):
     return tuple(output)
 
 
-def _calibration_slope(rows, epsilon):
+def _calibration_slope(rows, epsilon, *, max_iterations=100):
     x = [math.log(min(max(score, epsilon), 1 - epsilon) / (1 - min(max(score, epsilon), 1 - epsilon))) for _, score, _, _ in rows]
     if max(x) == min(x):
         return _undefined("constant_probability")
+    good_x = [value for value, row in zip(x, rows) if not row[2]]
+    bad_x = [value for value, row in zip(x, rows) if row[2]]
+    if max(good_x) < min(bad_x) or max(bad_x) < min(good_x):
+        return _undefined("separation")
     intercept = slope = 0.0
-    for _ in range(100):
+    for _ in range(max_iterations):
         h00 = h01 = h11 = g0 = g1 = 0.0
         for predictor, (_, _, outcome, weight) in zip(x, rows):
             linear = intercept + slope * predictor
@@ -368,7 +422,7 @@ def _calibration_slope(rows, epsilon):
             g0 += residual; g1 += residual * predictor
         determinant = h00 * h11 - h01 * h01
         if determinant <= 1e-18:
-            return _undefined("singular_or_separated")
+            return _undefined("singular")
         delta0 = (g0 * h11 - g1 * h01) / determinant
         delta1 = (g1 * h00 - g0 * h01) / determinant
         intercept += delta0; slope += delta1
@@ -379,14 +433,65 @@ def _calibration_slope(rows, epsilon):
     return _undefined("non_convergence")
 
 
-def _bootstrap_valid_count(rows, config):
+def _bootstrap_evidence(rows, config):
     bad = [row for row in rows if row[2]]
     good = [row for row in rows if not row[2]]
-    valid = 0
+    values: dict[str, list[float]] = defaultdict(list)
+    for key in ("ks", "risk_auc", "gini"):
+        values[key]
+    if config.score_type == ScoreType.PROBABILITY:
+        for key in ("brier_score", "calibration_in_the_large", "calibration_slope"):
+            values[key]
+    for index in range(len(config.score_band_edges) + 1):
+        values[f"band.{index}.observed_bad_rate"]
+    for fraction in config.top_fractions:
+        for suffix in ("bad_capture", "selected_bad_rate", "lift"):
+            values[f"top.{fraction:g}.{suffix}"]
     for replicate in range(config.bootstrap_resamples):
         digest = hashlib.sha256(f"ad3|{config.bootstrap_seed}|{replicate}".encode()).digest()
         rng = random.Random(int.from_bytes(digest, "big"))
         sample = [rng.choice(bad) for _ in bad] + [rng.choice(good) for _ in good]
-        if sample and sum(row[3] for row in sample if row[2]) > 0 and sum(row[3] for row in sample if not row[2]) > 0:
-            valid += 1
-    return valid
+        sample_bad = sum(row[3] for row in sample if row[2])
+        sample_good = sum(row[3] for row in sample if not row[2])
+        if not sample or sample_bad <= 0 or sample_good <= 0:
+            continue
+        total = sample_bad + sample_good
+        ks, _ = _ks(sample, sample_bad, sample_good)
+        auc = _auc(sample, sample_bad, sample_good)
+        values["ks"].append(ks); values["risk_auc"].append(auc); values["gini"].append(2 * auc - 1)
+        if config.score_type == ScoreType.PROBABILITY:
+            values["brier_score"].append(sum(w * (s - y) ** 2 for _, s, y, w in sample) / total)
+            values["calibration_in_the_large"].append(
+                sum(w * s for _, s, _, w in sample) / total - sample_bad / total
+            )
+            slope = _calibration_slope(sample, config.calibration_epsilon)
+            if slope.state == MetricState.AVAILABLE:
+                values["calibration_slope"].append(slope.value)
+        for index, band in enumerate(_bands(sample, config.score_band_edges)):
+            if band.observed_bad_rate.state == MetricState.AVAILABLE:
+                values[f"band.{index}.observed_bad_rate"].append(band.observed_bad_rate.value)
+        for item in _lift_capture(sample, config.top_fractions, total, sample_bad):
+            prefix = f"top.{item.requested_fraction:g}"
+            for suffix, metric in (("bad_capture", item.bad_capture), ("selected_bad_rate", item.selected_bad_rate), ("lift", item.lift)):
+                if metric.state == MetricState.AVAILABLE:
+                    values[f"{prefix}.{suffix}"].append(metric.value)
+    output = []
+    for key in sorted(values):
+        samples = sorted(values[key])
+        output.append(BootstrapEvidence(
+            metric_key=key, valid_resamples=len(samples),
+            reliable=len(samples) >= config.minimum_valid_resamples,
+            lower=_type7(samples, 0.025), upper=_type7(samples, 0.975),
+        ))
+    return tuple(output)
+
+
+def _type7(values, probability):
+    if not values:
+        return None
+    position = (len(values) - 1) * probability
+    lower = math.floor(position); upper = math.ceil(position)
+    if lower == upper:
+        return values[lower]
+    fraction = position - lower
+    return values[lower] + fraction * (values[upper] - values[lower])

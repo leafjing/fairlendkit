@@ -2,11 +2,12 @@ import pytest
 from pydantic import ValidationError
 
 from fairlendkit.alternative_data import (
+    AggregateReportRelease,
     RiskEntity,
     RiskEvaluationConfig,
     build_risk_diagnostic_release,
 )
-from fairlendkit.alternative_data.risk import _evaluate_risk_diagnostics
+from fairlendkit.alternative_data.risk import _calibration_slope, _evaluate_risk_diagnostics
 
 
 def configuration(**overrides):
@@ -64,6 +65,16 @@ def test_weighted_oracle_bands_ks_auc_gini_and_lift_ties():
     assert whole == crossing.model_copy(update={"requested_fraction": 1.0})
     assert result.bootstrap_valid_resamples == 20
     assert result.reliable is True
+    assert result.trace.outcome_definition == "explicit observed credit outcome"
+    assert result.trace.score_type == "probability"
+    assert {item.metric_key for item in result.bootstrap} >= {
+        "ks", "risk_auc", "gini", "brier_score", "calibration_in_the_large",
+        "band.0.observed_bad_rate", "top.0.5.bad_capture", "top.0.75.lift",
+    }
+    evidence = {item.metric_key: item for item in result.bootstrap}
+    assert evidence["ks"].valid_resamples == 20 and evidence["ks"].reliable
+    assert evidence["band.0.observed_bad_rate"].valid_resamples == 0
+    assert evidence["band.0.observed_bad_rate"].reliable is False
 
 
 def test_direction_probability_calibration_and_ranking_applicability():
@@ -107,11 +118,18 @@ def test_typed_outcomes_entity_uniqueness_and_input_gates_fail_closed():
         _evaluate_risk_diagnostics((entity("x", 1.1, "bad"),), configuration())
     with pytest.raises(ValidationError):
         RiskEntity(entity_id="x", score=0.5, outcome="bad", weight=-1)
-    with pytest.raises(ValueError, match="ad_label_immature"):
-        _evaluate_risk_diagnostics(
-            (RiskEntity(entity_id="x", score=0.5, outcome="bad", label_mature=False),),
-            configuration(),
-        )
+    excluded = _evaluate_risk_diagnostics(
+        (
+            RiskEntity(entity_id="x", score=0.5, outcome="bad", label_mature=False),
+            RiskEntity(entity_id="y", score=0.6, outcome="bad", censored=True),
+        ),
+        configuration(),
+    )
+    assert excluded.eligible_entity_count == 0
+    assert excluded.immature_excluded_count == 1
+    assert excluded.censored_excluded_count == 1
+    assert excluded.ks.state == "unavailable"
+    assert excluded.brier_score.state == "unavailable"
 
 
 def test_one_class_separation_empty_bands_and_determinism():
@@ -131,7 +149,50 @@ def test_one_class_separation_empty_bands_and_determinism():
     second = _evaluate_risk_diagnostics(tuple(reversed(separated_rows)), configuration())
     assert first == second
     assert first.calibration_slope.state == "unavailable"
-    assert first.calibration_slope.reason in {"separation", "singular_or_separated", "non_convergence"}
+    assert first.calibration_slope.reason == "separation"
+
+    singular = _calibration_slope(
+        (
+            ("a", 0.2, 0, 1e-30),
+            ("b", 0.5, 1, 1e-30),
+            ("c", 0.8, 0, 1e-30),
+        ),
+        1e-6,
+    )
+    assert singular.reason == "singular"
+    non_converged = _calibration_slope(
+        (
+            ("a", 0.2, 0, 1.0),
+            ("b", 0.5, 1, 1.0),
+            ("c", 0.8, 0, 1.0),
+        ),
+        1e-6,
+        max_iterations=0,
+    )
+    assert non_converged.reason == "non_convergence"
+
+    zero_weight = _evaluate_risk_diagnostics(
+        (entity("z1", 0.2, "good", 0), entity("z2", 0.8, "bad", 0)),
+        configuration(),
+    )
+    assert zero_weight.normalized_weight_total == 0
+    assert zero_weight.ks.state == "unavailable"
+    assert zero_weight.brier_score.reason == "zero_total_weight"
+
+
+def test_ks_preserves_all_maximizing_thresholds_and_canonical_smallest():
+    result = _evaluate_risk_diagnostics(
+        (
+            entity("bad-high", 0.9, "bad"),
+            entity("bad-mid", 0.8, "bad"),
+            entity("good-mid", 0.8, "good"),
+            entity("good-low", 0.7, "good"),
+        ),
+        configuration(),
+    )
+    assert result.ks.value == 0.5
+    assert result.ks_maximizing_scores == (0.9, 0.8)
+    assert result.ks_canonical_threshold == 0.8
 
 
 def test_public_risk_release_suppresses_sparse_diagnostics_and_publishes_supported():
@@ -145,6 +206,8 @@ def test_public_risk_release_suppresses_sparse_diagnostics_and_publishes_support
     assert sparse.count_bucket == "0..9"
     serialized = sparse.model_dump_json()
     assert "secret-a" not in serialized and "secret-b" not in serialized
+    with pytest.raises(ValidationError):
+        AggregateReportRelease.model_validate(sparse.model_dump())
 
     supported = tuple(
         entity(f"entity-{index}", 0.9 if index % 2 else 0.1, "bad" if index % 2 else "good")
