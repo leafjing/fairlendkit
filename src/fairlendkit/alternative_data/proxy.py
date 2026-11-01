@@ -20,7 +20,7 @@ import math
 from struct import pack
 from typing import Any, Callable, Iterable, Sequence
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 
 from fairlendkit.alternative_data.contracts import StrictModel
 from fairlendkit.alternative_data.suppression import _CountCell, _apply_suppression
@@ -90,6 +90,42 @@ class ProxyFailure(ValueError):
         )
         super().__init__(self.reason_code)
 
+    def errors(self) -> list[dict[str, object]]:
+        """Return only the stable public contract, never rejected input."""
+
+        return [{
+            "type": "proxy_contract_error",
+            "loc": [],
+            "msg": self.canonical_message,
+            "reason_code": self.reason_code,
+            "disposition": self.disposition,
+        }]
+
+    def json(self) -> str:
+        """Serialize the payload-free public error contract."""
+
+        return json.dumps(self.errors(), sort_keys=True, separators=(",", ":"))
+
+
+def _proxy_config_validation_reason(error: ValidationError) -> ProxyReason:
+    """Collapse Pydantic configuration failures to stable public reasons."""
+
+    messages = tuple(str(item.get("msg", "")) for item in error.errors(
+        include_input=False,
+        include_url=False,
+    ))
+    for reason in (
+        ProxyReason.WEIGHTING_UNSUPPORTED,
+        ProxyReason.CANDIDATE_PROHIBITED,
+        ProxyReason.WINDOW_CONFLICT,
+    ):
+        if any(reason.value in message for message in messages):
+            return reason
+    # Structural, type, range, extra-field, and cross-field failures all make
+    # the requested screening protocol unusable. Do not expose Pydantic's
+    # rejected value or distinguish shapes in a way that can leak payloads.
+    return ProxyReason.ISOLATION_FAILURE
+
 
 class _CategoryLevel(StrEnum):
     MISSING = "__internal_missing__"
@@ -157,6 +193,17 @@ class ProxyConfig(StrictModel):
     minimum_valid_resamples: int = Field(ge=1)
     confidence_level: float = Field(gt=0, lt=1)
     weighting: str = "unweighted"
+
+    def __init__(self, **data: object) -> None:
+        reason: ProxyReason | None = None
+        try:
+            super().__init__(**data)
+        except ValidationError as error:
+            reason = _proxy_config_validation_reason(error)
+        # Raise after leaving the ValidationError handler so neither __cause__
+        # nor __context__ retains Pydantic's rejected input payload.
+        if reason is not None:
+            raise ProxyFailure(reason)
 
     @model_validator(mode="after")
     def validate_contract(self):

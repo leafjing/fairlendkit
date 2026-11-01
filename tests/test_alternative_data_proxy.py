@@ -2,6 +2,7 @@ import csv
 from datetime import datetime, timezone
 import io
 import json
+import logging
 import re
 
 import pytest
@@ -110,7 +111,7 @@ def rows(*, single_provider=False, single_coverage=False, baseline=False):
     return tuple(output)
 
 
-def test_approved_contract_is_exact_and_caller_scores_are_forbidden():
+def test_approved_contract_is_exact_and_caller_scores_are_forbidden(caplog):
     with pytest.raises(ValidationError):
         ProxyEntity(
             entity_id="secret", window="development", candidate=1,
@@ -118,9 +119,9 @@ def test_approved_contract_is_exact_and_caller_scores_are_forbidden():
             candidate_score=.99,
             **provenance(),
         )
-    with pytest.raises(ValidationError, match="ad_proxy_weighting_unsupported"):
+    with pytest.raises(ProxyFailure, match="ad_proxy_weighting_unsupported"):
         config(weighting="weighted")
-    with pytest.raises(ValidationError, match="ad_proxy_candidate_prohibited"):
+    with pytest.raises(ProxyFailure, match="ad_proxy_candidate_prohibited"):
         config(candidate_id="entity_id")
     failure = ProxyFailure(ProxyReason.WEIGHTING_UNSUPPORTED)
     assert failure.disposition == "error"
@@ -128,13 +129,39 @@ def test_approved_contract_is_exact_and_caller_scores_are_forbidden():
         "Proxy-screening configuration requests weighted eligibility, fitting, "
         "metrics, bootstrap, or suppression."
     )
-    secret = "SECRET-CONFIG-PAYLOAD"
-    with pytest.raises(ValidationError) as captured:
-        config(weighting="weighted", candidate_id=secret)
-    assert secret not in str(captured.value)
-    assert secret not in repr(captured.value)
-    assert captured.value.__cause__ is None
-    assert captured.value.__context__ is None
+    failures = (
+        ({"weighting": "SECRET-WEIGHTING-RAW"}, ProxyReason.WEIGHTING_UNSUPPORTED),
+        ({"candidate_id": "entity_id", "population_id": "SECRET-CANDIDATE-RAW"}, ProxyReason.CANDIDATE_PROHIBITED),
+        ({"development_window": "SECRET-WINDOW-RAW", "holdout_window": "2000"}, ProxyReason.WINDOW_CONFLICT),
+        ({"fold_count": "SECRET-TYPE-RAW"}, ProxyReason.ISOLATION_FAILURE),
+        ({"SECRET-EXTRA-FIELD": "SECRET-EXTRA-RAW"}, ProxyReason.ISOLATION_FAILURE),
+    )
+    secrets = tuple(
+        value
+        for updates, _ in failures
+        for key, value in updates.items()
+        if key.startswith("SECRET") or (isinstance(value, str) and value.startswith("SECRET"))
+    )
+    for updates, reason in failures:
+        with pytest.raises(ProxyFailure) as captured:
+            config(**updates)
+        error = captured.value
+        assert error.reason_code == reason.value
+        surfaces = (
+            str(error),
+            repr(error),
+            repr(error.errors()),
+            error.json(),
+            repr(error.__cause__),
+            repr(error.__context__),
+        )
+        assert all(secret not in surface for secret in secrets for surface in surfaces)
+        assert error.__cause__ is None
+        assert error.__context__ is None
+        logging.getLogger("fairlendkit.proxy.boundary").error("%s", error)
+    log_text = "\n".join(record.getMessage() for record in caplog.records)
+    assert all(secret not in log_text for secret in secrets)
+    assert "ad_proxy_weighting_unsupported" in log_text
 
 
 def test_reason_contract_dispositions_and_messages_are_exact():
