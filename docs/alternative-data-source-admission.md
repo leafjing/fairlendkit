@@ -135,10 +135,29 @@ user identity.
 - Required attribution:
 - Required controls and limitations:
 - Decision evidence and signatures:
+
+## Enablement plan
+
+- Target disposition: repository | external_only
+- Value unlocked for FairLendKit:
+- Fixable conditions before admission:
+- Publisher/rightsholder contact or official support route:
+- Contact question and evidence requested:
+- Next evidence-gathering action, owner, and due state:
+- Canonical-schema mapping to implement:
+- Synthetic fixture that can proceed before data access:
+- Adapter/downloader/data-card deliverables after approval:
+- Condition that would make the source genuinely unacceptable:
 ```
 
 Blank, `unclear`, or unsupported answers remain blockers; they are not treated
 as permission or absence of risk.
+
+Discovery is enablement-first: every pending record names a concrete path toward
+`repository` or `external_only`, the party able to resolve missing evidence, and
+work that can proceed using a structure-equivalent synthetic fixture. Reviewers
+distinguish fixable conditions from unacceptable provenance, permission, or
+privacy failures. This planning does not weaken any admission gate.
 
 ## Trust tiers
 

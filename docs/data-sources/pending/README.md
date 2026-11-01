@@ -45,3 +45,9 @@ documented credit outcome may satisfy the risk-outcome contract.
 
 Every record remains `evidence_incomplete`. Priority controls investigation
 order, not trust, admission, or preferred analytical conclusion.
+
+Each record must include an enablement plan: target `repository` or
+`external_only` disposition, fixable conditions, official contact route, next
+evidence, canonical mapping, synthetic fixture, and post-approval deliverables.
+`Reject` is reserved for a verified unacceptable condition, not used merely
+because evidence collection requires work.

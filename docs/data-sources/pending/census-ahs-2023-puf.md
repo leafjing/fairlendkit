@@ -24,3 +24,20 @@ and cannot be renamed loan default.
 Required evidence: exact PUF archive/revision/members/codebook/hashes, Census/HUD
 terms, field matrix, panel/reference periods, attrition, imputation, disclosure,
 and a default `quality_only` use unless a mature credit outcome is documented.
+
+## Enablement plan
+
+- Target: `repository` if Census/HUD terms permit redistributing the selected
+  public file; otherwise `external_only` with a pinned official package.
+- Contact: AHS program office/data-user support and HUD AHS data steward through
+  official program channels.
+- Ask for: 2023 PUF revision identity, terms/redistribution, panel-ID controls,
+  codebook stability, and recommended rent/utility/imputation fields.
+- Next evidence: pin the national PUF package and documentation set, then verify
+  terms and panel/reference-period semantics.
+- Parallel work: synthetic housing-panel fixture and mappings for rent,
+  utilities, burden, weights, imputations, panel time, and unavailable states.
+- Deliverables after approval: adapter, panel-safe tests, housing data card,
+  rent/utility quality and representation example, and manifest verifier.
+- Unacceptable condition: panel/linkage restrictions or disclosure risk cannot
+  be reconciled with aggregate report controls.

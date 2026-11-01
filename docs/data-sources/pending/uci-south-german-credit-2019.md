@@ -32,3 +32,23 @@ Required evidence: official members/sizes/R documentation/hash, attribution,
 original collection and label horizon, sampling, time semantics, and privacy
 review. Any approval is limited to generic risk-metric mechanics, not modern
 population or alternative-signal claims.
+
+## Enablement plan
+
+- Target: `repository` as the first directly included risk-metric benchmark,
+  preserving CC BY 4.0 attribution and original limitations.
+- Contact: UCI Machine Learning Repository dataset maintainers/support and the
+  provenance contacts named by the official dataset documentation.
+- Ask for: current package revision/member manifest, checksum or stable version
+  identifier, original provenance citation, label definition/horizon, and any
+  privacy/use caveats beyond CC BY 4.0.
+- Next evidence: pin official downloadable members and documentation, review the
+  license/attribution files, compute hashes only after retrieval approval, and
+  decide whether missing time semantics restrict it to metric mechanics.
+- Parallel work: structure-equivalent 1,000-row synthetic binary-risk fixture
+  and generic risk adapter tests, clearly outside alternative-signal claims.
+- Deliverables after approval: vendored small dataset if allowed, manifest,
+  attribution notice, adapter, data card, binary outcome mapping, and AD-3 metric
+  benchmark tests.
+- Unacceptable condition: authoritative provenance or label meaning cannot be
+  established sufficiently even for bounded benchmark use.

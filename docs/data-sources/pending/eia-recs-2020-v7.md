@@ -28,3 +28,20 @@ official field says so.
 Required evidence: terms, attribution, redistribution and automated-access
 review, file size/hash, field/imputation/replicate-weight matrix, reference and
 release times, and a `quality_only` approved-use record.
+
+## Enablement plan
+
+- Target: `repository` for the public CSV/codebook if EIA terms permit;
+  otherwise `external_only` with official URL, byte hash, and cache workflow.
+- Contact: EIA RECS program/data support through the official RECS contact route.
+- Ask for: redistribution/attribution confirmation, stable v7 status, checksum
+  availability, revision policy, and correct replicate-weight use.
+- Next evidence: capture EIA website terms and v7 publication metadata, then
+  verify the official file manifest after retrieval is authorized.
+- Parallel work: synthetic RECS-shaped household fixture; adapter contracts for
+  energy expenditures, service types, imputation flags, main and replicate
+  weights, and annual reference periods.
+- Deliverables after approval: adapter, weighted quality/coverage example,
+  utility data card, variance tests, and source verifier.
+- Unacceptable condition: official terms bar intended use or public fields have
+  disclosure constraints incompatible with repository-safe outputs.

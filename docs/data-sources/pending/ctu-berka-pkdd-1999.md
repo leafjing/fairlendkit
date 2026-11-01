@@ -28,3 +28,22 @@ Required evidence: an author/CTU/VŠE-controlled current source, official
 codebook, package manifest, license and redistribution permission, checksums,
 outcome horizon, and privacy review. Availability on Kaggle, GitHub, or another
 mirror does not change the disposition.
+
+## Enablement plan
+
+- Target: `repository` if the rightsholder grants redistribution; otherwise
+  `external_only` from an official archive.
+- Contact: dataset author Petr Berka, CTU/VŠE research-data or library steward,
+  and the historical PKDD challenge rights contact, verified through current
+  institutional directories before outreach.
+- Ask for: authoritative archive, exact file manifest, codebook, license or
+  written permission, redistribution scope, and citation/version identity.
+- Next evidence: locate current institutional author and archive records, then
+  send one documented permission request rather than relying on mirrors.
+- Parallel work: implement a synthetic relational bank fixture with accounts,
+  dated transactions, loans, revisions, and outcomes; draft mappings only from
+  the official codebook once recovered.
+- Deliverables after approval: pinned manifest, relational adapter, leakage
+  tests, cash-flow data card, and a limited historical-risk benchmark.
+- Unacceptable condition: rightsholder denial, unverifiable provenance, or
+  consumer-level privacy risk that cannot be removed without destroying use.

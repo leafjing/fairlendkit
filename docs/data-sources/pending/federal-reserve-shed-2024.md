@@ -25,3 +25,21 @@ Required evidence: package members/sizes/revision/hash, public-use and
 redistribution terms, field matrix, survey reference periods, longitudinal ID
 privacy review, and outcome fitness. Default analytical disposition is
 `quality_only` unless later evidence establishes a mature outcome window.
+
+## Enablement plan
+
+- Target: `repository` if Federal Reserve terms affirm redistribution;
+  otherwise `external_only` with pinned official ZIP verification.
+- Contact: SHED program/data-page contact and Board public website support,
+  resolved from the canonical page rather than guessed email addresses.
+- Ask for: data-use/redistribution statement, revision identifier, stable package
+  checksum policy, and permitted treatment of longitudinal case IDs.
+- Next evidence: enumerate the official ZIP members and page revision notes
+  without retaining data, then obtain terms confirmation.
+- Parallel work: synthetic weighted household survey fixture and codebook-driven
+  mapping for bills, housing, credit access, hardship, and audit groups.
+- Deliverables after approval: version verifier, survey adapter, data card,
+  weighting tests, coverage/representation example, and no unsupported default
+  outcome claim.
+- Unacceptable condition: identifier/linkage restrictions incompatible with
+  safe processing or terms that prohibit reproducible local analysis.
