@@ -259,9 +259,56 @@ def test_public_risk_release_suppresses_sparse_diagnostics_and_publishes_support
     for exact in ('"entity_count":19', '"normalized_weight":19.0'):
         assert exact not in serialized
 
+    repeated = build_risk_diagnostic_release(
+        supported, configuration(), previous_release=protected
+    )
+    assert repeated == protected
+    assert repeated.diagnostics is not None
+    assert all(item.state == "suppressed" for item in repeated.diagnostics.bands)
+    assert all(item.state == "suppressed" for item in repeated.diagnostics.lift_capture)
+
     changed = list(supported)
     changed[0] = changed[0].model_copy(update={"censored": True})
     with pytest.raises(ValueError, match="previously published exact value"):
         build_risk_diagnostic_release(
             tuple(changed), configuration(), previous_release=protected
         )
+
+
+def test_previous_release_locks_overall_outcomes_bands_and_lift_counts():
+    rows = tuple(
+        entity(
+            f"band-{band}-{index}", score,
+            "bad" if index % 2 else "good",
+        )
+        for band, score in enumerate((0.1, 0.35, 0.6, 0.9))
+        for index in range(10)
+    )
+    previous = build_risk_diagnostic_release(rows, configuration())
+    assert previous.state == "published" and previous.diagnostics is not None
+    assert previous.entity_count == 40
+    assert previous.diagnostics.bad_entity_count == 20
+    assert previous.diagnostics.good_entity_count == 20
+    assert [item.entity_count for item in previous.diagnostics.bands] == [10] * 4
+    assert [item.entity_count for item in previous.diagnostics.lift_capture] == [20, 30, 40]
+
+    mutations = []
+    mutations.append(rows + (entity("added", 0.1, "good"),))
+
+    outcome_changed = list(rows)
+    outcome_changed[0] = outcome_changed[0].model_copy(update={"outcome": "bad"})
+    mutations.append(tuple(outcome_changed))
+
+    band_changed = list(rows)
+    band_changed[0] = band_changed[0].model_copy(update={"score": 0.35})
+    mutations.append(tuple(band_changed))
+
+    lift_changed = list(rows)
+    lift_changed[-1] = lift_changed[-1].model_copy(update={"weight": 100.0})
+    mutations.append(tuple(lift_changed))
+
+    for current in mutations:
+        with pytest.raises(ValueError, match="previously published exact value"):
+            build_risk_diagnostic_release(
+                current, configuration(), previous_release=previous
+            )
