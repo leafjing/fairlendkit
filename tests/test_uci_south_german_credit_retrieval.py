@@ -85,7 +85,7 @@ def assert_failed_once(tmp_path, *, data=None, responses=None, test_policy=None,
     data = data or archive_bytes()
     transport = FakeTransport(responses or [response(data)])
     with pytest.raises(Exception):
-        harness.retrieve_once(
+        harness._retrieve_once(
             run_id=run_id,
             quarantine_root=quarantine,
             audit_root=audit,
@@ -97,7 +97,7 @@ def assert_failed_once(tmp_path, *, data=None, responses=None, test_policy=None,
     assert json.loads((audit / f"{run_id}.json").read_text())["states"][-1]["state"] == "failed"
     calls = len(transport.calls)
     with pytest.raises(FileExistsError):
-        harness.retrieve_once(
+        harness._retrieve_once(
             run_id=run_id,
             quarantine_root=quarantine,
             audit_root=audit,
@@ -112,7 +112,7 @@ def test_valid_redirected_retrieval_is_quarantined_read_only(tmp_path):
     redirect = harness.Response(302, {"location": "/final.zip"}, ())
     transport = FakeTransport([redirect, response(data)])
     quarantine, audit = roots(tmp_path)
-    result = harness.retrieve_once(
+    result = harness._retrieve_once(
         run_id="authorized-1",
         quarantine_root=quarantine,
         audit_root=audit,
@@ -291,7 +291,7 @@ def test_ratio_encryption_and_content_privacy_controls(tmp_path):
 def test_cleanup_preserves_spent_marker_and_refuses_early_cleanup(tmp_path):
     data = archive_bytes()
     quarantine, audit = roots(tmp_path)
-    harness.retrieve_once(
+    harness._retrieve_once(
         run_id="cleanup-1",
         quarantine_root=quarantine,
         audit_root=audit,
@@ -318,7 +318,7 @@ def test_roots_and_run_ids_fail_before_network(tmp_path):
     quarantine, audit = roots(tmp_path)
     transport = FakeTransport([response(data)])
     with pytest.raises(ValueError):
-        harness.retrieve_once(
+        harness._retrieve_once(
             run_id="../bad",
             quarantine_root=quarantine,
             audit_root=audit,
@@ -328,11 +328,141 @@ def test_roots_and_run_ids_fail_before_network(tmp_path):
     assert transport.calls == []
     os.chmod(quarantine, 0o777)
     with pytest.raises(ValueError):
-        harness.retrieve_once(
+        harness._retrieve_once(
             run_id="bad-root",
             quarantine_root=quarantine,
             audit_root=audit,
             transport=transport,
             policy=policy(data),
+        )
+    assert transport.calls == []
+
+
+class FakeInspector:
+    def __init__(self, *, commit="a" * 40, dirty=False):
+        self._commit = commit
+        self._dirty = dirty
+
+    def commit(self):
+        return self._commit
+
+    def dirty(self, paths):
+        assert {path.name for path in paths} == {
+            "retrieve_uci_south_german_credit.py",
+            "test_uci_south_german_credit_retrieval.py",
+        }
+        return self._dirty
+
+
+def authorization_payload(quarantine, audit, now):
+    repository = Path(__file__).parents[1]
+    return {
+        "authorization_id": "review-authorization-1",
+        "run_id": "authorized-run-1",
+        "issued_at": now.isoformat(),
+        "expires_at": (now + harness.timedelta(hours=1)).isoformat(),
+        "candidate_id": "uci-south-german-credit-2019",
+        "max_attempts": 1,
+        "package_url": harness.PACKAGE_URL,
+        "allowed_redirect_host": harness.ALLOWED_HOST,
+        "https_only": True,
+        "max_redirects": harness.MAX_REDIRECTS,
+        "expected_content_length": harness.EXPECTED_COMPRESSED_SIZE,
+        "max_streamed_bytes": harness.MAX_COMPRESSED_SIZE,
+        "allowed_media_types": sorted(harness.ALLOWED_MEDIA_TYPES),
+        "members": harness.EXPECTED_MEMBERS,
+        "expected_uncompressed_bytes": harness.EXPECTED_UNCOMPRESSED_SIZE,
+        "max_uncompressed_bytes": harness.MAX_UNCOMPRESSED_SIZE,
+        "member_count": len(harness.EXPECTED_MEMBERS),
+        "max_compression_ratio": harness.MAX_RATIO,
+        "harness_git_commit": "a" * 40,
+        "harness_sha256": harness._sha256_file(repository / "scripts/retrieve_uci_south_german_credit.py"),
+        "test_sha256": harness._sha256_file(Path(__file__)),
+        "quarantine_root": str(quarantine),
+        "audit_root": str(audit),
+    }
+
+
+def write_authorization(tmp_path, payload):
+    target = tmp_path / "authorization.json"
+    target.write_text(json.dumps(payload), encoding="utf-8")
+    os.chmod(target, 0o400)
+    return target
+
+
+def test_strict_authorization_binding_validates_before_transport(tmp_path):
+    quarantine, audit = roots(tmp_path)
+    now = harness.datetime.now(harness.UTC)
+    authorization = write_authorization(
+        tmp_path, authorization_payload(quarantine, audit, now)
+    )
+    loaded = harness._load_authorization(
+        authorization,
+        now=now,
+        inspector=FakeInspector(),
+        require_unexpired=True,
+        enforce_review_state=True,
+    )
+    assert loaded["run_id"] == "authorized-run-1"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda payload: payload.update({"unknown": True}),
+        lambda payload: payload.update({"package_url": "https://evil.example/data.zip"}),
+        lambda payload: payload.update({"max_attempts": 2}),
+        lambda payload: payload.update({"harness_git_commit": "b" * 40}),
+        lambda payload: payload.update({"harness_sha256": "0" * 64}),
+        lambda payload: payload.update({"quarantine_root": payload["audit_root"]}),
+    ],
+)
+def test_authorization_mutations_fail_before_network(tmp_path, mutation):
+    quarantine, audit = roots(tmp_path)
+    now = harness.datetime.now(harness.UTC)
+    payload = authorization_payload(quarantine, audit, now)
+    mutation(payload)
+    authorization = write_authorization(tmp_path, payload)
+    transport = FakeTransport([])
+    with pytest.raises(ValueError):
+        harness.retrieve_authorized(
+            authorization_file=authorization,
+            transport=transport,
+            now=now,
+            inspector=FakeInspector(),
+        )
+    assert transport.calls == []
+
+
+def test_expired_dirty_and_writable_authorizations_fail_before_network(tmp_path):
+    quarantine, audit = roots(tmp_path)
+    now = harness.datetime.now(harness.UTC)
+    payload = authorization_payload(quarantine, audit, now - harness.timedelta(hours=2))
+    authorization = write_authorization(tmp_path, payload)
+    transport = FakeTransport([])
+    with pytest.raises(ValueError, match="currently valid"):
+        harness.retrieve_authorized(
+            authorization_file=authorization,
+            transport=transport,
+            now=now,
+            inspector=FakeInspector(),
+        )
+    payload = authorization_payload(quarantine, audit, now)
+    authorization.unlink()
+    authorization = write_authorization(tmp_path, payload)
+    with pytest.raises(ValueError, match="dirty"):
+        harness.retrieve_authorized(
+            authorization_file=authorization,
+            transport=transport,
+            now=now,
+            inspector=FakeInspector(dirty=True),
+        )
+    os.chmod(authorization, 0o600)
+    with pytest.raises(ValueError, match="0400"):
+        harness.retrieve_authorized(
+            authorization_file=authorization,
+            transport=transport,
+            now=now,
+            inspector=FakeInspector(),
         )
     assert transport.calls == []

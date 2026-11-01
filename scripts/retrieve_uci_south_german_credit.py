@@ -12,6 +12,7 @@ import re
 import shutil
 import stat
 import struct
+import subprocess
 import sys
 import unicodedata
 import urllib.error
@@ -71,6 +72,26 @@ class Transport(Protocol):
     def request(self, url: str) -> Response: ...
 
 
+class GitInspector(Protocol):
+    def commit(self) -> str: ...
+    def dirty(self, paths: tuple[Path, ...]) -> bool: ...
+
+
+class SubprocessGitInspector:
+    def commit(self) -> str:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[1], text=True
+        ).strip()
+
+    def dirty(self, paths: tuple[Path, ...]) -> bool:
+        repository = Path(__file__).resolve().parents[1]
+        relative = [str(path.resolve().relative_to(repository)) for path in paths]
+        output = subprocess.check_output(
+            ["git", "status", "--porcelain", "--", *relative], cwd=repository, text=True
+        )
+        return bool(output.strip())
+
+
 class UrllibTransport:
     """HTTPS transport with automatic redirects disabled."""
 
@@ -102,7 +123,33 @@ class UrllibTransport:
         return Response(int(handle.status), headers, chunks())
 
 
-def retrieve_once(
+def retrieve_authorized(
+    *,
+    authorization_file: Path,
+    transport: Transport,
+    now: datetime | None = None,
+    inspector: GitInspector | None = None,
+) -> dict[str, object]:
+    authorization = _load_authorization(
+        authorization_file,
+        now=now,
+        inspector=inspector or SubprocessGitInspector(),
+        require_unexpired=True,
+        enforce_review_state=True,
+    )
+    return _retrieve_once(
+        run_id=str(authorization["run_id"]),
+        quarantine_root=Path(str(authorization["quarantine_root"])),
+        audit_root=Path(str(authorization["audit_root"])),
+        transport=transport,
+        policy=Policy(),
+        now=now,
+        authorization_id=str(authorization["authorization_id"]),
+        authorization_sha256=_sha256_file(authorization_file),
+    )
+
+
+def _retrieve_once(
     *,
     run_id: str,
     quarantine_root: Path,
@@ -110,6 +157,8 @@ def retrieve_once(
     transport: Transport,
     policy: Policy = Policy(),
     now: datetime | None = None,
+    authorization_id: str = "test-authorization",
+    authorization_sha256: str = "0" * 64,
 ) -> dict[str, object]:
     """Perform one authorized attempt. Tests inject transport; CLI uses HTTPS."""
 
@@ -127,6 +176,8 @@ def retrieve_once(
         "schema_version": "1.0",
         "run_id": run_id,
         "authorization_binding": {
+            "authorization_id": authorization_id,
+            "authorization_sha256": authorization_sha256,
             "package_url": policy.package_url,
             "allowed_host": policy.allowed_host,
             "expected_compressed_size": policy.expected_compressed_size,
@@ -190,6 +241,116 @@ def cleanup_run(
         _sync_dir(audit_root)
     else:
         _transition(audit_path, audit, "cleaned", current)
+
+
+def cleanup_authorized(
+    *,
+    authorization_file: Path,
+    now: datetime | None = None,
+    inspector: GitInspector | None = None,
+) -> None:
+    authorization = _load_authorization(
+        authorization_file,
+        now=now,
+        inspector=inspector or SubprocessGitInspector(),
+        require_unexpired=False,
+        enforce_review_state=False,
+    )
+    cleanup_run(
+        run_id=str(authorization["run_id"]),
+        quarantine_root=Path(str(authorization["quarantine_root"])),
+        audit_root=Path(str(authorization["audit_root"])),
+        now=now,
+    )
+
+
+def _load_authorization(
+    path: Path,
+    *,
+    now: datetime | None,
+    inspector: GitInspector,
+    require_unexpired: bool,
+    enforce_review_state: bool,
+) -> dict[str, object]:
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise ValueError("authorization file must be an absolute regular non-symlink file")
+    if path.stat().st_mode & 0o777 != 0o400:
+        raise ValueError("authorization file mode must be 0400")
+    repository = Path(__file__).resolve().parents[1]
+    resolved = path.resolve(strict=True)
+    if resolved == repository or repository in resolved.parents:
+        raise ValueError("authorization file must be outside the repository")
+    try:
+        authorization = json.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise ValueError("authorization file must contain valid UTF-8 JSON") from error
+    required = {
+        "authorization_id", "run_id", "issued_at", "expires_at", "candidate_id",
+        "max_attempts", "package_url", "allowed_redirect_host", "https_only",
+        "max_redirects", "expected_content_length", "max_streamed_bytes",
+        "allowed_media_types", "members", "expected_uncompressed_bytes",
+        "max_uncompressed_bytes", "member_count", "max_compression_ratio",
+        "harness_git_commit", "harness_sha256", "test_sha256", "quarantine_root",
+        "audit_root",
+    }
+    if not isinstance(authorization, dict) or set(authorization) != required:
+        raise ValueError("authorization schema fields must match exactly")
+    for key in ("authorization_id", "run_id", "candidate_id", "harness_git_commit"):
+        if not isinstance(authorization[key], str) or not authorization[key]:
+            raise ValueError("authorization identity fields must be non-empty strings")
+    if re.fullmatch(r"[0-9a-f]{40}", str(authorization["harness_git_commit"])) is None:
+        raise ValueError("reviewed Git commit must be a lowercase full SHA")
+    for key in ("harness_sha256", "test_sha256"):
+        if re.fullmatch(r"[0-9a-f]{64}", str(authorization[key])) is None:
+            raise ValueError("reviewed file hashes must be lowercase SHA-256")
+    _validate_run_id(str(authorization["run_id"]))
+    try:
+        issued = datetime.fromisoformat(str(authorization["issued_at"]))
+        expires = datetime.fromisoformat(str(authorization["expires_at"]))
+    except ValueError as error:
+        raise ValueError("authorization timestamps must be ISO 8601") from error
+    if issued.tzinfo is None or expires.tzinfo is None:
+        raise ValueError("authorization timestamps must be timezone-aware")
+    issued, expires = issued.astimezone(UTC), expires.astimezone(UTC)
+    if expires <= issued or expires - issued > timedelta(hours=24):
+        raise ValueError("authorization validity cannot exceed 24 hours")
+    current = (now or datetime.now(UTC)).astimezone(UTC)
+    if require_unexpired and not (issued <= current < expires):
+        raise ValueError("authorization is not currently valid")
+    expected = {
+        "candidate_id": "uci-south-german-credit-2019",
+        "max_attempts": 1,
+        "package_url": PACKAGE_URL,
+        "allowed_redirect_host": ALLOWED_HOST,
+        "https_only": True,
+        "max_redirects": MAX_REDIRECTS,
+        "expected_content_length": EXPECTED_COMPRESSED_SIZE,
+        "max_streamed_bytes": MAX_COMPRESSED_SIZE,
+        "allowed_media_types": sorted(ALLOWED_MEDIA_TYPES),
+        "members": EXPECTED_MEMBERS,
+        "expected_uncompressed_bytes": EXPECTED_UNCOMPRESSED_SIZE,
+        "max_uncompressed_bytes": MAX_UNCOMPRESSED_SIZE,
+        "member_count": len(EXPECTED_MEMBERS),
+        "max_compression_ratio": MAX_RATIO,
+    }
+    if any(authorization[key] != value for key, value in expected.items()):
+        raise ValueError("authorization policy does not match compiled constants")
+    quarantine = _validate_root(Path(str(authorization["quarantine_root"])))
+    audit = _validate_root(Path(str(authorization["audit_root"])))
+    if resolved == quarantine or quarantine in resolved.parents or resolved == audit or audit in resolved.parents:
+        raise ValueError("authorization file must be outside approved roots")
+    harness_path = Path(__file__).resolve()
+    test_path = repository / "tests/test_uci_south_german_credit_retrieval.py"
+    if authorization["harness_sha256"] != _sha256_file(harness_path):
+        raise ValueError("authorization harness hash mismatch")
+    if authorization["test_sha256"] != _sha256_file(test_path):
+        raise ValueError("authorization test hash mismatch")
+    if enforce_review_state:
+        if authorization["harness_git_commit"] != inspector.commit():
+            raise ValueError("authorization reviewed Git commit mismatch")
+        if inspector.dirty((harness_path, test_path)):
+            raise ValueError("reviewed harness or test file is dirty")
+    return authorization
 
 
 def _download(path: Path, transport: Transport, policy: Policy) -> dict[str, object]:
@@ -456,28 +617,28 @@ def _safe_failure(error: BaseException) -> str:
     return type(error).__name__ + ": " + str(error).split("?")[0][:256]
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while block := stream.read(8192):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("retrieve", "cleanup"):
         command = commands.add_parser(name)
-        command.add_argument("--run-id", required=True)
-        command.add_argument("--quarantine-root", type=Path, required=True)
-        command.add_argument("--audit-root", type=Path, required=True)
+        command.add_argument("--authorization-file", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.command == "retrieve":
-        retrieve_once(
-            run_id=args.run_id,
-            quarantine_root=args.quarantine_root,
-            audit_root=args.audit_root,
+        retrieve_authorized(
+            authorization_file=args.authorization_file,
             transport=UrllibTransport(),
         )
     else:
-        cleanup_run(
-            run_id=args.run_id,
-            quarantine_root=args.quarantine_root,
-            audit_root=args.audit_root,
-        )
+        cleanup_authorized(authorization_file=args.authorization_file)
     return 0
 
 
