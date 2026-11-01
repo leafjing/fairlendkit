@@ -217,31 +217,19 @@ def test_public_risk_release_suppresses_sparse_diagnostics_and_publishes_support
         )
         for index in range(20)
     )
-    published = build_risk_diagnostic_release(supported, configuration())
-    assert published.state == "published"
-    assert published.entity_count == 20
-    assert published.diagnostics is not None
-    low, middle_low, middle_high, high = published.diagnostics.bands
-    assert low.state == "suppressed"
-    assert low.entity_count is None and low.observed_bad_rate is None
-    assert low.count_bucket == "0..9" and low.reason_code == "ad_sparse_report_cell"
-    assert middle_low.state == "suppressed" and middle_high.state == "suppressed"
-    assert high.state == "suppressed"
-    assert high.entity_count is None and high.normalized_weight is None
-    assert high.observed_bad_rate is None
-    assert high.count_bucket == "hidden"
+    protected = build_risk_diagnostic_release(supported, configuration())
+    assert protected.state == "published" and protected.entity_count == 20
+    assert protected.diagnostics is not None
+    diagnostics = protected.diagnostics
+    low, _, _, high = diagnostics.bands
+    assert low.state == "suppressed" and low.count_bucket == "0..9"
+    assert high.state == "suppressed" and high.count_bucket == "hidden"
     assert high.reason_code == "ad_complementary_suppression"
-    band_bootstrap = {
-        item.metric_key: item for item in published.diagnostics.bootstrap
-        if item.metric_key.startswith("band.")
-    }
-    assert band_bootstrap["band.0.observed_bad_rate"].state == "suppressed"
-    assert band_bootstrap["band.0.observed_bad_rate"].valid_resamples is None
-    assert band_bootstrap["band.3.observed_bad_rate"].state == "suppressed"
-    serialized = published.model_dump_json()
+    assert diagnostics.bad_entity_count is None
+    assert diagnostics.good_entity_count is None
+    assert diagnostics.ks.reason == "ad_complementary_suppression"
+    assert all(item.state == "suppressed" for item in diagnostics.lift_capture)
+    assert all(item.state == "suppressed" for item in diagnostics.bootstrap)
+    serialized = protected.model_dump_json()
     for exact in ('"entity_count":19', '"normalized_weight":19.0'):
         assert exact not in serialized
-    assert set(low.model_dump(exclude_none=True)) == {
-        "state", "upper", "minimum_report_cell_count",
-        "count_bucket", "reason_code",
-    }

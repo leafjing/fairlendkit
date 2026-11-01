@@ -9,7 +9,11 @@ from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 
-from fairlendkit.alternative_data.contracts import StrictModel
+from fairlendkit.alternative_data.contracts import (
+    AggregateReportEvidence,
+    DisclosureState,
+    StrictModel,
+)
 from fairlendkit.alternative_data.suppression import _CountCell, _apply_suppression
 from fairlendkit.metrics.bootstrap import bootstrap_index_draws
 
@@ -284,11 +288,29 @@ class ReleasedBootstrapEvidence(StrictModel):
         return self
 
 
-class ReleasedRiskDiagnostics(RiskDiagnostics):
+class ReleasedRiskDiagnostics(StrictModel):
+    eligible_entity_count: int | None = None
+    immature_excluded_count: int | None = None
+    censored_excluded_count: int | None = None
+    normalized_weight_total: float | None = None
+    bad_entity_count: int | None = None
+    good_entity_count: int | None = None
+    zero_weight_excluded_count: int | None = None
     bands: tuple[ReleasedRiskBand, ...]
+    calibration_in_the_large: MetricValue
+    brier_score: MetricValue
+    calibration_slope: MetricValue
+    ks: MetricValue
+    ks_maximizing_scores: tuple[float, ...]
+    ks_canonical_threshold: float | None
+    risk_auc: MetricValue
+    gini: MetricValue
     lift_capture: tuple[ReleasedLiftCapture, ...]
+    trace: RiskTrace
     bootstrap: tuple[ReleasedBootstrapEvidence, ...]
-
+    bootstrap_valid_resamples: int | None = None
+    reliable: bool | None = None
+    reason_code: str | None = None
 
 class RiskDiagnosticRelease(StrictModel):
     state: str
@@ -303,9 +325,16 @@ class RiskDiagnosticRelease(StrictModel):
         if self.state == "suppressed":
             if self.entity_count is not None or self.diagnostics is not None:
                 raise ValueError("suppressed risk evidence cannot expose exact values")
-            if self.count_bucket != f"0..{self.minimum_report_cell_count - 1}":
+            expected_bucket = (
+                f"0..{self.minimum_report_cell_count - 1}"
+                if self.reason_code == "ad_sparse_report_cell"
+                else "hidden"
+            )
+            if self.count_bucket != expected_bucket:
                 raise ValueError("suppressed risk evidence requires canonical count bucket")
-            if self.reason_code != "ad_sparse_report_cell":
+            if self.reason_code not in {
+                "ad_sparse_report_cell", "ad_complementary_suppression"
+            }:
                 raise ValueError("suppressed risk evidence requires canonical reason")
         elif self.state == "published":
             if self.entity_count is None or self.entity_count < self.minimum_report_cell_count:
@@ -330,24 +359,59 @@ def build_risk_diagnostic_release(
             count_bucket=f"0..{config.minimum_report_cell_count - 1}",
             reason_code="ad_sparse_report_cell",
         )
-    band_disclosure, lift_disclosure = _risk_disclosure(entities, config)
+    disclosure = _risk_disclosure(entities, config)
+    if disclosure["overall"].state.value == "suppressed":
+        return RiskDiagnosticRelease(
+            state="suppressed",
+            minimum_report_cell_count=config.minimum_report_cell_count,
+            count_bucket="hidden",
+            reason_code="ad_complementary_suppression",
+        )
+    band_disclosure = disclosure["bands"]
+    lift_disclosure = disclosure["lift"]
     released_bands = tuple(
         _release_band(band, band_disclosure[index], config.minimum_report_cell_count)
         for index, band in enumerate(diagnostics.bands)
     )
+    core_published = all(
+        disclosure[key].state.value == "published"
+        for key in ("positive", "bad", "good")
+    )
     released_lift = tuple(
-        _release_lift(item, lift_disclosure[index], config.minimum_report_cell_count)
+        _release_lift(
+            item, lift_disclosure[index], config.minimum_report_cell_count,
+            core_published,
+        )
         for index, item in enumerate(diagnostics.lift_capture)
     )
     released_bootstrap = tuple(
-        _release_bootstrap(item, released_bands, released_lift)
+        _release_bootstrap(item, released_bands, released_lift, core_published)
         for item in diagnostics.bootstrap
     )
+    hidden = MetricValue(state="unavailable", reason="ad_complementary_suppression")
     released = ReleasedRiskDiagnostics(
-        **diagnostics.model_dump(exclude={"bands", "lift_capture", "bootstrap"}),
+        eligible_entity_count=_released_count(diagnostics.eligible_entity_count, disclosure["eligible"]),
+        immature_excluded_count=_released_count(diagnostics.immature_excluded_count, disclosure["immature"]),
+        censored_excluded_count=_released_count(diagnostics.censored_excluded_count, disclosure["censored"]),
+        normalized_weight_total=diagnostics.normalized_weight_total if disclosure["positive"].state.value == "published" else None,
+        bad_entity_count=_released_count(diagnostics.bad_entity_count, disclosure["bad"]),
+        good_entity_count=_released_count(diagnostics.good_entity_count, disclosure["good"]),
+        zero_weight_excluded_count=_released_count(diagnostics.zero_weight_excluded_count, disclosure["zero_weight"]),
         bands=released_bands,
+        calibration_in_the_large=diagnostics.calibration_in_the_large if core_published else hidden,
+        brier_score=diagnostics.brier_score if core_published else hidden,
+        calibration_slope=diagnostics.calibration_slope if core_published else hidden,
+        ks=diagnostics.ks if core_published else hidden,
+        ks_maximizing_scores=diagnostics.ks_maximizing_scores if core_published else (),
+        ks_canonical_threshold=diagnostics.ks_canonical_threshold if core_published else None,
+        risk_auc=diagnostics.risk_auc if core_published else hidden,
+        gini=diagnostics.gini if core_published else hidden,
         lift_capture=released_lift,
+        trace=diagnostics.trace,
         bootstrap=released_bootstrap,
+        bootstrap_valid_resamples=diagnostics.bootstrap_valid_resamples if core_published else None,
+        reliable=diagnostics.reliable if core_published else None,
+        reason_code=None if core_published else "ad_complementary_suppression",
     )
     return RiskDiagnosticRelease(
         state="published",
@@ -355,6 +419,10 @@ def build_risk_diagnostic_release(
         entity_count=len(entities),
         diagnostics=released,
     )
+
+
+def _released_count(value, evidence):
+    return value if evidence.state.value == "published" else None
 
 
 def _release_band(band: RiskBand, evidence, minimum: int) -> ReleasedRiskBand:
@@ -375,12 +443,13 @@ def _release_band(band: RiskBand, evidence, minimum: int) -> ReleasedRiskBand:
     )
 
 
-def _release_lift(item, evidence, minimum):
-    if evidence.state.value == "suppressed":
+def _release_lift(item, evidence, minimum, core_published):
+    if evidence.state.value == "suppressed" or not core_published:
         return ReleasedLiftCapture(
             state="suppressed", requested_fraction=item.requested_fraction,
-            minimum_report_cell_count=minimum, count_bucket=evidence.count_bucket,
-            reason_code=evidence.reason_code,
+            minimum_report_cell_count=minimum,
+            count_bucket=(evidence.count_bucket if evidence.state.value == "suppressed" else "hidden"),
+            reason_code=(evidence.reason_code if evidence.state.value == "suppressed" else "ad_complementary_suppression"),
         )
     return ReleasedLiftCapture(
         state="published", minimum_report_cell_count=minimum, **item.model_dump()
@@ -395,8 +464,19 @@ def _risk_disclosure(entities, config):
     favorable = {(type(value), value) for value in config.favorable_outcome_labels}
     unfavorable = {(type(value), value) for value in config.unfavorable_outcome_labels}
     prepared = []
+    eligible = set()
+    immature = set()
+    censored = set()
+    bad_members = set()
+    good_members = set()
+    positive = set()
+    zero_weight = set()
     for item in entities:
-        if not item.label_mature or item.censored:
+        if not item.label_mature:
+            immature.add(item.entity_id)
+            continue
+        if item.censored:
+            censored.add(item.entity_id)
             continue
         if (type(item.outcome), item.outcome) not in favorable | unfavorable:
             continue
@@ -407,8 +487,13 @@ def _risk_disclosure(entities, config):
         while index < len(config.score_band_edges) and risk >= config.score_band_edges[index]:
             index += 1
         buckets[index].add(item.entity_id)
+        eligible.add(item.entity_id)
+        (bad_members if (type(item.outcome), item.outcome) in unfavorable else good_members).add(item.entity_id)
         if item.weight > 0:
+            positive.add(item.entity_id)
             prepared.append((item.entity_id, risk, item.weight))
+        else:
+            zero_weight.add(item.entity_id)
     lift_members = []
     total_weight = sum(row[2] for row in prepared)
     groups = defaultdict(list)
@@ -424,17 +509,37 @@ def _risk_disclosure(entities, config):
             if cumulative >= fraction * total_weight:
                 break
         lift_members.append(frozenset(row[0] for row in selected))
-    cells = (_CountCell("risk.population", "overall", overall, True),) + tuple(
+    named = {
+        "overall": _CountCell("risk.population", "overall", overall, True),
+        "eligible": _CountCell("risk.population", "eligible", frozenset(eligible)),
+        "immature": _CountCell("risk.population", "immature", frozenset(immature)),
+        "censored": _CountCell("risk.population", "censored", frozenset(censored)),
+        "positive": _CountCell("risk.weight", "positive", frozenset(positive)),
+        "zero_weight": _CountCell("risk.weight", "zero", frozenset(zero_weight)),
+        "bad": _CountCell("risk.outcome", "bad", frozenset(bad_members & positive)),
+        "good": _CountCell("risk.outcome", "good", frozenset(good_members & positive)),
+    }
+    cells = tuple(named.values()) + tuple(
         _CountCell("risk.score_band", str(index), frozenset(members))
         for index, members in enumerate(buckets)
     ) + tuple(
         _CountCell("risk.lift_capture", str(index), members)
         for index, members in enumerate(lift_members)
     )
-    release = _apply_suppression(
-        cells, config.minimum_report_cell_count, frozenset()
-    )
+    nonempty = tuple(cell for cell in cells if cell.entities)
+    release = _apply_suppression(nonempty, config.minimum_report_cell_count, frozenset())
     by_identity = {(item.table_id, item.cell_id): item for item in release.cells}
+    for cell in cells:
+        if cell.entities:
+            continue
+        by_identity[cell.identity] = AggregateReportEvidence(
+            table_id=cell.table_id,
+            cell_id=cell.cell_id,
+            state=DisclosureState.SUPPRESSED,
+            minimum_report_cell_count=config.minimum_report_cell_count,
+            count_bucket=f"0..{config.minimum_report_cell_count - 1}",
+            reason_code="ad_sparse_report_cell",
+        )
     band_release = tuple(
         by_identity[("risk.score_band", str(index))] for index in range(len(buckets))
     )
@@ -442,12 +547,17 @@ def _risk_disclosure(entities, config):
         by_identity[("risk.lift_capture", str(index))]
         for index in range(len(lift_members))
     )
-    return band_release, lift_release
+    return {
+        **{key: by_identity[cell.identity] for key, cell in named.items()},
+        "bands": band_release,
+        "lift": lift_release,
+    }
 
 
 def _release_bootstrap(
     evidence: BootstrapEvidence, bands: tuple[ReleasedRiskBand, ...],
     lift: tuple[ReleasedLiftCapture, ...],
+    core_published: bool,
 ) -> ReleasedBootstrapEvidence:
     parts = evidence.metric_key.split(".")
     if len(parts) >= 3 and parts[0] == "band" and parts[1].isdigit():
@@ -458,14 +568,24 @@ def _release_bootstrap(
                 metric_key=evidence.metric_key,
                 reason_code="ad_sparse_report_cell",
             )
-    if len(parts) >= 3 and parts[0] == "top":
-        requested = float(parts[1])
-        item = next((value for value in lift if value.requested_fraction == requested), None)
+    if parts[0] == "top":
+        item = next(
+            (
+                value for value in lift
+                if evidence.metric_key.startswith(f"top.{value.requested_fraction:g}.")
+            ),
+            None,
+        )
         if item is not None and item.state == "suppressed":
             return ReleasedBootstrapEvidence(
                 state="suppressed", metric_key=evidence.metric_key,
                 reason_code="ad_sparse_report_cell",
             )
+    if parts[0] not in {"band", "top"} and not core_published:
+        return ReleasedBootstrapEvidence(
+            state="suppressed", metric_key=evidence.metric_key,
+            reason_code="ad_sparse_report_cell",
+        )
     return ReleasedBootstrapEvidence(state="published", **evidence.model_dump())
 
 
