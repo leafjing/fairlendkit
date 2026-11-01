@@ -44,6 +44,7 @@ class RiskEvaluationConfig(StrictModel):
     bootstrap_seed: int = Field(default=0, ge=0, le=2**64 - 1)
     bootstrap_resamples: int = Field(default=100, ge=1)
     minimum_valid_resamples: int = Field(default=50, ge=1)
+    minimum_report_cell_count: int = Field(default=10, ge=10)
 
     @model_validator(mode="after")
     def validate_contract(self) -> "RiskEvaluationConfig":
@@ -146,7 +147,55 @@ class RiskDiagnostics(StrictModel):
     reliable: bool
 
 
-def evaluate_risk_diagnostics(
+class RiskDiagnosticRelease(StrictModel):
+    state: str
+    minimum_report_cell_count: int = Field(ge=10)
+    entity_count: int | None = None
+    diagnostics: RiskDiagnostics | None = None
+    count_bucket: str | None = None
+    reason_code: str | None = None
+
+    @model_validator(mode="after")
+    def validate_disclosure(self) -> "RiskDiagnosticRelease":
+        if self.state == "suppressed":
+            if self.entity_count is not None or self.diagnostics is not None:
+                raise ValueError("suppressed risk evidence cannot expose exact values")
+            if self.count_bucket != f"0..{self.minimum_report_cell_count - 1}":
+                raise ValueError("suppressed risk evidence requires canonical count bucket")
+            if self.reason_code != "ad_sparse_report_cell":
+                raise ValueError("suppressed risk evidence requires canonical reason")
+        elif self.state == "published":
+            if self.entity_count is None or self.entity_count < self.minimum_report_cell_count:
+                raise ValueError("published risk evidence must meet disclosure minimum")
+            if self.diagnostics is None or self.count_bucket is not None or self.reason_code is not None:
+                raise ValueError("published risk evidence requires diagnostics without suppression metadata")
+        else:
+            raise ValueError("risk release state must be published or suppressed")
+        return self
+
+
+def build_risk_diagnostic_release(
+    entities: tuple[RiskEntity, ...], config: RiskEvaluationConfig
+) -> RiskDiagnosticRelease:
+    if len({item.entity_id for item in entities}) != len(entities):
+        raise ValueError("risk evaluation requires one row per entity")
+    diagnostics = _evaluate_risk_diagnostics(entities, config)
+    if len(entities) < config.minimum_report_cell_count:
+        return RiskDiagnosticRelease(
+            state="suppressed",
+            minimum_report_cell_count=config.minimum_report_cell_count,
+            count_bucket=f"0..{config.minimum_report_cell_count - 1}",
+            reason_code="ad_sparse_report_cell",
+        )
+    return RiskDiagnosticRelease(
+        state="published",
+        minimum_report_cell_count=config.minimum_report_cell_count,
+        entity_count=len(entities),
+        diagnostics=diagnostics,
+    )
+
+
+def _evaluate_risk_diagnostics(
     entities: tuple[RiskEntity, ...], config: RiskEvaluationConfig
 ) -> RiskDiagnostics:
     if len({item.entity_id for item in entities}) != len(entities):
