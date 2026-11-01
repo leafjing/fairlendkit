@@ -79,7 +79,7 @@ Three electricity bills are explicitly supplied:
 Expected values:
 
 - original billed amount = `100 + 120 + 80 = 300`;
-- net adjusted obligation = `100 + 120 + (80 - 20) = 260`;
+- net adjusted obligation = `100 + 120 + (80 - 20) = 280`;
 - total linked payment = `100 + 120 + 60 = 280`;
 - fully paid count = `3 / 3 = 1.0`;
 - fully paid by due date count = `2 / 3 = 0.6666666666666666`;
@@ -87,11 +87,13 @@ Expected values:
 - estimated-bill prevalence = `1 / 3 = 0.3333333333333333`; and
 - adjustment prevalence = `1 / 3 = 0.3333333333333333`.
 
-Payment totals may exceed the net adjusted obligation because the Month 2
-payment was complete and Month 3 was adjusted. The profile reports both totals;
-it does not reinterpret the difference as income, credit, or overpayment. An
-explicit service interruption would be contextual evidence only and would not
-change these payment-behavior numerators.
+Total linked payment equals the net adjusted obligation in this oracle. The
+profile reports both totals; it does not reinterpret any difference in another
+fixture as income, credit, or overpayment. The corrected `280` value is solely
+an arithmetic correction: it does not change the input events, Month 2 payment
+timeliness, availability, or any numerator or denominator. An explicit service
+interruption would be contextual evidence only and would not change these
+payment-behavior numerators.
 
 ## Required fixture assertions
 
