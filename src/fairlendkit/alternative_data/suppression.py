@@ -21,7 +21,7 @@ from fairlendkit.alternative_data.quality import (
     _typed_equal,
     _typed_sort_key,
     _typed_token,
-    calculate_quality_evidence,
+    _calculate_quality_evidence,
 )
 from fairlendkit.alternative_data.leakage import (
     GateDisposition,
@@ -59,7 +59,7 @@ def build_quality_report_release(
         raise ValueError("population entity identities must be unique")
     if any(record.entity_id not in set(entity_ids) for record in record_items):
         raise ValueError("every signal record must belong to the declared population")
-    calculate_quality_evidence(
+    _calculate_quality_evidence(
         entities=entity_items,
         records=record_items,
         coverages=coverage_items,
@@ -175,6 +175,21 @@ def _candidate_cells(
             record.entity_id for record in records if record.source_id == source_id
         )
         cells.append(_CountCell("quality.source", _typed_token(source_id), members))
+
+    for provider_id in sorted({source.provider_id for source in config.sources}):
+        provider_sources = {
+            source.source_id
+            for source in config.sources
+            if source.provider_id == provider_id
+        }
+        members = frozenset(
+            record.entity_id
+            for record in records
+            if record.source_id in provider_sources
+        )
+        cells.append(
+            _CountCell("quality.provider", _typed_token(provider_id), members)
+        )
 
     identities = tuple(cell.identity for cell in cells)
     if len(set(identities)) != len(identities):

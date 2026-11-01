@@ -2,6 +2,8 @@ from datetime import UTC, datetime
 
 import pytest
 
+import fairlendkit.alternative_data as alternative_data
+
 from fairlendkit.alternative_data import (
     AlternativeDataConfig,
     AlternativeDataReasonCode,
@@ -11,8 +13,8 @@ from fairlendkit.alternative_data import (
     QualityPopulationEntity,
     SignalRecord,
     build_quality_report_release,
-    calculate_quality_evidence,
 )
+from fairlendkit.alternative_data.quality import _calculate_quality_evidence
 
 
 def source(**overrides):
@@ -111,7 +113,7 @@ def test_quality_engine_assembles_eligibility_coverage_and_group_evidence():
         record("late", observed_at="2026-01-02T00:00:00Z"),
         record("wrong-currency", currency="EUR"),
     )
-    result = calculate_quality_evidence(
+    result = _calculate_quality_evidence(
         entities=entities,
         records=records,
         coverages=(coverage("entity-secret-1"),),
@@ -145,7 +147,10 @@ def test_quality_engine_assembles_eligibility_coverage_and_group_evidence():
         if item.code == AlternativeDataReasonCode.PENDING_RECORD
     )
     assert pending_reason.unit == "record"
+    assert pending_reason.population == "records_in_scope"
     assert pending_reason.denominator == 5
+    assert pending_reason.scope_key == "overall"
+    assert pending_reason.source_id == "cash-source"
     assert pending_reason.signal_family == "cash_flow"
 
     scope_keys = tuple(scope.scope_key for scope in result.scopes)
@@ -159,7 +164,7 @@ def test_quality_engine_assembles_eligibility_coverage_and_group_evidence():
 
 
 def test_missing_signal_is_unavailable_and_never_becomes_adverse_behavior():
-    result = calculate_quality_evidence(
+    result = _calculate_quality_evidence(
         entities=(entity("entity-secret-2", "B"),),
         records=(),
         coverages=(),
@@ -194,7 +199,7 @@ def test_missing_signal_reasons_are_separate_by_family_with_entity_denominators(
             ),
         )
     )
-    result = calculate_quality_evidence(
+    result = _calculate_quality_evidence(
         entities=(entity("entity-secret-1", "A"),),
         records=(record("cash-record"),),
         coverages=(coverage("entity-secret-1"),),
@@ -208,7 +213,17 @@ def test_missing_signal_reasons_are_separate_by_family_with_entity_denominators(
 
     assert tuple(reason.signal_family for reason in missing) == ("rent", "utility")
     assert all(reason.unit == "entity" for reason in missing)
+    assert all(reason.population == "entities_in_scope" for reason in missing)
+    assert all(reason.scope_key == "overall" for reason in missing)
+    assert all(reason.source_id is None for reason in missing)
     assert all(reason.count == 1 and reason.denominator == 1 for reason in missing)
+
+
+def test_unpublished_quality_models_are_not_in_the_public_api():
+    assert not hasattr(alternative_data, "calculate_quality_evidence")
+    assert not hasattr(alternative_data, "QualityScopeResult")
+    assert not hasattr(alternative_data, "AlternativeDataQualityResult")
+    assert not hasattr(alternative_data, "QualityReasonCount")
 
 
 def test_record_with_multiple_exclusion_reasons_counts_once():
@@ -217,7 +232,7 @@ def test_record_with_multiple_exclusion_reasons_counts_once():
         observed_at="2026-01-02T00:00:00Z",
         currency="EUR",
     )
-    result = calculate_quality_evidence(
+    result = _calculate_quality_evidence(
         entities=(entity("entity-secret-1", "A"),),
         records=(item,),
         coverages=(coverage("entity-secret-1"),),
@@ -251,7 +266,7 @@ def test_period_overlap_and_gap_are_typed_observations():
             period_end="2025-03-31T00:00:00Z",
         ),
     )
-    result = calculate_quality_evidence(
+    result = _calculate_quality_evidence(
         entities=(entity("entity-secret-1", "A"),),
         records=records,
         coverages=(coverage("entity-secret-1"),),
@@ -271,13 +286,13 @@ def test_quality_output_is_deterministic_and_contains_no_consumer_identity():
     )
     records = (record("one"),)
     coverages = (coverage("entity-secret-1"),)
-    first = calculate_quality_evidence(
+    first = _calculate_quality_evidence(
         entities=entities,
         records=records,
         coverages=coverages,
         config=config(),
     )
-    second = calculate_quality_evidence(
+    second = _calculate_quality_evidence(
         entities=reversed(entities),
         records=reversed(records),
         coverages=reversed(coverages),
@@ -293,7 +308,7 @@ def test_quality_output_is_deterministic_and_contains_no_consumer_identity():
 
 def test_quality_engine_fails_closed_on_future_evidence():
     with pytest.raises(ValueError, match="ad_future_timestamp"):
-        calculate_quality_evidence(
+        _calculate_quality_evidence(
             entities=(entity("entity-secret-1", "A"),),
             records=(
                 record(
@@ -360,3 +375,23 @@ def test_primary_suppression_handles_zero_count_configured_cells():
     )
     assert established.state == "suppressed"
     assert established.count_bucket == "0..9"
+
+
+def test_public_release_never_serializes_exact_sparse_values_or_intervals():
+    release = build_quality_report_release(
+        entities=(entity("entity-secret-1", "rare"),),
+        records=(record("record-1"),),
+        coverages=(coverage("entity-secret-1"),),
+        config=config(),
+    )
+
+    assert release.__class__.__name__ == "AggregateReportRelease"
+    assert any(cell.table_id == "quality.provider" for cell in release.cells)
+    for cell in release.cells:
+        assert cell.state == "suppressed"
+        assert cell.entity_count is None
+        assert cell.value is None
+        assert cell.numerator is None
+        assert cell.denominator is None
+        assert cell.interval_lower is None
+        assert cell.interval_upper is None

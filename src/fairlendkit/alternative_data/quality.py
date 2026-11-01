@@ -49,6 +49,11 @@ class QualityEvidenceUnit(StrEnum):
     ENTITY = "entity"
 
 
+class QualityEvidencePopulation(StrEnum):
+    RECORDS_IN_SCOPE = "records_in_scope"
+    ENTITIES_IN_SCOPE = "entities_in_scope"
+
+
 class QualityPopulationEntity(StrictModel):
     """Sensitive run input; the entity identity never enters quality results."""
 
@@ -75,7 +80,10 @@ class QualityReasonCount(StrictModel):
     disposition: AlternativeDataDisposition
     count: int = Field(ge=1)
     unit: QualityEvidenceUnit
+    population: QualityEvidencePopulation
     denominator: int = Field(ge=1)
+    scope_key: str = Field(pattern=r"^[a-z][a-z0-9_.-]*$")
+    source_id: str | None = None
     signal_family: SignalFamily | None = None
     message: str = Field(min_length=1)
 
@@ -85,6 +93,13 @@ class QualityReasonCount(StrictModel):
             raise ValueError("reason disposition and message must match the contract")
         if self.count > self.denominator:
             raise ValueError("reason count cannot exceed its explicit denominator")
+        expected_population = (
+            QualityEvidencePopulation.RECORDS_IN_SCOPE
+            if self.unit == QualityEvidenceUnit.RECORD
+            else QualityEvidencePopulation.ENTITIES_IN_SCOPE
+        )
+        if self.population != expected_population:
+            raise ValueError("reason population must match its evidence unit")
         if (
             self.code == AlternativeDataReasonCode.SIGNAL_NOT_PROVIDED
             and self.signal_family is None
@@ -102,7 +117,7 @@ class ProviderCoverage(StrictModel):
     entity_coverage_rate: float = Field(ge=0.0, le=1.0)
 
 
-class QualityScopeResult(StrictModel):
+class _QualityScopeResult(StrictModel):
     scope_key: str = Field(pattern=r"^[a-z][a-z0-9_.-]*$")
     scope_kind: QualityScopeKind
     signal_family: SignalFamily | None = None
@@ -127,7 +142,7 @@ class QualityScopeResult(StrictModel):
     reasons: tuple[QualityReasonCount, ...]
 
     @model_validator(mode="after")
-    def validate_counts_and_time(self) -> "QualityScopeResult":
+    def validate_counts_and_time(self) -> "_QualityScopeResult":
         if self.authoritative_record_count > self.eligible_record_count:
             raise ValueError("authoritative records must be a subset of eligible records")
         if (
@@ -162,13 +177,13 @@ class QualityScopeResult(StrictModel):
         return self
 
 
-class AlternativeDataQualityResult(StrictModel):
+class _AlternativeDataQualityResult(StrictModel):
     population_count: int = Field(ge=0)
     input_record_count: int = Field(ge=0)
-    scopes: tuple[QualityScopeResult, ...]
+    scopes: tuple[_QualityScopeResult, ...]
 
     @model_validator(mode="after")
-    def validate_scopes(self) -> "AlternativeDataQualityResult":
+    def validate_scopes(self) -> "_AlternativeDataQualityResult":
         keys = tuple(scope.scope_key for scope in self.scopes)
         if not keys or keys[0] != "overall":
             raise ValueError("quality results must begin with overall scope")
@@ -183,14 +198,14 @@ class AlternativeDataQualityResult(StrictModel):
         return self
 
 
-def calculate_quality_evidence(
+def _calculate_quality_evidence(
     *,
     entities: Iterable[QualityPopulationEntity],
     records: Iterable[SignalRecord],
     coverages: Iterable[CreditCoverage],
     config: AlternativeDataConfig,
-) -> AlternativeDataQualityResult:
-    """Return deterministic aggregate quality evidence without behavior inference."""
+) -> _AlternativeDataQualityResult:
+    """Build unpublished evidence for validation and disclosure processing only."""
 
     entity_items = tuple(entities)
     record_items = tuple(records)
@@ -400,7 +415,7 @@ def calculate_quality_evidence(
         )
 
     results = tuple(assemble(spec) for spec in scopes)
-    return AlternativeDataQualityResult(
+    return _AlternativeDataQualityResult(
         population_count=len(entity_items),
         input_record_count=len(record_items),
         scopes=results,
@@ -441,7 +456,7 @@ def _assemble_scope(
     ],
     sources: dict[str, AlternativeDataSource],
     as_of_time: datetime,
-) -> QualityScopeResult:
+) -> _QualityScopeResult:
     scoped = tuple(
         record
         for record in records
@@ -452,14 +467,23 @@ def _assemble_scope(
         record for record in scoped if _record_identity(record) in authoritative_ids
     )
     record_denominators = {
-        signal_family: sum(record.signal_family == signal_family for record in scoped)
+        (signal_family, source_id): sum(
+            record.signal_family == signal_family and record.source_id == source_id
+            for record in scoped
+        )
         for signal_family in SignalFamily
+        for source_id in sources
     }
     eligible = 0
     excluded = 0
     unavailable = 0
     reason_counts: dict[
-        tuple[AlternativeDataReasonCode, SignalFamily | None, QualityEvidenceUnit],
+        tuple[
+            AlternativeDataReasonCode,
+            SignalFamily | None,
+            QualityEvidenceUnit,
+            str | None,
+        ],
         int,
     ] = {}
     for record in scoped:
@@ -474,7 +498,12 @@ def _assemble_scope(
         else:
             eligible += 1
         for code in record_reasons[_record_identity(record)]:
-            reason_key = (code, record.signal_family, QualityEvidenceUnit.RECORD)
+            reason_key = (
+                code,
+                record.signal_family,
+                QualityEvidenceUnit.RECORD,
+                record.source_id,
+            )
             reason_counts[reason_key] = reason_counts.get(reason_key, 0) + 1
     excluded_entities = 0
     unavailable_entities = 0
@@ -495,7 +524,12 @@ def _assemble_scope(
         for code, reason_family in entity_reasons[entity_id]:
             if family is not None and reason_family not in (None, family):
                 continue
-            reason_key = (code, reason_family, QualityEvidenceUnit.ENTITY)
+            reason_key = (
+                code,
+                reason_family,
+                QualityEvidenceUnit.ENTITY,
+                None,
+            )
             reason_counts[reason_key] = reason_counts.get(reason_key, 0) + 1
 
     starts = tuple(_instant(record.evidence_start) for record in authoritative)
@@ -545,30 +579,40 @@ def _assemble_scope(
 
     reasons = tuple(
         QualityReasonCount(
-            code=key[0],
-            disposition=REASON_CONTRACT[key[0]][0],
+            code=reason_key[0],
+            disposition=REASON_CONTRACT[reason_key[0]][0],
             count=count,
-            unit=key[2],
+            unit=reason_key[2],
+            population=(
+                QualityEvidencePopulation.RECORDS_IN_SCOPE
+                if reason_key[2] == QualityEvidenceUnit.RECORD
+                else QualityEvidencePopulation.ENTITIES_IN_SCOPE
+            ),
             denominator=(
-                record_denominators[key[1]]
-                if key[2] == QualityEvidenceUnit.RECORD and key[1] is not None
+                record_denominators[(reason_key[1], reason_key[3])]
+                if reason_key[2] == QualityEvidenceUnit.RECORD
+                and reason_key[1] is not None
+                and reason_key[3] is not None
                 else len(scoped)
-                if key[2] == QualityEvidenceUnit.RECORD
+                if reason_key[2] == QualityEvidenceUnit.RECORD
                 else len(members)
             ),
-            signal_family=key[1],
-            message=REASON_CONTRACT[key[0]][1],
+            scope_key=key,
+            source_id=reason_key[3],
+            signal_family=reason_key[1],
+            message=REASON_CONTRACT[reason_key[0]][1],
         )
-        for key, count in sorted(
+        for reason_key, count in sorted(
             reason_counts.items(),
             key=lambda item: (
                 item[0][0].value,
                 "" if item[0][1] is None else item[0][1].value,
                 item[0][2].value,
+                "" if item[0][3] is None else item[0][3],
             ),
         )
     )
-    return QualityScopeResult(
+    return _QualityScopeResult(
         scope_key=key,
         scope_kind=kind,
         signal_family=family,
