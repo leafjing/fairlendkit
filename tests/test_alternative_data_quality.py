@@ -8,6 +8,8 @@ from fairlendkit.alternative_data import (
     AlternativeDataConfig,
     AlternativeDataReasonCode,
     AlternativeDataSource,
+    AggregateReportEvidence,
+    AggregateReportRelease,
     CreditCoverage,
     ObservationWindow,
     QualityPopulationEntity,
@@ -15,6 +17,11 @@ from fairlendkit.alternative_data import (
     build_quality_report_release,
 )
 from fairlendkit.alternative_data.quality import _calculate_quality_evidence
+from fairlendkit.alternative_data.suppression import (
+    _atoms,
+    _candidate_cells,
+    _has_alternative_value,
+)
 
 
 def source(**overrides):
@@ -358,6 +365,31 @@ def test_cross_table_suppression_prevents_sparse_cell_reconstruction():
     assert "entity-secret-0" not in serialized
     assert '"entity_count":1' not in serialized
 
+    candidate_cells = _candidate_cells(entities, records, coverages, config())
+    published_ids = {
+        (cell.table_id, cell.cell_id)
+        for cell in release.cells
+        if cell.state == "published"
+    }
+    published = tuple(
+        cell for cell in candidate_cells if cell.identity in published_ids
+    )
+    atoms, actual = _atoms(candidate_cells)
+    for released_cell in release.cells:
+        if released_cell.state == "suppressed":
+            hidden = next(
+                cell
+                for cell in candidate_cells
+                if cell.identity == (released_cell.table_id, released_cell.cell_id)
+            )
+            assert _has_alternative_value(
+                hidden,
+                candidate_cells,
+                published,
+                atoms,
+                actual,
+            )
+
 
 def test_primary_suppression_handles_zero_count_configured_cells():
     entities = tuple(entity(f"entity-secret-{index}", "A") for index in range(12))
@@ -395,3 +427,34 @@ def test_public_release_never_serializes_exact_sparse_values_or_intervals():
         assert cell.denominator is None
         assert cell.interval_lower is None
         assert cell.interval_upper is None
+
+
+def test_previous_published_exact_value_is_an_enforced_release_constraint():
+    entities = tuple(entity(f"entity-secret-{index}", "A") for index in range(12))
+    records = tuple(
+        record(f"record-{index}", entity_id=item.entity_id)
+        for index, item in enumerate(entities)
+    )
+    coverages = tuple(coverage(item.entity_id) for item in entities)
+    previous = AggregateReportRelease(
+        cells=(
+            AggregateReportEvidence(
+                table_id="quality.population",
+                cell_id="overall",
+                state="published",
+                minimum_report_cell_count=10,
+                entity_count=12,
+                value=12.0,
+                numerator=12.0,
+            ),
+        )
+    )
+
+    with pytest.raises(ValueError, match="previously published exact value"):
+        build_quality_report_release(
+            entities=entities[:-1],
+            records=records[:-1],
+            coverages=coverages[:-1],
+            config=config(),
+            previous_release=previous,
+        )

@@ -79,9 +79,16 @@ def build_quality_report_release(
     known = {cell.identity for cell in cells}
     locked = set()
     if previous_release is not None:
+        current_counts = {cell.identity: len(cell.entities) for cell in cells}
         for cell in previous_release.cells:
             identity = (cell.table_id, cell.cell_id)
             if cell.state == DisclosureState.PUBLISHED and identity in known:
+                if cell.entity_count is None:
+                    raise ValueError("previously published cells require an exact count")
+                if current_counts[identity] != cell.entity_count:
+                    raise ValueError(
+                        "current cell conflicts with a previously published exact value"
+                    )
                 locked.add(identity)
     return _apply_suppression(
         cells,
@@ -217,7 +224,7 @@ def _apply_suppression(
             (
                 cell
                 for cell in cells
-                if cell.identity in primary
+                if cell.identity in hidden
                 and not _has_alternative_value(cell, cells, published, atoms, actual)
             ),
             None,
