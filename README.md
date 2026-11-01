@@ -122,9 +122,15 @@ The following remain future milestones and are not exposed by the current core:
 
 - threshold scanning or a fairness-accuracy frontier;
 - a notebook workflow beyond the checked-in command-line example;
-- proxy-risk screening;
 - governance integration or investigation lifecycle tooling; and
 - mitigation, reweighing, threshold recommendations, or model retraining.
+
+The release-candidate alternative-data APIs are available from
+`fairlendkit.alternative_data`. They provide caller-configured validation,
+quality evidence, signal profiles, risk diagnostics, and potential proxy-risk
+screening through disclosure-controlled typed releases. They do not connect to,
+download, admit, or redistribute real consumer data, and they do not make
+credit, causal, discrimination, legal, or compliance determinations.
 
 See the [Product brief](docs/product-brief.md), [Product requirements](docs/product-requirements.md), [Canonical glossary](docs/glossary.md), [Architecture](docs/architecture.md), [Metric contracts](docs/metric-contracts.md), [Undefined reasons](docs/undefined-reasons.md), [Report schema](docs/report-schema.md), [Methodology and guardrails](docs/methodology-and-guardrails.md), and [Roadmap](docs/roadmap.md).
 
@@ -140,9 +146,9 @@ Implementation is tracked as ordered, testable work packages in the
 Pre-alpha. Milestone 3 core audit engine and reliability contracts are
 implemented. Milestone 4 is closed: the installed CLI and JSON, CSV, and HTML
 reporting workflow passed independent review and Python 3.11/3.12 CI before PR
-#46 merged. Alternative-data validation, risk analysis, fairness, and
-potential-proxy screening are under active contract development and are not yet
-public capabilities.
+#46 merged. The AD-0 through AD-4 alternative-data implementation is now a
+release candidate exposed through `fairlendkit.alternative_data`; it remains
+synthetic/caller-input only and does not authorize any live data operation.
 
 ## Milestone 3 release evidence
 
