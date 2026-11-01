@@ -140,13 +140,63 @@ def _proxy_entity_validation_reason(error: ValidationError) -> ProxyReason:
     return ProxyReason.ISOLATION_FAILURE
 
 
+class _ProxyInputModel(StrictModel):
+    """Non-bypassable payload-free boundary for public proxy inputs."""
+
+    @classmethod
+    def _validation_reason(cls, error: ValidationError) -> ProxyReason:
+        return ProxyReason.ISOLATION_FAILURE
+
+    @classmethod
+    def _run_public_validation(cls, validator: Callable[[], object]):
+        reason: ProxyReason | None = None
+        result: object | None = None
+        try:
+            result = validator()
+        except ValidationError as error:
+            reason = cls._validation_reason(error)
+        # Raise outside the Pydantic handler so rejected input is not retained
+        # by cause/context, regardless of which standard validator was called.
+        if reason is not None:
+            raise ProxyFailure(reason)
+        assert result is not None
+        return result
+
+    def __init__(self, **data: object) -> None:
+        reason: ProxyReason | None = None
+        try:
+            super().__init__(**data)
+        except ValidationError as error:
+            reason = type(self)._validation_reason(error)
+        if reason is not None:
+            raise ProxyFailure(reason)
+
+    @classmethod
+    def model_validate(cls, obj: object, **kwargs: object):
+        return cls._run_public_validation(
+            lambda: super(_ProxyInputModel, cls).model_validate(obj, **kwargs)
+        )
+
+    @classmethod
+    def model_validate_json(cls, json_data: str | bytes | bytearray, **kwargs: object):
+        return cls._run_public_validation(
+            lambda: super(_ProxyInputModel, cls).model_validate_json(json_data, **kwargs)
+        )
+
+    @classmethod
+    def model_validate_strings(cls, obj: object, **kwargs: object):
+        return cls._run_public_validation(
+            lambda: super(_ProxyInputModel, cls).model_validate_strings(obj, **kwargs)
+        )
+
+
 class _CategoryLevel(StrEnum):
     MISSING = "__internal_missing__"
     RARE = "__internal_rare__"
     UNSEEN = "__internal_unseen__"
 
 
-class ProxyEntity(StrictModel):
+class ProxyEntity(_ProxyInputModel):
     entity_id: str = Field(min_length=1)
     window: ProxyWindow
     candidate: float | int | str | bool | None
@@ -165,29 +215,9 @@ class ProxyEntity(StrictModel):
     population_eligible: bool = True
     weight: float | None = None
 
-    def __init__(self, **data: object) -> None:
-        reason: ProxyReason | None = None
-        try:
-            super().__init__(**data)
-        except ValidationError as error:
-            reason = _proxy_entity_validation_reason(error)
-        # Leave the Pydantic handler before raising so rejected entity input is
-        # absent from both the public error and its exception chain.
-        if reason is not None:
-            raise ProxyFailure(reason)
-
     @classmethod
-    def model_validate(cls, obj: object, **kwargs: object) -> "ProxyEntity":
-        reason: ProxyReason | None = None
-        result: ProxyEntity | None = None
-        try:
-            result = super().model_validate(obj, **kwargs)
-        except ValidationError as error:
-            reason = _proxy_entity_validation_reason(error)
-        if reason is not None:
-            raise ProxyFailure(reason)
-        assert result is not None
-        return result
+    def _validation_reason(cls, error: ValidationError) -> ProxyReason:
+        return _proxy_entity_validation_reason(error)
 
     @field_validator("weight")
     @classmethod
@@ -197,7 +227,7 @@ class ProxyEntity(StrictModel):
         return value
 
 
-class ProxyConfig(StrictModel):
+class ProxyConfig(_ProxyInputModel):
     protocol_version: str = Field(min_length=1)
     population_id: str = Field(min_length=1)
     candidate_id: str = Field(min_length=1)
@@ -231,16 +261,9 @@ class ProxyConfig(StrictModel):
     confidence_level: float = Field(gt=0, lt=1)
     weighting: str = "unweighted"
 
-    def __init__(self, **data: object) -> None:
-        reason: ProxyReason | None = None
-        try:
-            super().__init__(**data)
-        except ValidationError as error:
-            reason = _proxy_config_validation_reason(error)
-        # Raise after leaving the ValidationError handler so neither __cause__
-        # nor __context__ retains Pydantic's rejected input payload.
-        if reason is not None:
-            raise ProxyFailure(reason)
+    @classmethod
+    def _validation_reason(cls, error: ValidationError) -> ProxyReason:
+        return _proxy_config_validation_reason(error)
 
     @model_validator(mode="after")
     def validate_contract(self):

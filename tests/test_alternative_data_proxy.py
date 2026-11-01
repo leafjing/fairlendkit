@@ -219,6 +219,67 @@ def test_public_entity_validation_is_stable_and_payload_free(caplog):
     assert all(secret not in log_text for secret in secrets)
 
 
+def test_all_standard_public_validation_entrypoints_are_payload_free(caplog):
+    entity = dict(
+        entity_id="entity-safe",
+        window="SECRET-ENTITY-WINDOW",
+        candidate="1.0",
+        protected="class-a",
+        provider_stratum="provider-a",
+        coverage_stratum="coverage-a",
+        candidate_source_id="source-v1",
+        candidate_derivation_version="derivation-v1",
+        reducer_id="reducer-v1",
+        reducer_version="1",
+        as_of_time="2025-01-01T00:00:00Z",
+        candidate_available_time="2024-12-01T00:00:00Z",
+        protected_observation_time="2024-12-01T00:00:00Z",
+    )
+    config_payload = config().model_dump(mode="json")
+    config_payload["weighting"] = "SECRET-CONFIG-WEIGHTING"
+    calls = (
+        lambda: ProxyEntity(**entity),
+        lambda: ProxyEntity.model_validate(entity),
+        lambda: ProxyEntity.model_validate_json(json.dumps(entity)),
+        lambda: ProxyEntity.model_validate_strings(entity),
+        lambda: ProxyConfig(**config_payload),
+        lambda: ProxyConfig.model_validate(config_payload),
+        lambda: ProxyConfig.model_validate_json(json.dumps(config_payload)),
+        lambda: ProxyConfig.model_validate_strings(config_payload),
+    )
+    secrets = ("SECRET-ENTITY-WINDOW", "SECRET-CONFIG-WEIGHTING")
+    observed_reasons = []
+    for call in calls:
+        with pytest.raises(ProxyFailure) as captured:
+            call()
+        error = captured.value
+        observed_reasons.append(error.reason_code)
+        surfaces = (
+            str(error),
+            repr(error),
+            repr(error.errors()),
+            error.json(),
+            repr(error.__cause__),
+            repr(error.__context__),
+        )
+        assert all(secret not in surface for secret in secrets for surface in surfaces)
+        assert error.__cause__ is None
+        assert error.__context__ is None
+        logging.getLogger("fairlendkit.proxy.all-entrypoints").error("%s", error)
+    assert observed_reasons[:4] == [ProxyReason.ISOLATION_FAILURE.value] * 4
+    # model_validate_strings cannot represent this model's tuple-valued strata;
+    # it therefore fails structurally before the weighting validator. The
+    # boundary still returns the stable generic protocol error without input.
+    assert observed_reasons[4:] == [
+        ProxyReason.WEIGHTING_UNSUPPORTED.value,
+        ProxyReason.WEIGHTING_UNSUPPORTED.value,
+        ProxyReason.WEIGHTING_UNSUPPORTED.value,
+        ProxyReason.ISOLATION_FAILURE.value,
+    ]
+    log_text = "\n".join(record.getMessage() for record in caplog.records)
+    assert all(secret not in log_text for secret in secrets)
+
+
 def test_reason_contract_dispositions_and_messages_are_exact():
     expected = {
         ProxyReason.CANDIDATE_PROHIBITED: (
