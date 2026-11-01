@@ -36,6 +36,12 @@ from fairlendkit.alternative_data.reasons import (
 )
 from fairlendkit.alternative_data.quality import QualityPopulationEntity
 from fairlendkit.alternative_data.suppression import build_quality_report_release
+from fairlendkit.alternative_data.adapters import (
+    SignalRecordFieldMap,
+    adapt_cash_flow_records,
+    adapt_rent_records,
+    adapt_utility_records,
+)
 
 __all__ = [
     "AcquisitionMethod",
@@ -59,6 +65,7 @@ __all__ = [
     "SignalFamily",
     "SignalEventType",
     "SignalRecord",
+    "SignalRecordFieldMap",
     "TransferScope",
     "UtilityEventType",
     "evaluate_feature_record",
@@ -66,6 +73,9 @@ __all__ = [
     "evaluate_outcome_record",
     "evaluate_source_completion",
     "build_quality_report_release",
+    "adapt_cash_flow_records",
+    "adapt_rent_records",
+    "adapt_utility_records",
     "make_evidence",
     "select_authoritative_feature_records",
 ]
