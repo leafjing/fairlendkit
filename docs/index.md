@@ -29,6 +29,7 @@ page for each topic; it does not replace the normative contracts.
 - [Milestone 4 user workflow and reports](milestone-4-user-workflow.md)
 - [Milestone 4 release evidence](milestone-4-release-evidence.md)
 - [Milestone 5 alternative-data credit assessment](alternative-data-credit-assessment.md)
+- [AD-D0 data-source discovery and admission](alternative-data-source-admission.md)
 - [Alternative-data field dictionary](alternative-data-field-dictionary.md)
 - [Alternative-data reason codes](alternative-data-reason-codes.md)
 - [Alternative-data hand-calculated examples](alternative-data-hand-calculated-examples.md)

@@ -225,6 +225,12 @@ appear in generated artifacts.
 
 ## Delivery slices
 
+0. **AD-D0 — source discovery and admission:** candidate inventory, provenance,
+   license/redistribution matrix, signal/outcome/time coverage, privacy and
+   representation review, and `repository` / `external_only` / `reject`
+   decisions under the
+   [data-source admission contract](alternative-data-source-admission.md). No
+   external data or downloader enters the repository before approval.
 1. **AD-0 — contracts and leakage gate:** domain models, time windows,
    provenance, coverage strata, reason codes, privacy boundary, and fixtures.
 2. **AD-1 — common quality engine:** eligibility, temporal integrity,

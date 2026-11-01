@@ -69,6 +69,9 @@ coupling report delivery to new analytical behavior.
   It adds leakage-safe longitudinal data validation, signal-specific quality
   evidence, credit-risk performance diagnostics, coverage fairness, and
   potential proxy-risk screening for cash-flow, rent, and utility signals.
+  AD-D0 source discovery and admission must close before AD-0 implementation;
+  external data may not enter the repository before source, license, privacy,
+  temporal-fitness, and representation review.
 - Threshold scanning and the fairness-accuracy frontier are frozen and deferred
   until Milestone 5 closes. Existing experimental branches are not release
   contracts and must not be merged into this milestone.
