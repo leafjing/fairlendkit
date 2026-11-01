@@ -55,6 +55,10 @@ Concrete dataframe adapters parse these records but cannot invent categories,
 impute missing events, reinterpret an amount, choose an audit population, or
 define consumer coverage status.
 
+The normative field-level types, conditional requirements, family vocabularies,
+and report-safe projection are defined in the
+[alternative-data field dictionary](alternative-data-field-dictionary.md).
+
 Raw transaction descriptions, account numbers, addresses, meter identifiers,
 and other direct identifiers are not required by the analytical contract and
 must not appear in report artifacts. Reports retain aggregate evidence and
@@ -77,6 +81,9 @@ group where support permits:
 Quality checks describe observed evidence. They do not assert that an absent
 payment occurred, that a consumer was delinquent, or that data are fit for a
 particular lending use.
+
+All validation and availability evidence uses the closed
+[alternative-data reason-code contract](alternative-data-reason-codes.md).
 
 ## Signal-family profiles
 
@@ -115,6 +122,10 @@ seasonality support, and reporting gaps.
 Service interruption, geographic availability, household composition, climate,
 provider practices, subsidies, and billing cadence are potential context or
 proxy pathways; the toolkit does not interpret them as consumer creditworthiness.
+
+The three profiles are fixed by independently reproducible
+[hand-calculated examples](alternative-data-hand-calculated-examples.md). These
+examples define denominators and unavailable states as well as arithmetic.
 
 ## Credit-risk performance
 
