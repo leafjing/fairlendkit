@@ -69,3 +69,8 @@ No sample is selected until CFPB restores or identifies an official package
 page with sample identity and terms. Survey hardship is never a default label,
 and credit-derived variables cannot become `risk_eligible` without explicit
 time alignment, outcome semantics, maturity, privacy, and censoring review.
+
+An unsent official inquiry is prepared at
+[`cfpb-making-ends-meet-request.md`](../contact-drafts/cfpb-making-ends-meet-request.md).
+It is a draft only and must not be sent without explicit authorization from
+custice. Preparing the draft does not change the candidate or admission state.

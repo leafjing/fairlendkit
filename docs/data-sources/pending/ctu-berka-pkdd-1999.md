@@ -29,6 +29,30 @@ codebook, package manifest, license and redistribution permission, checksums,
 outcome horizon, and privacy review. Availability on Kaggle, GitHub, or another
 mirror does not change the disposition.
 
+## Verified institutional evidence
+
+Checked 2026-11-01 without retrieving any dataset or mirror content:
+
+- the current VŠE profile for Petr Berka is reachable at
+  <https://insis.vse.cz/lide/clovek.pl?id=454>;
+- the current VŠE Department of Information and Knowledge Engineering research
+  page states that its data-mining group co-organized ECML/PKDD Discovery
+  Challenges and identifies Petr Berka, but its challenge link points to the
+  historical `sorry.vse.cz` host;
+- the current VŠE Library Open Science support page identifies the university
+  library as an institutional route for research-data management and repository
+  questions; and
+- the historical `sorry.vse.cz` and `lisp.vse.cz` hosts did not resolve in the
+  current check.
+
+These records establish an institutional connection and two official inquiry
+routes, not an authoritative package. No current VŠE/CTU archive, package
+identity, dictionary, license, redistribution permission, checksum, or privacy
+terms were located. A web archive, GitHub repository, Kaggle entry, or other
+mirror may help locate former filenames, but none may supply authoritative
+metadata or bytes for admission. The candidate therefore remains
+`evidence_incomplete`, with no manifested release and no download authorization.
+
 ## Enablement plan
 
 - Target: `repository` if the rightsholder grants redistribution; otherwise
@@ -38,8 +62,10 @@ mirror does not change the disposition.
   institutional directories before outreach.
 - Ask for: authoritative archive, exact file manifest, codebook, license or
   written permission, redistribution scope, and citation/version identity.
-- Next evidence: locate current institutional author and archive records, then
-  send one documented permission request rather than relying on mirrors.
+- Next evidence: ask the current author profile contact and VŠE Library Open
+  Science support for the authoritative archive, package identity, dictionary,
+  rights holder, license, redistribution scope, and privacy conditions. Sending
+  that request requires separate authorization.
 - Parallel work: implement a synthetic relational bank fixture with accounts,
   dated transactions, loans, revisions, and outcomes; draft mappings only from
   the official codebook once recovered.

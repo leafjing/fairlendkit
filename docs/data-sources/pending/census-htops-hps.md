@@ -64,6 +64,21 @@ checksums, license/terms, revision identity, and the October user note's effect
 on the September ZIP remain unresolved. Candidate status stays
 `evidence_incomplete`; no artifact is approved for download.
 
+The official 2026 topical directory was also checked on 2026-11-01. It exposes
+the March, May, and July SAS/CSV ZIPs, but no standalone July dictionary or
+replicate-weight artifact. The release page says those components are included
+with each release, while neither page publishes the July ZIP member listing.
+Consequently, their exact member names, paths, formats, and placement cannot be
+verified without inspecting package content, which remains prohibited.
+
+The July ZIP reports a 2026-09-10 last-modified date, while the official user-
+notes page labels the July note “Updated October 30, 2026.” The pages do not say
+whether that later note changes package bytes, interpretation only, weighting,
+or any field semantics. It must not be treated as a publisher-issued package
+revision identity. The next official inquiry must ask Census for the July member
+manifest, dictionary and replicate-weight locations, stable revision identity,
+and the precise effect of the October note before any package retrieval.
+
 Any eventual use defaults to `quality_only`. Survey-reported rent, mortgage,
 energy, or expense difficulty is not a transaction history or credit outcome.
 Weights and replicate weights must remain wave-specific, and no uncertainty
