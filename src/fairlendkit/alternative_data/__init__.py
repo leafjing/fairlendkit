@@ -50,6 +50,18 @@ from fairlendkit.alternative_data.risk import (
     ScoreType,
     build_risk_diagnostic_release,
 )
+from fairlendkit.alternative_data.proxy import (
+    CandidateKind,
+    ProxyConfig,
+    ProxyEntity,
+    ProxyRelease,
+    ProxyWindow,
+    build_proxy_release,
+    render_proxy_csv,
+    render_proxy_json,
+    render_proxy_html,
+    proxy_fold,
+)
 
 __all__ = [
     "AcquisitionMethod",
@@ -81,6 +93,11 @@ __all__ = [
     "RiskEvaluationConfig",
     "ScoreTarget",
     "ScoreType",
+    "CandidateKind",
+    "ProxyConfig",
+    "ProxyEntity",
+    "ProxyRelease",
+    "ProxyWindow",
     "evaluate_feature_record",
     "evaluate_credit_coverage",
     "evaluate_outcome_record",
@@ -92,4 +109,9 @@ __all__ = [
     "make_evidence",
     "select_authoritative_feature_records",
     "build_risk_diagnostic_release",
+    "build_proxy_release",
+    "render_proxy_csv",
+    "render_proxy_json",
+    "render_proxy_html",
+    "proxy_fold",
 ]
