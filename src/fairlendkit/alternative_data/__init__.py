@@ -42,6 +42,18 @@ from fairlendkit.alternative_data.adapters import (
     adapt_rent_records,
     adapt_utility_records,
 )
+from fairlendkit.alternative_data.risk import (
+    LiftCapture,
+    MetricState,
+    MetricValue,
+    RiskBand,
+    RiskDiagnostics,
+    RiskEntity,
+    RiskEvaluationConfig,
+    ScoreTarget,
+    ScoreType,
+    evaluate_risk_diagnostics,
+)
 
 __all__ = [
     "AcquisitionMethod",
@@ -68,6 +80,15 @@ __all__ = [
     "SignalRecordFieldMap",
     "TransferScope",
     "UtilityEventType",
+    "LiftCapture",
+    "MetricState",
+    "MetricValue",
+    "RiskBand",
+    "RiskDiagnostics",
+    "RiskEntity",
+    "RiskEvaluationConfig",
+    "ScoreTarget",
+    "ScoreType",
     "evaluate_feature_record",
     "evaluate_credit_coverage",
     "evaluate_outcome_record",
@@ -78,4 +99,5 @@ __all__ = [
     "adapt_utility_records",
     "make_evidence",
     "select_authoritative_feature_records",
+    "evaluate_risk_diagnostics",
 ]
