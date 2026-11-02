@@ -40,6 +40,14 @@ TABLE_SNAPSHOTS = {
     "order": (6471, 6, "9b88d5bbdc6534cd630fea9fa311aa3fd931a43fd73916f9f5c429d202b8af0a"),
     "trans": (1056320, 10, "7d7498d12f57d39b3c7d7e1e02c95321e3324fa97f008093b35e1f46f29eb3a0"),
 }
+TRANSACTION_CUTOFF_COUNTS = {
+    "strictly_before_loan_date": 17_621,
+    "same_day_as_loan_date": 55,
+    "after_loan_date": 73_013,
+    "finished_loans_with_strictly_before_transactions": 234,
+    "finished_loans_with_same_day_transactions": 40,
+    "finished_loans_with_after_transactions": 234,
+}
 FINISHED_STATUSES = frozenset({"A", "B"})
 SENSITIVE_OR_LINKABLE_COLUMNS = frozenset(
     {

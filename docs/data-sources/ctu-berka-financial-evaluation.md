@@ -31,7 +31,9 @@ imbalance and limited sample size.
 
 All 234 completed loans have transactions on the loan date or later. The live
 join contained 17,621 transactions strictly before `loan.date`, 55 on the same
-date, and 73,013 after it. Because the source has dates but no decision-time
+date across 40 completed loans, and 73,013 after it across all 234 completed
+loans. All 234 also have at least one strictly earlier transaction. Because the
+source has dates but no decision-time
 timestamps, same-day ordering is unknowable. Any feature query must therefore
 enforce `trans.date < loan.date`; same-day and post-loan balances, transaction
 behavior, loan duration/completion logic, and any other future-derived values

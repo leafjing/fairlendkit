@@ -15,6 +15,7 @@ from fairlendkit.research.ctu_berka import (
     TABLE_SNAPSHOTS,
     TOTAL_COLUMNS,
     TOTAL_ROWS,
+    TRANSACTION_CUTOFF_COUNTS,
     canonical_table_sha256,
     finished_label,
     predecision_transaction_mask,
@@ -141,4 +142,5 @@ def test_manifest_pins_only_aggregate_external_evidence() -> None:
         for name, values in manifest["tables"].items()
     }
     assert observed_tables == TABLE_SNAPSHOTS
+    assert manifest["finished_loan_transaction_counts"] == TRANSACTION_CUTOFF_COUNTS
     assert manifest["raw_or_transformed_data_committed"] is False
