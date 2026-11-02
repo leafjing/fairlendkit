@@ -63,14 +63,18 @@ The metadata-only
 artifacts with `release_id=null`, `redistribution=unverified`, and file scope
 `unverified`. The ZIP member names, dictionary and replicate-weight placement,
 checksums, license/terms, and revision identity remain unresolved. Candidate
-status stays `evidence_incomplete`; no artifact is approved for download.
+status stays `evidence_incomplete`: temporary download is authorized for
+content evaluation, but the artifacts are not formally admitted and must not
+be committed to the repository or redistributed.
 
 The official 2026 topical directory was also checked on 2026-11-01. It exposes
 the March, May, and July SAS/CSV ZIPs, but no standalone July dictionary or
 replicate-weight artifact. The release page says those components are included
 with each release, while neither page publishes the July ZIP member listing.
 Consequently, their exact member names, paths, formats, and placement cannot be
-verified without inspecting package content, which remains prohibited.
+verified from metadata alone. The authorized content evaluation may inspect
+them in temporary storage; formal admission, repository storage, and
+redistribution remain prohibited.
 
 The official user note resolves its relationship to the ZIP. The October 30
 `Health1`/`Housing3` and October 7 `Transportation3` corrections affect
