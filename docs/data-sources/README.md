@@ -6,6 +6,9 @@ raw, sampled, transformed, or row-level third-party data.
 - `pending/` holds unverified candidate records.
 - `admission-proposals/` holds independently reviewable proposals; a proposal
   is not an admission decision or download authorization.
+- [`admission-queue.md`](admission-queue.md) is the reviewed, strictly serial
+  work queue for moving candidates through retrieval, admission, promotion, and
+  redistribution as separate gates.
 - Approved/rejected registers are created only after independent review under
   the [AD-D0 admission contract](../alternative-data-source-admission.md).
 

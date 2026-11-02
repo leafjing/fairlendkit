@@ -33,18 +33,13 @@ transaction histories. Utility or rent hardship, arrears, missed bills, or
 service interruption must not be renamed as loan default. Only the publisher's
 documented credit outcome may satisfy the risk-outcome contract.
 
-## Current priority queue
+## Current admission queue
 
-1. [CTU/Berka PKDD'99](ctu-berka-pkdd-1999.md)
-2. [CFPB Making Ends Meet](cfpb-making-ends-meet.md)
-3. [Federal Reserve SHED 2024](federal-reserve-shed-2024.md)
-4. [Census HTOPS/HPS](census-htops-hps.md)
-5. [EIA RECS 2020 v7](eia-recs-2020-v7.md)
-6. [Census/HUD AHS 2023 PUF](census-ahs-2023-puf.md)
-7. [UCI South German Credit](uci-south-german-credit-2019.md)
-
-Every record remains `evidence_incomplete`. Priority controls investigation
-order, not trust, admission, or preferred analytical conclusion.
+The current evidence-maturity order, per-source next gate, and blocking state
+are maintained in the
+[serial admission queue](../admission-queue.md). Every record in this directory
+remains `evidence_incomplete`. Queue position controls work order only; it is not
+trust, admission, download authorization, or a preferred analytical conclusion.
 
 Each record must include an enablement plan: target `repository` or
 `external_only` disposition, fixable conditions, official contact route, next
