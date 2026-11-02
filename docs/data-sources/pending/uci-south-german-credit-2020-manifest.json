@@ -1,0 +1,74 @@
+{
+  "manifest_version": "1.0",
+  "candidate_id": "uci-south-german-credit-2020",
+  "publisher_legal_name": "UCI Machine Learning Repository",
+  "canonical_landing_url": "https://archive.ics.uci.edu/dataset/573/south+german+credit+update",
+  "persistent_identifier": "https://doi.org/10.24432/C5QG88",
+  "release_id": "uci-573-2020-current-at-2026-11-02",
+  "release_date": "2024-03-16",
+  "retrieved_at": "2026-11-02T04:08:00Z",
+  "license_id": "CC-BY-4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+  "terms_url": null,
+  "redistribution": "permitted",
+  "files": [
+    {
+      "path": "south+german+credit+update.zip",
+      "media_type": "application/zip",
+      "expected_bytes": 13130,
+      "publisher_checksum": null,
+      "repository_sha256": "0b40d40eb7321693d559e247a556f88a6cc8df8489c3cb2ae084db7592584551",
+      "role": "data",
+      "contains_row_level_data": true,
+      "unit_of_observation": "one historical credit contract/case",
+      "expected_columns": [],
+      "redistribution_scope": "repository"
+    },
+    {
+      "path": "codetable.txt",
+      "media_type": "text/plain; charset=utf-8",
+      "expected_bytes": 3154,
+      "publisher_checksum": null,
+      "repository_sha256": "0040e7a173a06d1167447b2bbc4315ee1380fa3c25db321b9fd7d97ada0721bf",
+      "role": "codebook",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "repository"
+    },
+    {
+      "path": "read_SouthGermanCredit.R",
+      "media_type": "text/plain; charset=utf-8",
+      "expected_bytes": 7550,
+      "publisher_checksum": null,
+      "repository_sha256": "92340012c6387dcc0fea9dcf47e2cc9659cda93c21bd688f3f694f0f0229ed68",
+      "role": "data_dictionary",
+      "contains_row_level_data": false,
+      "unit_of_observation": null,
+      "expected_columns": [],
+      "redistribution_scope": "repository"
+    },
+    {
+      "path": "SouthGermanCredit.asc",
+      "media_type": "text/plain; charset=utf-8",
+      "expected_bytes": 47940,
+      "publisher_checksum": null,
+      "repository_sha256": "5f363343f356ca38a0236baab849e472846399b2176ccc5bd686483dd8a7562f",
+      "role": "data",
+      "contains_row_level_data": true,
+      "unit_of_observation": "one historical credit contract/case",
+      "expected_columns": [
+        "laufkont", "laufzeit", "moral", "verw", "hoehe", "sparkont",
+        "beszeit", "rate", "famges", "buerge", "wohnzeit", "verm",
+        "alter", "weitkred", "wohn", "bishkred", "beruf", "pers",
+        "telef", "gastarb", "kredit"
+      ],
+      "redistribution_scope": "repository"
+    }
+  ],
+  "documentation": [
+    "https://archive.ics.uci.edu/dataset/573/south+german+credit+update",
+    "https://doi.org/10.24432/C5QG88"
+  ],
+  "review_state": "evidence_incomplete"
+}

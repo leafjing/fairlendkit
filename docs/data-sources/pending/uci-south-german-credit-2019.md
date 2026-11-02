@@ -2,7 +2,7 @@
 
 - Candidate ID: `uci-south-german-credit-2019`
 - Priority: 7
-- Review status: `evidence_incomplete`
+- Review status: `superseded`
 - Publisher: UCI Machine Learning Repository
 - Original provenance: corrected South German credit representation; original
   collection context needs further review
@@ -17,6 +17,10 @@
   provenance, and privacy confirmation
 - Decision: none
 - Trust tier: B pending original-provenance and privacy review
+
+This record is superseded by the current official UCI 573 record,
+[`uci-south-german-credit-2020`](uci-south-german-credit-2020.md). Its UCI 522
+identity and DOI must not be used for the downloaded UCI 573 package.
 
 UCI documents 1,000 cases, 700 good and 300 bad, with 20 predictor variables and
 data from 1973–1975. It is a small cross-sectional credit-risk benchmark, not
