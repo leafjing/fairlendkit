@@ -31,7 +31,7 @@ KEYWORDS = {
     "algorithmic auditing",
     "reproducible research",
 }
-VERSION = "0.1.0.dev0"
+VERSION = "0.1.0rc1"
 AUTHOR = "Zijing Ye"
 AUTHOR_GIVEN = "Zijing"
 AUTHOR_FAMILY = "Ye"

@@ -615,7 +615,7 @@ def _installed_environment() -> bytes:
     )
     lines = result.stdout.decode("utf-8").splitlines()
     normalized = (
-        "fairlendkit==0.1.0.dev0" if line.startswith("fairlendkit @ ") else line
+        "fairlendkit==0.1.0rc1" if line.startswith("fairlendkit @ ") else line
         for line in lines
     )
     return ("\n".join(normalized) + "\n").encode("utf-8")

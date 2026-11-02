@@ -19,7 +19,7 @@ venv_python="$release_tmp/venv/bin/python"
 
 "$venv_python" --version
 "$venv_python" -m pip freeze --all \
-  | sed -E 's#^fairlendkit @ .*#fairlendkit==0.1.0.dev0#' \
+  | sed -E 's#^fairlendkit @ .*#fairlendkit==0.1.0rc1#' \
   | tee "$release_tmp/pip-freeze.txt"
 cmp "$repo_root/docs/milestone-3-release-pip-freeze.txt" \
   "$release_tmp/pip-freeze.txt"

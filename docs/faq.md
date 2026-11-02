@@ -55,8 +55,9 @@ implemented core.
 
 ## Does it provide HTML reports, CSV reports, or a CLI?
 
-No. The current public API returns a renderer-neutral typed result and canonical
-JSON. HTML/CSV renderers and a command-line interface are roadmap items.
+Yes. The `fairlendkit audit` command writes canonical JSON, metrics CSV, and a
+self-contained HTML report from one typed audit result. These formats present
+the same analysis and do not independently recompute metrics.
 
 ## How should I cite it?
 

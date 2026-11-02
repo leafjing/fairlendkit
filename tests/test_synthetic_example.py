@@ -6,7 +6,7 @@ from fairlendkit import AuditResult
 
 
 def test_synthetic_schema_v2_example_is_executable_and_deterministic(capsys, monkeypatch):
-    monkeypatch.setattr("fairlendkit.application._package_version", lambda: "0.1.0.dev0")
+    monkeypatch.setattr("fairlendkit.application._package_version", lambda: "0.1.0rc1")
     runpy.run_path("examples/synthetic/run_audit.py")
     first = capsys.readouterr().out
     runpy.run_path("examples/synthetic/run_audit.py")

@@ -69,7 +69,7 @@ The release-gate SHA-256 of the exact example stdout, including its final
 newline, is:
 
 ```text
-19f9bce01b90186040346079d36ab6fd5be1f209db1ea08b064537c7ae3c02f0
+43c196e36cd3509fce3e4be0ca4cd624e5e233ad4a6c9ad6df01f0bffe499c76
 ```
 
 From a clean checkout, the single release-verification entry point creates a
@@ -122,9 +122,15 @@ The following remain future milestones and are not exposed by the current core:
 
 - threshold scanning or a fairness-accuracy frontier;
 - a notebook workflow beyond the checked-in command-line example;
-- proxy-risk screening;
 - governance integration or investigation lifecycle tooling; and
 - mitigation, reweighing, threshold recommendations, or model retraining.
+
+The release-candidate alternative-data APIs are available from
+`fairlendkit.alternative_data`. They provide caller-configured validation,
+quality evidence, signal profiles, risk diagnostics, and potential proxy-risk
+screening through disclosure-controlled typed releases. They do not connect to,
+download, admit, or redistribute real consumer data, and they do not make
+credit, causal, discrimination, legal, or compliance determinations.
 
 See the [Product brief](docs/product-brief.md), [Product requirements](docs/product-requirements.md), [Canonical glossary](docs/glossary.md), [Architecture](docs/architecture.md), [Metric contracts](docs/metric-contracts.md), [Undefined reasons](docs/undefined-reasons.md), [Report schema](docs/report-schema.md), [Methodology and guardrails](docs/methodology-and-guardrails.md), and [Roadmap](docs/roadmap.md).
 
@@ -138,10 +144,11 @@ Implementation is tracked as ordered, testable work packages in the
 ## Status
 
 Pre-alpha. Milestone 3 core audit engine and reliability contracts are
-implemented. The Milestone 4 candidate adds the installed CLI and JSON, CSV,
-and HTML reporting workflow; it remains subject to independent review and green
-Python 3.11/3.12 CI before closure. Threshold sensitivity and the remaining V1
-workflow are still under development.
+implemented. Milestone 4 is closed: the installed CLI and JSON, CSV, and HTML
+reporting workflow passed independent review and Python 3.11/3.12 CI before PR
+#46 merged. The AD-0 through AD-4 alternative-data implementation is now a
+release candidate exposed through `fairlendkit.alternative_data`; it remains
+synthetic/caller-input only and does not authorize any live data operation.
 
 ## Milestone 3 release evidence
 
@@ -161,7 +168,7 @@ workflow are still under development.
 The complete checked-in verification record is
 [`docs/milestone-3-release-evidence.md`](docs/milestone-3-release-evidence.md).
 
-The Milestone 4 candidate evidence is recorded in
+The Milestone 4 closure evidence is recorded in
 [`docs/milestone-4-release-evidence.md`](docs/milestone-4-release-evidence.md).
 
 ## Citation

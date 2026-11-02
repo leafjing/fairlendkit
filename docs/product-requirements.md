@@ -59,6 +59,24 @@ Mitigation and re-audit are deferred to V1.1.
 
 The configuration must define label semantics. FairLendKit must never infer whether a larger score represents higher creditworthiness or higher default risk.
 
+## Alternative-data requirements
+
+Cash-flow, rent, and utility-payment analysis must use explicit source,
+provider, event/period time, observation time, decision time, lookback,
+performance-window, label-maturity, currency, and revision/reversal semantics.
+The toolkit must reject time leakage and preserve unavailable coverage as a
+separate state. It must not infer delinquency, unfavorable outcomes, or
+traditional-credit coverage status from missing records.
+
+Alternative-data outputs must distinguish source/data quality, signal-family
+profiles, credit-risk performance, data-access and coverage fairness, decision
+fairness, and potential proxy-risk screens. All screens retain denominators,
+exclusions, uncertainty or reliability state, provenance, and limitations.
+Consumer-level raw records and direct identifiers must not appear in reports.
+
+The normative delivery contract is
+[`alternative-data-credit-assessment.md`](alternative-data-credit-assessment.md).
+
 ## V1 outputs
 
 - `report.html`: human-readable review report
