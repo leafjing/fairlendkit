@@ -41,6 +41,7 @@ page for each topic; it does not replace the normative contracts.
 - [Alternative-data credit-risk metrics](alternative-data-risk-metrics.md)
 - [Alternative-data potential proxy-risk screening](alternative-data-proxy-screening.md)
 - [Citation and research relationship](citation-and-research.md)
+- [Conditional disparity and HMDA case-study contract](research/conditional-disparity-and-hmda-case-study.md)
 - [Repository discoverability decisions](discoverability-audit.md)
 - [Technical discovery configuration and site templates](repository-discoverability-config.md)
 
