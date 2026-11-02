@@ -22,6 +22,7 @@ def _run_gate(
     tmp_path: Path,
     *,
     main_sha: str = "reviewed-main-sha",
+    base_sha: str = "reviewed-main-sha",
     changed_field: str | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], Path]:
     bin_dir = tmp_path / "bin"
@@ -29,7 +30,6 @@ def _run_gate(
     calls = tmp_path / "calls"
     payload = {
         "headRefOid": "reviewed-release-sha",
-        "baseRefOid": "reviewed-main-sha",
         "reviewDecision": "APPROVED",
         "mergeStateStatus": "CLEAN",
     }
@@ -53,6 +53,7 @@ printf 'gh %s\\n' "$*" >> {calls}
 case "$1 $2" in
   "pr checks") exit 0 ;;
   "pr view") printf '%s\\n' {json.dumps(payload)!r} ;;
+  "api repos/{{owner}}/{{repo}}/pulls/123") printf '%s\\n' {base_sha!r} ;;
   "pr merge") exit 0 ;;
   *) exit 97 ;;
 esac
@@ -93,6 +94,7 @@ def test_release_notes_call_the_single_production_merge_gate() -> None:
     assert command_block.count("bash scripts/verify_release_pr_gate.sh") == 1
     assert "gh pr checks" not in command_block
     assert "gh pr view" not in command_block
+    assert "gh api" not in command_block
     assert "gh pr merge" not in command_block
 
 
@@ -108,7 +110,7 @@ def test_first_oid_failure_stops_all_side_effect_stubs(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "changed_field",
-    ("headRefOid", "baseRefOid", "reviewDecision", "mergeStateStatus"),
+    ("headRefOid", "reviewDecision", "mergeStateStatus"),
 )
 def test_each_pr_field_drift_stops_before_merge(
     tmp_path: Path, changed_field: str
@@ -118,6 +120,7 @@ def test_each_pr_field_drift_stops_before_merge(
     assert result.returncode != 0
     assert any(call.startswith("gh pr checks ") for call in calls)
     assert any(call.startswith("gh pr view ") for call in calls)
+    assert any(call.startswith("gh api ") for call in calls)
     assert not any(call.startswith("gh pr merge ") for call in calls)
     assert not any(call.startswith("merge ") for call in calls)
     assert not any(call.startswith("tag ") for call in calls)
@@ -129,6 +132,7 @@ def test_matching_state_runs_checks_and_merges_exactly_once(tmp_path: Path) -> N
     assert result.returncode == 0, result.stderr
     assert len([call for call in calls if call.startswith("gh pr checks ")]) == 1
     assert len([call for call in calls if call.startswith("gh pr view ")]) == 1
+    assert len([call for call in calls if call.startswith("gh api ")]) == 1
     merge_calls = [call for call in calls if call.startswith("gh pr merge ")]
     assert merge_calls == [
         "gh pr merge 123 --merge --delete-branch=false "
@@ -136,3 +140,22 @@ def test_matching_state_runs_checks_and_merges_exactly_once(tmp_path: Path) -> N
     ]
     assert not any(call.startswith("merge ") for call in calls)
     assert not any(call.startswith("tag ") for call in calls)
+
+
+@pytest.mark.parametrize("base_sha", ("DRIFTED", ""))
+def test_rest_base_sha_drift_or_missing_stops_before_merge(
+    tmp_path: Path, base_sha: str
+) -> None:
+    result, call_log = _run_gate(tmp_path, base_sha=base_sha)
+    calls = _calls(call_log)
+    assert result.returncode != 0
+    assert len([call for call in calls if call.startswith("gh api ")]) == 1
+    assert not any(call.startswith("gh pr merge ") for call in calls)
+
+
+def test_rest_base_sha_match_allows_merge(tmp_path: Path) -> None:
+    result, call_log = _run_gate(tmp_path, base_sha="reviewed-main-sha")
+    calls = _calls(call_log)
+    assert result.returncode == 0, result.stderr
+    assert len([call for call in calls if call.startswith("gh api ")]) == 1
+    assert len([call for call in calls if call.startswith("gh pr merge ")]) == 1
