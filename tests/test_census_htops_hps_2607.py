@@ -57,24 +57,37 @@ def test_variance_semantics_are_pinned_but_not_implemented() -> None:
     assert VARIANCE_OUTPUTS_ENABLED is False
 
 
-@pytest.mark.parametrize("name", ["PWEIGHT", "HWEIGHT"])
-def test_full_sample_weight_zero_matches_main_rows(name: str) -> None:
-    values = tuple(str(index / 10) for index in range(EXPECTED["rows"]))
-    validate_full_sample_weight_rows(values, values, name)
+def _weight_values() -> tuple[str, ...]:
+    return tuple(str(index / 10) for index in range(EXPECTED["rows"]))
 
 
-@pytest.mark.parametrize("name", ["PWEIGHT", "HWEIGHT"])
-def test_single_full_sample_weight_drift_fails(name: str) -> None:
-    main = ["1.0"] * EXPECTED["rows"]
-    weight_zero = main.copy()
-    weight_zero[EXPECTED["rows"] // 2] = "1.0001"
-    with pytest.raises(Htops2607IntegrityError, match="differs at row"):
-        validate_full_sample_weight_rows(main, weight_zero, name)
+def test_person_full_sample_weight_zero_matches_main_rows() -> None:
+    values = _weight_values()
+    validate_full_sample_weight_rows(values, values, values, values)
+
+
+def test_household_full_sample_weight_zero_matches_main_rows() -> None:
+    values = _weight_values()
+    validate_full_sample_weight_rows(values, values, values, values)
+
+
+def test_person_single_full_sample_weight_drift_fails() -> None:
+    values = _weight_values()
+    drifted = list(values); drifted[EXPECTED["rows"] // 2] = "1.0001"
+    with pytest.raises(Htops2607IntegrityError, match="PWEIGHT.*differs at row"):
+        validate_full_sample_weight_rows(values, drifted, values, values)
+
+
+def test_household_single_full_sample_weight_drift_fails() -> None:
+    values = _weight_values()
+    drifted = list(values); drifted[EXPECTED["rows"] // 2] = "1.0001"
+    with pytest.raises(Htops2607IntegrityError, match="HWEIGHT.*differs at row"):
+        validate_full_sample_weight_rows(values, values, values, drifted)
 
 
 def test_full_sample_weight_length_drift_fails() -> None:
     with pytest.raises(Htops2607IntegrityError, match="row count"):
-        validate_full_sample_weight_rows(("1",), ("1",), "PWEIGHT")
+        validate_full_sample_weight_rows(("1",), ("1",), _weight_values(), _weight_values())
 
 
 def test_schema_and_special_rules_artifact_matches_digests() -> None:

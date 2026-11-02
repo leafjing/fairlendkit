@@ -88,9 +88,19 @@ def validate_replicate_columns(columns: Sequence[str], prefix: str) -> None:
 
 
 def validate_full_sample_weight_rows(
+    person_main: Sequence[str],
+    person_weight_zero: Sequence[str],
+    household_main: Sequence[str],
+    household_weight_zero: Sequence[str],
+) -> None:
+    """Compare both main weights with replicate-file weight 0 row by row."""
+    _validate_one_full_sample_weight(person_main, person_weight_zero, "PWEIGHT")
+    _validate_one_full_sample_weight(household_main, household_weight_zero, "HWEIGHT")
+
+
+def _validate_one_full_sample_weight(
     main_values: Sequence[str], weight_zero_values: Sequence[str], name: str,
 ) -> None:
-    """Require the replicate file's weight 0 to equal the main weight row by row."""
     if len(main_values) != EXPECTED["rows"] or len(weight_zero_values) != EXPECTED["rows"]:
         raise Htops2607IntegrityError(f"HTOPS {name} full-sample weight row count changed")
     for index, (main_value, weight_zero_value) in enumerate(
