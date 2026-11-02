@@ -4,6 +4,11 @@ from fairlendkit.research.ctu_berka import (
     predecision_transaction_mask,
     validate_snapshot_summary,
 )
+from fairlendkit.research.federal_reserve_shed_2024 import (
+    Shed2024IntegrityError,
+    analysis_columns as shed_analysis_columns,
+    validate_summary as validate_shed_2024_summary,
+)
 from fairlendkit.research.uci_south_german_credit import (
     SouthGermanCreditBenchmark,
     load_south_german_credit,
@@ -11,8 +16,11 @@ from fairlendkit.research.uci_south_german_credit import (
 
 __all__ = [
     "CtuFinancialIntegrityError",
+    "Shed2024IntegrityError",
     "SouthGermanCreditBenchmark",
     "load_south_german_credit",
     "predecision_transaction_mask",
+    "shed_analysis_columns",
     "validate_snapshot_summary",
+    "validate_shed_2024_summary",
 ]

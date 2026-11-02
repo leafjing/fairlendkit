@@ -10,8 +10,11 @@
   <https://www.federalreserve.gov/consumerscommunities/files/SHED_2024codebook.pdf>
 - Official CSV package:
   <https://www.federalreserve.gov/consumerscommunities/files/SHED_public_use_data_2024_(CSV).zip>
-- Exact release/version: 2024 SHED; package revision still to be pinned
-- License/redistribution: package-specific terms not yet verified
+- Exact release/version: 2024 SHED public-use CSV; codebook last updated May 28,
+  2025; package identity and aggregate evidence pinned in
+  [the technical evaluation](../federal-reserve-shed-2024-evaluation.md)
+- License/redistribution: public download verified, but no dataset-specific
+  redistribution grant located; project redistribution prohibited
 - Decision: none
 - Trust tier: A for publisher authority; admission remains incomplete
 
@@ -21,10 +24,9 @@ and descriptive quality research. It is not bank transactions, rent ledgers,
 utility bills, or observed loan performance. Reported inability to pay a bill
 retains that survey meaning and is not converted to loan default.
 
-Required evidence: package members/sizes/revision/hash, public-use and
-redistribution terms, field matrix, survey reference periods, longitudinal ID
-privacy review, and outcome fitness. Default analytical disposition is
-`quality_only` unless later evidence establishes a mature outcome window.
+Technical content evidence is complete. Admission remains incomplete pending a
+verified redistribution/rights basis. Maximum analytical disposition is
+`external_only + quality_only`; no mature credit-performance outcome exists.
 
 ## Enablement plan
 
