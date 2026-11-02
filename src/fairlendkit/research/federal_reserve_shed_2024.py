@@ -22,15 +22,15 @@ SPECIAL_RESPONSE_RULES = {
         "ppcm1301": ("Not asked",),
     },
     "dont_know": {
-        "A6": ("Don't know",),
-        "CH2A": ("Don't know",),
-        "D47": ("Don't know",),
-        "E2A": ("Don't know",),
-        "K0": ("Don't know",),
-        "SL13": ("Don't know",),
-        "SL3": ("Don't know",),
-        "SL4": ("Don't know",),
-        "ppfs1482": ("Don't know",),
+        "A6": ("Don’t know",),
+        "CH2A": ("Don’t know",),
+        "D47": ("Don’t know",),
+        "E2A": ("Don’t know",),
+        "K0": ("Don’t know",),
+        "SL13": ("Don’t know",),
+        "SL3": ("Don’t know",),
+        "SL4": ("Don’t know",),
+        "ppfs1482": ("Don’t know",),
     },
     "refused": {
         "CH2A": ("Refused",),
@@ -70,7 +70,7 @@ EXPECTED = {
     },
     "missingness": (2159319, 254, 497),
     "imputation_flags": (342, 4204890, 0, 4191995, 12895),
-    "special_response_rules_sha256": "0c90a8ee99195f8a7e2bffa869722fb7a2b41d360d7c9f5f913674bb35e70b42",
+    "special_response_rules_sha256": "a19cf85d3459959ae0481eed2e7278703c0a2e6819993511c6ee1493a222efc9",
     "special_responses": {"not_asked": 20300, "dont_know": 4313, "refused": 537},
 }
 

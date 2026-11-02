@@ -115,19 +115,21 @@ def test_codebook_mapping_and_special_counts_are_deterministic() -> None:
         "special_response_rules_sha256"
     ]
     row = {column: "" for columns in SPECIAL_RESPONSE_RULES.values() for column in columns}
-    row.update({"ind1": "-2", "A6": "Don't know", "ND1_e": "Refused"})
+    row.update({"ind1": "-2", "A6": "Don’t know", "ND1_e": "Refused"})
     assert summarize_special_responses((row,)) == {
         "not_asked": 1,
         "dont_know": 1,
         "refused": 1,
     }
+    row["A6"] = "Don't know"
+    assert summarize_special_responses((row,))["dont_know"] == 0
 
 
 def test_special_response_mapping_drift_fails_closed() -> None:
     drifted = {
         category: dict(columns) for category, columns in SPECIAL_RESPONSE_RULES.items()
     }
-    drifted["dont_know"]["A6"] = ("Refused",)
+    drifted["dont_know"]["A6"] = ("Don't know",)
     evidence = _valid()
     evidence["special_response_rules_sha256"] = special_response_rules_sha256(drifted)
     with pytest.raises(Shed2024IntegrityError, match="mapping"):
