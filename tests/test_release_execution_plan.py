@@ -13,113 +13,126 @@ RELEASE_NOTES = REPO_ROOT / "docs" / "releases" / "v0.1.0rc1.md"
 PR_GATE = REPO_ROOT / "scripts" / "verify_release_pr_gate.sh"
 
 
-def _run_bash(
-    script: str,
-    cwd: Path,
+def _write_executable(path: Path, text: str) -> None:
+    path.write_text(text, encoding="utf-8")
+    path.chmod(0o755)
+
+
+def _run_gate(
+    tmp_path: Path,
     *,
-    env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["bash", "-c", script],
-        cwd=cwd,
+    main_sha: str = "reviewed-main-sha",
+    changed_field: str | None = None,
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    calls = tmp_path / "calls"
+    payload = {
+        "headRefOid": "reviewed-release-sha",
+        "baseRefOid": "reviewed-main-sha",
+        "reviewDecision": "APPROVED",
+        "mergeStateStatus": "CLEAN",
+    }
+    if changed_field is not None:
+        payload[changed_field] = "DRIFTED"
+
+    _write_executable(
+        bin_dir / "git",
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+printf 'git %s\\n' "$*" >> {calls}
+test "$1 $2" = "rev-parse origin/main"
+printf '%s\\n' {main_sha!r}
+""",
+    )
+    _write_executable(
+        bin_dir / "gh",
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+printf 'gh %s\\n' "$*" >> {calls}
+case "$1 $2" in
+  "pr checks") exit 0 ;;
+  "pr view") printf '%s\\n' {json.dumps(payload)!r} ;;
+  "pr merge") exit 0 ;;
+  *) exit 97 ;;
+esac
+""",
+    )
+    for command in ("merge", "tag"):
+        _write_executable(
+            bin_dir / command,
+            f"#!/usr/bin/env bash\nprintf '{command} %s\\n' \"$*\" >> {calls}\n",
+        )
+
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "PR": "123",
+        "REVIEWED_MAIN_SHA": "reviewed-main-sha",
+        "REVIEWED_RELEASE_SHA": "reviewed-release-sha",
+    }
+    result = subprocess.run(
+        ["bash", str(PR_GATE)],
+        cwd=REPO_ROOT,
         check=False,
         capture_output=True,
         text=True,
-        env=None if env is None else {**os.environ, **env},
+        env=env,
     )
+    return result, calls
 
 
-def _gate_env(**updates: str) -> dict[str, str]:
-    values = {
-        "CURRENT_MAIN_SHA": "reviewed-main-sha",
-        "REVIEWED_MAIN_SHA": "reviewed-main-sha",
-        "REVIEWED_RELEASE_SHA": "reviewed-release-sha",
-        "PR_STATE": json.dumps(
-            {
-                "headRefOid": "reviewed-release-sha",
-                "baseRefOid": "reviewed-main-sha",
-                "reviewDecision": "APPROVED",
-                "mergeStateStatus": "CLEAN",
-            }
-        ),
-    }
-    values.update(updates)
-    return values
+def _calls(path: Path) -> list[str]:
+    return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
 
 
-def test_release_plan_is_fail_closed_after_first_oid_failure(tmp_path: Path) -> None:
+def test_release_notes_call_the_single_production_merge_gate() -> None:
     text = RELEASE_NOTES.read_text(encoding="utf-8")
     command_block = text.split("```bash\n", 1)[1].split("\n```", 1)[0]
     assert command_block.startswith("set -euo pipefail\n")
-    gate_call = "bash scripts/verify_release_pr_gate.sh"
-    assert gate_call in command_block
-    assert command_block.rindex(gate_call) < command_block.index("gh pr merge")
+    assert command_block.count("bash scripts/verify_release_pr_gate.sh") == 1
+    assert "gh pr checks" not in command_block
+    assert "gh pr view" not in command_block
+    assert "gh pr merge" not in command_block
 
-    marker = tmp_path / "marker-must-not-run"
-    merge_marker = tmp_path / "merge-must-not-run"
-    tag_marker = tmp_path / "tag-must-not-run"
-    result = _run_bash(
-        f"""
-set -euo pipefail
-bash {PR_GATE}
-touch {marker}
-touch {merge_marker}
-touch {tag_marker}
-""",
-        tmp_path,
-        env=_gate_env(CURRENT_MAIN_SHA="drifted-main-sha"),
-    )
 
+def test_first_oid_failure_stops_all_side_effect_stubs(tmp_path: Path) -> None:
+    result, call_log = _run_gate(tmp_path, main_sha="DRIFTED")
+    calls = _calls(call_log)
     assert result.returncode != 0
-    assert not marker.exists()
-    assert not merge_marker.exists()
-    assert not tag_marker.exists()
+    assert calls == ["git rev-parse origin/main"]
+    assert not any("pr merge" in call for call in calls)
+    assert not any(call.startswith("merge ") for call in calls)
+    assert not any(call.startswith("tag ") for call in calls)
 
 
 @pytest.mark.parametrize(
     "changed_field",
     ("headRefOid", "baseRefOid", "reviewDecision", "mergeStateStatus"),
 )
-def test_each_pr_identity_field_drift_stops_before_merge_stub(
-    tmp_path: Path,
-    changed_field: str,
+def test_each_pr_field_drift_stops_before_merge(
+    tmp_path: Path, changed_field: str
 ) -> None:
-    expected = {
-        "headRefOid": "reviewed-release-sha",
-        "baseRefOid": "reviewed-main-sha",
-        "reviewDecision": "APPROVED",
-        "mergeStateStatus": "CLEAN",
-    }
-    payload = dict(expected)
-    payload[changed_field] = "DRIFTED"
-    marker = tmp_path / f"merge-ran-{changed_field}"
-    result = _run_bash(
-        f"""
-set -euo pipefail
-bash {PR_GATE}
-touch {marker}
-""",
-        tmp_path,
-        env=_gate_env(PR_STATE=json.dumps(payload)),
-    )
-
-    assert result.returncode != 0, changed_field
-    assert not marker.exists(), changed_field
+    result, call_log = _run_gate(tmp_path, changed_field=changed_field)
+    calls = _calls(call_log)
+    assert result.returncode != 0
+    assert any(call.startswith("gh pr checks ") for call in calls)
+    assert any(call.startswith("gh pr view ") for call in calls)
+    assert not any(call.startswith("gh pr merge ") for call in calls)
+    assert not any(call.startswith("merge ") for call in calls)
+    assert not any(call.startswith("tag ") for call in calls)
 
 
-def test_matching_pr_identity_fields_reach_merge_stub(tmp_path: Path) -> None:
-    marker = tmp_path / "merge-ran"
-    tag_marker = tmp_path / "tag-must-not-run-before-merge"
-    result = _run_bash(
-        f"""
-set -euo pipefail
-bash {PR_GATE}
-printf x >> {marker}
-""",
-        tmp_path,
-        env=_gate_env(),
-    )
-
-    assert result.returncode == 0
-    assert marker.read_text(encoding="utf-8") == "x"
-    assert not tag_marker.exists()
+def test_matching_state_runs_checks_and_merges_exactly_once(tmp_path: Path) -> None:
+    result, call_log = _run_gate(tmp_path)
+    calls = _calls(call_log)
+    assert result.returncode == 0, result.stderr
+    assert len([call for call in calls if call.startswith("gh pr checks ")]) == 1
+    assert len([call for call in calls if call.startswith("gh pr view ")]) == 1
+    merge_calls = [call for call in calls if call.startswith("gh pr merge ")]
+    assert merge_calls == [
+        "gh pr merge 123 --merge --delete-branch=false "
+        "--match-head-commit reviewed-release-sha"
+    ]
+    assert not any(call.startswith("merge ") for call in calls)
+    assert not any(call.startswith("tag ") for call in calls)

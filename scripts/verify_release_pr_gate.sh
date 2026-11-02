@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${CURRENT_MAIN_SHA:?set current main SHA}"
+: "${PR:?set reviewed PR number}"
 : "${REVIEWED_MAIN_SHA:?set reviewed main SHA}"
 : "${REVIEWED_RELEASE_SHA:?set reviewed release SHA}"
-: "${PR_STATE:?set PR state JSON}"
 
+CURRENT_MAIN_SHA=$(git rev-parse origin/main)
 test "$CURRENT_MAIN_SHA" = "$REVIEWED_MAIN_SHA"
+
+gh pr checks "$PR" --watch --fail-fast
+PR_STATE=$(gh pr view "$PR" --json headRefOid,baseRefOid,reviewDecision,mergeStateStatus)
 test "$(printf '%s' "$PR_STATE" | jq -r .headRefOid)" = "$REVIEWED_RELEASE_SHA"
 test "$(printf '%s' "$PR_STATE" | jq -r .baseRefOid)" = "$REVIEWED_MAIN_SHA"
 test "$(printf '%s' "$PR_STATE" | jq -r .reviewDecision)" = "APPROVED"
 test "$(printf '%s' "$PR_STATE" | jq -r .mergeStateStatus)" = "CLEAN"
+
+gh pr merge "$PR" --merge --delete-branch=false --match-head-commit "$REVIEWED_RELEASE_SHA"
