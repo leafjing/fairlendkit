@@ -110,6 +110,7 @@ metric comparison.
 | Selection rate | Configured favorable decision divided by group denominator | `selection_rate` under an explicit positive label | Predicted-positive prevalence/group counts | Recompute numerator and denominator independently; names alone are insufficient. |
 | Directed AIR | Comparison selection rate divided by configured reference selection rate | A ratio reduction may default to min/max or overall comparison depending on invocation | Disparity ratio relative to a selected reference group | Require an explicit reference group and formula; never equate min/max ratio with directed AIR. |
 | TPR/FPR | Uses configured favorable outcome and score/decision semantics | Standard classification metrics supplied to `MetricFrame` | Crosstab rates derived from label and score columns | Freeze positive label, denominator, missingness, and weight behavior. |
+| ROC AUC | Weighted favorable-versus-unfavorable pairwise ranking probability; a tie contributes `0.5` | `MetricFrame(metrics=sklearn.metrics.roc_auc_score, ...)` using the pinned scikit-learn dependency | No equivalent AUC API is presumed; if the pinned package exposes none, emit `metric_not_supported` | Compare only when both classes have positive weight, score direction and exclusions match, and the same weight semantics are supported. Constant scores with both classes must produce `0.5`. |
 | Equal opportunity/equalized odds | Typed aggregate from group rates | Metric helpers and grouped differences | Derivable from group-rate disparities, subject to API semantics | Compare the underlying group rates first, then the aggregate formula. |
 | Sample weights | Supported only through documented metric contracts | Passed through metric `sample_params` where supported | Do not assume equivalent weighted semantics without API-level evidence | Weighted cases are metric-specific; unsupported paths are `not_comparable`. |
 | Conditional strata | Governed by the reviewed conditional-disparity research contract | `control_features` can organize conditional groups | Group audit is not presumed equivalent to causal or risk adjustment | Compare strata only after freezing the target population and aggregation rule. |
@@ -179,6 +180,47 @@ including common support, uncertainty, sensitivity, and non-causal language.
 This independent branch records the commit identity rather than creating a link
 to a document that is not yet present on its `main` baseline.
 
+### 5.7 ROC AUC and constant-score semantics
+
+The canonical AUC estimand is the weighted probability that a randomly selected
+favorable row has a higher score than a randomly selected unfavorable row, with
+`0.5` credit for a tie. Therefore, when both classes have positive total weight
+and every eligible score is equal, canonical AUC is defined as exactly `0.5`.
+
+The tool mapping is frozen as follows:
+
+- FairLendKit calls its reviewed ROC AUC contract and records value, numerator,
+  denominator, status, undefined reason, eligible count, and weight totals.
+- Fairlearn runs the pinned scikit-learn `roc_auc_score` through `MetricFrame`.
+  The lock manifest records the exact scikit-learn version. Raw return values,
+  warnings, exceptions, per-group results, and `sample_weight` invocation are
+  preserved before normalization.
+- Aequitas is not assumed to provide a row-score ROC AUC API. The adapter must
+  verify the pinned `1.1.0` API manifest. If no semantically equivalent API is
+  present, it emits `metric_not_supported`, a null normalized value, and no
+  match/mismatch claim for AUC. It must not reconstruct AUC from unrelated
+  crosstab rates and label that result equivalent.
+
+Required AUC cases and canonical states are:
+
+- both classes present with positive weight and all scores constant: defined
+  `0.5`, including the weighted path;
+- mixed ties and strict orderings: the pairwise tie contribution remains `0.5`;
+- only one observed class: undefined/not comparable, preserving each tool's raw
+  warning, exception, or null state;
+- one class present but with zero total class weight: undefined/not comparable,
+  distinct from an absent class;
+- empty eligible sample: undefined/not comparable; and
+- NaN, infinite, non-numeric, or otherwise invalid scores: apply the canonical
+  exclusion/failure rule first; if adapter cohorts differ, emit
+  `cohort_mismatch` rather than comparing values.
+
+For single-class, zero-class-weight, empty, and invalid-score cases, no adapter
+may coerce a raw `NaN`, exception, or undefined state to numeric zero or `0.5`.
+Weighted AUC is comparable only when the same eligible rows and identical
+positive weights reach both supported implementations. Otherwise use
+`weight_semantics_not_equivalent`.
+
 ## 6. Reproducible comparison protocol
 
 ### 6.1 Environment
@@ -200,6 +242,20 @@ not modify package runtime metadata or default extras.
 7. Emit pass, mismatch, or not-comparable status with stable reason codes.
 8. Re-run from the lock manifest and require byte-stable canonical artifacts,
    excluding explicitly identified environment/timestamp fields.
+
+Before step 4, each external tool records exactly one execution status:
+
+- `not_executed`
+- `dependency_identity_mismatch`
+- `execution_failed`
+- `execution_succeeded`
+
+Only `execution_succeeded` permits metric normalization or comparison for that
+tool. `not_executed`, `dependency_identity_mismatch`, and `execution_failed`
+must leave every normalized value null, prohibit `value_match`, omit match and
+mismatch totals for that tool, set the top-level constraint status to `failed`,
+record a stable reason code, and keep the release lock closed. A stored fixture
+or expected value is not evidence that an external package executed.
 
 ### 6.3 Metric cases
 
@@ -253,7 +309,9 @@ The machine-readable comparison uses at least these reason codes:
 - `metric_not_supported`
 - `dependency_identity_mismatch`
 - `adapter_input_digest_mismatch`
+- `external_not_executed`
 - `external_execution_failed`
+- `external_output_invalid`
 
 A mismatch is evidence to investigate. It is not automatically assigned to one
 tool as an error and must not be silently accepted because two of three tools
@@ -276,6 +334,46 @@ The spike artifact contains:
 - separate totals for matches, mismatches, not-comparable cases, and execution
   failures; and
 - a release lock that remains `locked_research_only` until independent review.
+
+The top-level artifact also contains:
+
+- `constraint_status`: `passed` or `failed`;
+- `candidate_copy_status`: always `locked_research_only` for this spike;
+- one execution-status object for Fairlearn and one for Aequitas, each with
+  package identity, command, exit status, stdout/stderr digests, start/end time,
+  and stable reason code;
+- `comparisons_emitted`: boolean, which may be true only when both external
+  package identities match and both executions succeeded; and
+- nullable match/mismatch/not-comparable totals that remain null whenever
+  `comparisons_emitted=false`.
+
+Top-level acceptance is fail closed. It is `passed` only if the canonical input
+and all adapter digests match, both pinned external identities match, both
+external executions succeed, required raw outputs are present, and every
+required comparison has either a reviewed comparison result or an allowed
+`metric_not_supported`/not-comparable reason. A tool may succeed overall while
+AUC is `metric_not_supported`; this is an explicit AUC non-comparison, not an
+AUC match.
+
+Machine-readable acceptance tests must prove that:
+
+1. Fairlearn `not_executed` produces null normalized values and totals,
+   `constraint_status=failed`, `comparisons_emitted=false`, and a closed lock.
+2. Aequitas `not_executed` produces the same fail-closed top-level behavior.
+3. A dependency version or artifact-hash mismatch fails before execution and
+   cannot emit `value_match`.
+4. A non-zero exit, timeout, malformed raw output, or missing required output
+   maps to `execution_failed` and cannot emit comparison totals.
+5. Constant-score, two-class weighted and unweighted AUC is `0.5` for each
+   supported implementation.
+6. Single-class, zero-class-weight, empty, and invalid-score AUC cases preserve
+   raw states and reviewed normalized undefined reasons without numeric
+   coercion.
+7. Aequitas without an equivalent AUC API emits `metric_not_supported`, a null
+   normalized AUC value, and no AUC match claim while leaving other successfully
+   executed metric comparisons eligible.
+8. No precomputed fixture value can change an external status from
+   `not_executed` or `execution_failed` to success.
 
 Raw external outputs may be stored only when they contain synthetic fixture
 data and pass repository size and license checks. The artifact must not copy
