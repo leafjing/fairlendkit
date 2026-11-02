@@ -1,16 +1,125 @@
 {
   "candidate_id": "cfpb-making-ends-meet",
-  "accessed_utc": "2026-11-02T05:05:26Z",
+  "release": "sample-specific public-use files; July 2025 user guide",
+  "accessed_utc": "2026-11-02T05:12:28Z",
   "disposition": "external_only",
   "usage": "quality_only",
-  "user_guide": {"bytes": 261183, "sha256": "fb5549ea677c1c0ad2e3919c46352ec07dcdda7bb3d93b3f9eb6d8a6ffa6ce3e"},
+  "publisher_page": "https://www.consumerfinance.gov/data-research/making-ends-meet-survey-data/public-data/",
+  "terms": {
+    "upstream_condition": "A copy of the CFPB agreement must be transmitted to or incorporated into an agreement with any recipient when MEM data are repackaged, modified, or distributed.",
+    "project_redistribution": "prohibited",
+    "archived_snapshot_url": "https://web.archive.org/web/20260924134643id_/https://www.consumerfinance.gov/data-research/making-ends-meet-survey-data/public-data/",
+    "decoded_html_bytes": 156941,
+    "decoded_html_sha256": "34466a12ccbbff5071331df3bd8c7638de32414875ab383af8abf71c6fb12dc6"
+  },
+  "user_guide": {
+    "url": "https://files.consumerfinance.gov/f/documents/cfpb_making-ends-meet_public-use-file_user-guide.pdf",
+    "filename": "cfpb_making-ends-meet_public-use-file_user-guide.pdf",
+    "bytes": 261183,
+    "sha256": "fb5549ea677c1c0ad2e3919c46352ec07dcdda7bb3d93b3f9eb6d8a6ffa6ce3e"
+  },
+  "aggregate_evidence_fields": {
+    "weight_statistics": ["missing", "non_finite", "zero", "negative", "minimum", "maximum"],
+    "missingness": ["blank_cells", "columns_with_blanks", "complete_columns", "imputation_indicator_columns"]
+  },
   "samples": {
-    "1": {"bytes": 3504546, "sha256": "664fb88960969ddecb7945a5b605ef1504df556f22f0a82f22d8ae86271f9009", "csv_sha256": "607770805ee67829ddf2a5782d6542d5ca8c380b4e0e1f9c53cd23047793d5e8", "rows": 2986, "columns": 612, "weights": ["w1weight", "w2weight", "w3weight", "w321weight"]},
-    "3": {"bytes": 1664247, "sha256": "ee0e119aa358978e20777d618ef2ae7cb0c0b0eee3cdbd56e6b926a39b7ddc51", "csv_sha256": "97887ff1bce9fbee98f67e71accd8e703e7e42f892601af157a255912d9459a1", "rows": 2125, "columns": 404, "weights": ["weight", "w2weight", "w2comb_weight"]},
-    "4": {"bytes": 1929800, "sha256": "2e76cf9eb24d3f822afedcb3e7b0d32d7c5ad3db30285bf477dbaa981dd639ab", "csv_sha256": "fe7763cb508dedad4c6086018696b5f58320a84be2ed20c7a00d1a8e29f5e51e", "rows": 2136, "columns": 396, "weights": ["weight", "comb_weight", "w2weight", "w2comb_weight"]},
-    "5": {"bytes": 2401143, "sha256": "09e88d34e88b847ffe613c27c0088b587f4317c28547df128ee847d82364eb7f", "csv_sha256": "58633701a1cb3a4d85c78a0d3bcdb240b9abdc6aed996d95a64cf700401be04a", "rows": 3113, "columns": 491, "weights": ["weight", "comb_weight", "w2weight_paper", "w2weight_online", "w2comb_weight_online", "w2comb_weight_paper"]},
-    "6": {"bytes": 1502328, "sha256": "cfa280a45ed256db42be0cc4df87b0db182ebf11f19983aaeab981ed1543deca", "csv_sha256": "1d9288d40af00f739ad88fa5997f1f84a0116ea9a49c4399f029bba5d3287900", "rows": 2630, "columns": 346, "weights": ["weight_paper", "weight_online", "comb_weight_paper", "comb_weight_online"]}
+    "1": {
+      "url": "https://files.consumerfinance.gov/f/documents/cfpb_making-ends-meet_data-sample-1.zip",
+      "filename": "cfpb_making-ends-meet_data-sample-1.zip",
+      "bytes": 3504546,
+      "sha256": "664fb88960969ddecb7945a5b605ef1504df556f22f0a82f22d8ae86271f9009",
+      "csv_filename": "Sample1/MEM_S1W1W2W3_PUF.csv",
+      "csv_sha256": "607770805ee67829ddf2a5782d6542d5ca8c380b4e0e1f9c53cd23047793d5e8",
+      "rows": 2986,
+      "columns": 612,
+      "weight_statistics": {
+        "w1weight": [0, 0, 0, 0, 32.411503, 14054.265],
+        "w2weight": [1118, 0, 0, 0, 48.252583, 26830.291],
+        "w3weight": [1240, 0, 0, 0, 61.827072, 58646.918],
+        "w321weight": [1538, 0, 0, 0, 72.300713, 72310.953]
+      },
+      "missingness": [690256, 512, 100, 0],
+      "special_response_counts": {}
+    },
+    "3": {
+      "url": "https://files.consumerfinance.gov/f/documents/cfpb_making-ends-meet_data-sample-3.zip",
+      "filename": "cfpb_making-ends-meet_data-sample-3.zip",
+      "bytes": 1664247,
+      "sha256": "ee0e119aa358978e20777d618ef2ae7cb0c0b0eee3cdbd56e6b926a39b7ddc51",
+      "csv_filename": "Sample3/MEM_S3W1W2_PUF.csv",
+      "csv_sha256": "97887ff1bce9fbee98f67e71accd8e703e7e42f892601af157a255912d9459a1",
+      "rows": 2125,
+      "columns": 404,
+      "weight_statistics": {
+        "weight": [0, 0, 0, 0, 248.43109, 93385.68],
+        "w2weight": [1063, 0, 0, 0, 538.45044, 25063.686],
+        "w2comb_weight": [1063, 0, 0, 0, 186.32747, 8673.1348]
+      },
+      "missingness": [420047, 358, 46, 0],
+      "special_response_counts": {"q98:3:don't_know": 25}
+    },
+    "4": {
+      "url": "https://files.consumerfinance.gov/f/documents/cfpb_making-ends-meet_data-sample-4.zip",
+      "filename": "cfpb_making-ends-meet_data-sample-4.zip",
+      "bytes": 1929800,
+      "sha256": "2e76cf9eb24d3f822afedcb3e7b0d32d7c5ad3db30285bf477dbaa981dd639ab",
+      "csv_filename": "Sample4/MEM_S4W1W2_PUF.csv",
+      "csv_sha256": "fe7763cb508dedad4c6086018696b5f58320a84be2ed20c7a00d1a8e29f5e51e",
+      "rows": 2136,
+      "columns": 396,
+      "weight_statistics": {
+        "weight": [0, 0, 0, 0, 402.1825, 15738.883],
+        "comb_weight": [0, 0, 0, 0, 402.1825, 15738.883],
+        "w2weight": [763, 0, 0, 0, 823.07983, 18949.76],
+        "w2comb_weight": [763, 0, 0, 0, 362.354, 8342.4727]
+      },
+      "missingness": [355351, 371, 25, 0],
+      "special_response_counts": {"q81:3:don't_know": 15}
+    },
+    "5": {
+      "url": "https://files.consumerfinance.gov/f/documents/cfpb_making-ends-meet_data-sample-5.zip",
+      "filename": "cfpb_making-ends-meet_data-sample-5.zip",
+      "bytes": 2401143,
+      "sha256": "09e88d34e88b847ffe613c27c0088b587f4317c28547df128ee847d82364eb7f",
+      "csv_filename": "Sample5/MEM_S5W1W2_PUF.csv",
+      "csv_sha256": "58633701a1cb3a4d85c78a0d3bcdb240b9abdc6aed996d95a64cf700401be04a",
+      "rows": 3113,
+      "columns": 491,
+      "weight_statistics": {
+        "weight": [0, 0, 0, 0, 529.48383, 7089.5503],
+        "comb_weight": [0, 0, 0, 0, 1999.803, 26776.461],
+        "w2weight_paper": [1161, 0, 0, 0, 836.19739, 11771.118],
+        "w2weight_online": [1339, 0, 0, 0, 875.29626, 14371.805],
+        "w2comb_weight_online": [1339, 0, 0, 0, 875.29626, 14371.805],
+        "w2comb_weight_paper": [1161, 0, 0, 0, 836.19739, 11771.118]
+      },
+      "missingness": [713085, 466, 25, 0],
+      "special_response_counts": {
+        "q75:3:don't_know": 22,
+        "q104:5:don't_know": 1668,
+        "q105:5:don't_know": 1549,
+        "q106:4:don't_know": 959
+      }
+    },
+    "6": {
+      "url": "https://files.consumerfinance.gov/f/documents/cfpb_making-ends-meet_data-sample-6.zip",
+      "filename": "cfpb_making-ends-meet_data-sample-6.zip",
+      "bytes": 1502328,
+      "sha256": "cfa280a45ed256db42be0cc4df87b0db182ebf11f19983aaeab981ed1543deca",
+      "csv_filename": "Sample6/MEM_S6W_PUF.csv",
+      "csv_sha256": "1d9288d40af00f739ad88fa5997f1f84a0116ea9a49c4399f029bba5d3287900",
+      "rows": 2630,
+      "columns": 346,
+      "weight_statistics": {
+        "weight_paper": [0, 0, 0, 0, 465.05878, 9643.7891],
+        "weight_online": [306, 0, 0, 0, 512.1629, 14670.264],
+        "comb_weight_paper": [0, 0, 0, 0, 793.9455, 16463.818],
+        "comb_weight_online": [306, 0, 0, 0, 823.74152, 23595.041]
+      },
+      "missingness": [361431, 313, 33, 0],
+      "special_response_counts": {"q79:3:don't_know": 22, "q95:5:don't_know": 14}
+    }
   },
   "raw_or_transformed_data_committed": false,
-  "redistribution": "terms_must_accompany_any_recipient"
+  "redistribution": "prohibited"
 }

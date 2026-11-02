@@ -2,10 +2,13 @@ import pytest
 
 from fairlendkit.research.cfpb_making_ends_meet import (
     DISPOSITION,
+    REDISTRIBUTION,
     SAMPLES,
     USAGE,
     MakingEndsMeetIntegrityError,
     analysis_columns,
+    summarize_missingness,
+    summarize_weight_values,
     validate_sample_summary,
 )
 
@@ -20,6 +23,9 @@ def _valid(sample: int) -> dict[str, object]:
         "identifier_nulls": 0,
         "identifier_unique": expected["rows"],
         "weight_columns": expected["weights"],
+        "weight_statistics": expected["weight_statistics"],
+        "missingness": expected["missingness"],
+        "special_response_counts": expected["special_response_counts"],
     }
 
 
@@ -28,6 +34,7 @@ def test_all_reviewed_samples_validate_as_external_quality_only() -> None:
         validate_sample_summary(sample, **_valid(sample))  # type: ignore[arg-type]
     assert DISPOSITION == "external_only"
     assert USAGE == "quality_only"
+    assert REDISTRIBUTION == "prohibited"
     assert set(SAMPLES) == {1, 3, 4, 5, 6}
 
 
@@ -41,6 +48,9 @@ def test_all_reviewed_samples_validate_as_external_quality_only() -> None:
         ("identifier_nulls", 1, "respondent ID"),
         ("identifier_unique", 1, "respondent ID"),
         ("weight_columns", ("wrong",), "weight columns"),
+        ("weight_statistics", {}, "weight statistics"),
+        ("missingness", (1, 1, 1, 1), "missingness"),
+        ("special_response_counts", {"wrong": 1}, "special-response"),
     ],
 )
 def test_sample_evidence_drift_fails_closed(field: str, value: object, message: str) -> None:
@@ -61,3 +71,21 @@ def test_random_id_is_removed_from_analysis_columns() -> None:
     )
     with pytest.raises(MakingEndsMeetIntegrityError, match="required"):
         analysis_columns(("weight", "difficulty_paying"))
+
+
+def test_aggregate_summaries_keep_blanks_and_special_codes_distinct() -> None:
+    assert summarize_weight_values(("", "1.5", "0", "-2", "nan", "bad")) == (
+        1, 2, 1, 1, -2.0, 1.5,
+    )
+    rows = (
+        {"survey": "", "response": "3", "imputed_flag": "0"},
+        {"survey": "1", "response": "", "imputed_flag": "1"},
+    )
+    assert summarize_missingness(rows, ("survey", "response", "imputed_flag")) == (
+        2, 2, 1, 1,
+    )
+
+
+def test_weight_summary_without_finite_values_fails_closed() -> None:
+    with pytest.raises(MakingEndsMeetIntegrityError, match="no finite"):
+        summarize_weight_values(("", "nan"))

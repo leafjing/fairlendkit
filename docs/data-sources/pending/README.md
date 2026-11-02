@@ -35,16 +35,16 @@ documented credit outcome may satisfy the risk-outcome contract.
 
 ## Current priority queue
 
-1. [CTU/Berka PKDD'99](ctu-berka-pkdd-1999.md)
-2. [CFPB Making Ends Meet](cfpb-making-ends-meet.md)
-3. [Federal Reserve SHED 2024](federal-reserve-shed-2024.md)
-4. [Census HTOPS/HPS](census-htops-hps.md)
-5. [EIA RECS 2020 v7](eia-recs-2020-v7.md)
-6. [Census/HUD AHS 2023 PUF](census-ahs-2023-puf.md)
+1. [Federal Reserve SHED 2024](federal-reserve-shed-2024.md)
+2. [Census HTOPS/HPS](census-htops-hps.md)
+3. [EIA RECS 2020 v7](eia-recs-2020-v7.md)
+4. [Census/HUD AHS 2023 PUF](census-ahs-2023-puf.md)
+5. [CTU/Berka PKDD'99 (`external_only` evaluation)](../ctu-berka-financial-evaluation.md)
+6. [CFPB Making Ends Meet (`external_only` evaluation)](../cfpb-making-ends-meet-evaluation.md)
 7. [UCI South German Credit (dataset 573, adopted quality-only benchmark)](../uci-south-german-credit-2020.md)
 
-Pending records 1–6 remain `evidence_incomplete`. Item 7 is listed only to route
-stale discovery to the adopted dataset 573 record. Priority controls
+Pending records 1–4 remain `evidence_incomplete`. Items 5–7 are listed only to
+route stale discovery to their completed records. Priority controls
 investigation order, not trust, admission, or preferred analytical conclusion.
 
 Each record must include an enablement plan: target `repository` or
