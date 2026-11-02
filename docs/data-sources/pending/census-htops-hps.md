@@ -8,9 +8,11 @@
 - HTOPS overview: <https://www.census.gov/programs-surveys/htops.html>
 - Official data page linked there:
   <https://www.census.gov/programs-surveys/household-pulse-survey/data.html>
-- Selected investigation snapshot: July 2026 cross-sectional PUF, collected
-  2026-07-15 through 2026-08-03; no publisher-issued release identity verified
-- License/redistribution: Census and file-specific terms require verification
+- Selected release: latest available July 2026 cross-sectional PUF, collected
+  2026-07-15 through 2026-08-03; no immutable release ID or checksum published
+- Rights/disposition: Census public-use and citation guidance supports analysis,
+  but no file-specific redistribution grant was found; project use is
+  `external_only`, `quality_only`, and redistribution prohibited
 - Decision: none
 - Trust tier: A for publisher authority; admission remains incomplete
 
@@ -20,15 +22,15 @@ and weights. These are survey responses, not consumer transaction, rent-ledger,
 or utility-account histories. HTOPS and HPS waves must not be silently pooled;
 housing or energy difficulty is not a credit-default label.
 
-Required evidence: one exact cycle, package, codebook, questionnaire, weights,
-revision notes, terms, hashes, collection/reference periods, response-rate and
-representation limits. Expected disposition is `quality_only` absent a separate
-mature credit outcome.
+Required content evidence: archive/member hashes and shape, dictionary and
+replicate-weight identity, questionnaire/source-accuracy/user-note alignment,
+weight and special-code aggregates, identifier containment, and field fitness.
+The disposition remains `quality_only`; survey hardship is not credit default.
 
 ## Enablement plan
 
-- Target: `repository` for a clearly redistributable selected wave; otherwise
-  `external_only` with a wave-pinned Census download workflow.
+- Target: `external_only` with a July-wave-pinned Census download workflow; raw
+  and transformed respondent rows must not enter the repository.
 - Contact: Census HTOPS/HPS program office and official data-user support.
 - Ask for: recommended current wave, revision/version identity, public-use and
   redistribution terms, archive stability, and questionnaire comparability.
@@ -84,3 +86,7 @@ energy, or expense difficulty is not a transaction history or credit outcome.
 Weights and replicate weights must remain wave-specific, and no uncertainty
 estimate may be published before the official variance procedure receives an
 independent calculation contract and golden fixture.
+
+The refreshed source, rights, weight, special-code, privacy, and citation review
+is recorded in
+[`../investigations/census-htops-july-2026-metadata-2026-11-02.md`](../investigations/census-htops-july-2026-metadata-2026-11-02.md).

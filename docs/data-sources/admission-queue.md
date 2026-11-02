@@ -125,22 +125,24 @@ dictionary, and relevant utility semantics are the strongest after UCI.
 ### 3. Census HTOPS July 2026 cross-sectional PUF
 
 - Candidate: [`census-htops-hps`](pending/census-htops-hps.md)
-- Current gate: Q0.
+- Current gate: latest public microdata confirmed as July 2026 cross-sectional;
+  direct content evaluation may proceed under `external_only + quality_only`.
 - Evidence ready: one exact cross-sectional cycle, official ZIP and supporting
   document URLs, observed byte sizes, collection dates, and a strict
   `quality_only` survey boundary.
 - Intended use: housing/energy hardship coverage, missingness,
   representativeness, and survey-quality evidence; never transaction history or
   credit default.
-- Blocking before Q1: official ZIP member list, data-dictionary and replicate-
-  weight locations, publisher revision identity, reuse/redistribution terms,
-  and the exact effect of the 2026-10-30 user note on the 2026-09-10 ZIP.
+- Blocking before approval: official ZIP/member hashes and shape, data-
+  dictionary and replicate-weight member identities, exact weight/special-code
+  aggregates, identifier containment, and the semantic effect of the
+  2026-10-30 user note on the 2026-09-10 ZIP.
 - Required bespoke retrieval: July-cycle-only ZIP contract, member whitelist,
   survey/replicate-weight validation, wave isolation, and an independently
   approved variance contract. It cannot pool 2025 longitudinal or another 2026
   cross-sectional wave.
-- Likely disposition: `repository` if Census terms and package identity close;
-  otherwise `external_only`.
+- Disposition: `external_only`, `quality_only`, redistribution prohibited; raw
+  and transformed respondent rows must not enter the repository.
 
 ### 4. Census/HUD AHS 2023 national PUF v1.1
 
