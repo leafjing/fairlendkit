@@ -1,5 +1,5 @@
 annotated-types==0.7.0
-fairlendkit==0.1.0.dev0
+fairlendkit==0.1.0rc1
 hatchling==1.26.3
 iniconfig==2.3.0
 numpy==1.26.4

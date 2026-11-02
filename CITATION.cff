@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use FairLendKit, cite this software and pin the exact version or commit."
 title: "FairLendKit"
 type: software
-version: "0.1.0.dev0"
+version: "0.1.0rc1"
 authors:
   - family-names: "Ye"
     given-names: "Zijing"
