@@ -44,7 +44,7 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     result = run_benchmark(repetitions=2)
     payload = json.loads(result.canonical_json())
     assert payload["benchmark_id"] == "fairlendkit-simulated-impact-v1"
-    assert payload["code_commit_basis"] == "961ffbd"
+    assert payload["code_commit_basis"] == "f9da5a0"
     assert payload["policy_assumptions"]["code_commit_basis_definition"].startswith(
         "Git commit containing the benchmark generator"
     )

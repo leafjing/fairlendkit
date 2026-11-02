@@ -17,7 +17,7 @@ from typing import Callable, Sequence
 
 BENCHMARK_ID = "fairlendkit-simulated-impact-v1"
 SCENARIO_ID = "fairlendkit-sim-impact-v1"
-CODE_COMMIT_BASIS = "961ffbd"
+CODE_COMMIT_BASIS = "f9da5a0"
 CODE_COMMIT_BASIS_DEFINITION = (
     "Git commit containing the benchmark generator and contract logic used to "
     "produce this artifact; the later artifact-only commit may differ."
