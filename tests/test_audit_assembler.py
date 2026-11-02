@@ -394,3 +394,15 @@ def test_e2e_sparse_class_and_precision_support_reasons_are_typed():
     assert reasons["precision"] == "no_favorable_decisions"
     assert reasons["true_positive_rate"] == "no_favorable_outcomes"
     assert reasons["roc_auc"] == "no_favorable_outcomes"
+
+
+def test_e2e_constant_scores_emit_defined_chance_auc_without_reason():
+    data = frame().assign(score=0.5, record_id=range(6))
+    result = run_audit(data, config(record_id_column="record_id"))
+    auc_metrics = [
+        item for item in result.observed_metrics if item.metric == "roc_auc"
+    ]
+
+    assert auc_metrics
+    assert all(item.value.value == 0.5 for item in auc_metrics)
+    assert all(item.value.undefined_reason is None for item in auc_metrics)

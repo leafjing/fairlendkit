@@ -167,8 +167,10 @@ limitations.
 - Definition: weighted probability that a favorable-outcome score ranks above
   an unfavorable-outcome score, with ties worth `0.5`.
 - Range: `[0, 1]`.
-- Undefined: either outcome class is absent or has zero positive weight, or all
-  eligible scores are constant.
+- Constant-score contract: when both outcome classes have positive weight and
+  every eligible score is equal, every favorable/unfavorable pair is a tie and
+  AUC is defined as `0.5` with no undefined reason.
+- Undefined: either outcome class is absent or has zero positive weight.
 - Invalid input: scores must be finite numeric values.
 
 ## Hand-calculated fixture

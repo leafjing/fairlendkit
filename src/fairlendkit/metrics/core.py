@@ -239,13 +239,6 @@ def roc_auc(
         return MetricValue(None, None, 0.0, "zero_favorable_outcome_weight")
     if unfavorable_weight == 0:
         return MetricValue(None, None, 0.0, "zero_unfavorable_outcome_weight")
-    if min(scores) == max(scores):
-        return MetricValue(
-            None,
-            None,
-            favorable_weight * unfavorable_weight,
-            "constant_score",
-        )
     if weights is None:
         # The pairwise definition contributes only 0, 0.5, or 1 per pair.
         # Aggregate equal-score runs to preserve that exact numerator while
