@@ -39,7 +39,7 @@ def test_fixed_sample_and_fairlendkit_metrics_are_reproducible():
 def test_not_executed_tools_fail_closed(tool):
     artifact = build_interop_artifact()
     record = artifact["external_execution"][tool]
-    assert record["status"] == "not_executed"
+    assert record["execution_status"] == "not_executed"
     assert record["reason_code"] == "external_not_executed"
     assert record["normalized_values"] is None
     assert record["value_match"] is None
@@ -59,7 +59,8 @@ def test_package_identity_is_pinned_but_not_claimed_verified():
         record = artifact["external_execution"][tool]
         assert record["expected_package_identity"] == identity
         assert record["identity_verified"] is False
-        assert record["command"] is None
+        assert record["command"][-2:] == ["--input", "fixed-synthetic-v1"]
+        assert record["command_status"] == "planned_not_executed"
         assert record["exit_status"] is None
         assert record["stdout_sha256"] is None
         assert record["stderr_sha256"] is None

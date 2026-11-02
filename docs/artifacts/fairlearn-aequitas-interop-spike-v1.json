@@ -24,8 +24,18 @@
   "execution_failure_total": null,
   "external_execution": {
     "aequitas": {
-      "command": null,
+      "command": [
+        "python",
+        "-m",
+        "fairlendkit.research.external_fairness_adapter",
+        "--tool",
+        "aequitas",
+        "--input",
+        "fixed-synthetic-v1"
+      ],
+      "command_status": "planned_not_executed",
       "ended_at_utc": null,
+      "execution_status": "not_executed",
       "exit_status": null,
       "expected_package_identity": {
         "artifact": "aequitas-1.1.0-py3-none-any.whl",
@@ -41,14 +51,23 @@
       "reason_code": "external_not_executed",
       "reported_values": null,
       "started_at_utc": null,
-      "status": "not_executed",
       "stderr_sha256": null,
       "stdout_sha256": null,
       "value_match": null
     },
     "fairlearn": {
-      "command": null,
+      "command": [
+        "python",
+        "-m",
+        "fairlendkit.research.external_fairness_adapter",
+        "--tool",
+        "fairlearn",
+        "--input",
+        "fixed-synthetic-v1"
+      ],
+      "command_status": "planned_not_executed",
       "ended_at_utc": null,
+      "execution_status": "not_executed",
       "exit_status": null,
       "expected_package_identity": {
         "artifact": "fairlearn-0.15.0-py3-none-any.whl",
@@ -64,7 +83,6 @@
       "reason_code": "external_not_executed",
       "reported_values": null,
       "started_at_utc": null,
-      "status": "not_executed",
       "stderr_sha256": null,
       "stdout_sha256": null,
       "value_match": null
@@ -237,5 +255,5 @@
   "mismatch_total": null,
   "not_comparable_total": null,
   "reason_code": "external_not_executed",
-  "result_sha256": "db00ed628ee02fcf960d08662e5a90ac37e0dcfd5a567bf4a04101a146f7dac4"
+  "result_sha256": "2a0427c84620864edf5e7ca95fb7aab31dbecd1953893ef19a9abd4db0f1e49d"
 }
