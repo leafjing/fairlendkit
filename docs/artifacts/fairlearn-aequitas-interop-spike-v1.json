@@ -35,6 +35,7 @@
       ],
       "command_status": "planned_not_executed",
       "ended_at_utc": null,
+      "evidence_status": "synthetic_semantic_spike_external_not_executed",
       "execution_status": "not_executed",
       "exit_status": null,
       "expected_package_identity": {
@@ -67,6 +68,7 @@
       ],
       "command_status": "planned_not_executed",
       "ended_at_utc": null,
+      "evidence_status": "synthetic_semantic_spike_external_not_executed",
       "execution_status": "not_executed",
       "exit_status": null,
       "expected_package_identity": {
@@ -239,8 +241,8 @@
         "api": null,
         "execution_status": "not_executed",
         "normalized_value": null,
-        "reason_code": "metric_not_supported",
-        "support_status": "metric_not_supported",
+        "reason_code": "external_not_executed",
+        "support_status": "not_evaluated",
         "value_match": null
       },
       "fairlearn": {
@@ -255,5 +257,5 @@
   "mismatch_total": null,
   "not_comparable_total": null,
   "reason_code": "external_not_executed",
-  "result_sha256": "2a0427c84620864edf5e7ca95fb7aab31dbecd1953893ef19a9abd4db0f1e49d"
+  "result_sha256": "5666dd5a6bd0341b0e24c478bc8e1fde81ee3b9be2358b72feae98d41fbcc197"
 }
