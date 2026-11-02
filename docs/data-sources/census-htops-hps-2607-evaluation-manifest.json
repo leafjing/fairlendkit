@@ -27,6 +27,29 @@
     "puf_effect": "none; the note explicitly states that the underlying PUF is not affected",
     "affected_published_tables": ["Health1", "Housing3", "Transportation3"]
   },
+  "supporting_documents": {
+    "questionnaire": {
+      "url": "https://www2.census.gov/programs-surveys/demo/technical-documentation/hhp/HTOPS_2607_Questionnaire_ENGLISH.pdf",
+      "filename": "HTOPS_2607_Questionnaire_ENGLISH.pdf",
+      "bytes": 397247,
+      "sha256": "ab59743a68470c64aba42dfa8b72ab1ffce9eba8b34a69b0d5bbe53232b6896c",
+      "last_modified_utc": "2026-09-24T13:02:14Z"
+    },
+    "source_and_accuracy": {
+      "url": "https://www2.census.gov/programs-surveys/demo/technical-documentation/hhp/HTOPS_2607_Source_and_Accuracy.pdf",
+      "filename": "HTOPS_2607_Source_and_Accuracy.pdf",
+      "bytes": 1279166,
+      "sha256": "5b17eb1e2b01fe59eb434366a257da979be01c651be14b23f55d83747c644360",
+      "last_modified_utc": "2026-09-24T12:47:12Z"
+    },
+    "quality_measures": {
+      "url": "https://www2.census.gov/programs-surveys/demo/tables/hhp/2026/2607/HTOPS_2607_Quality_Measures.xlsx",
+      "filename": "HTOPS_2607_Quality_Measures.xlsx",
+      "bytes": 12763,
+      "sha256": "da5533fef6ca2e9b73457dc8faaf589ef96217d0f9e9d94f08ff2821a77a50bb",
+      "last_modified_utc": "2026-09-24T12:47:11Z"
+    }
+  },
   "members": {
     "HTOPS_HPS_2607_PUF Data Dictionary_CSV.xlsx": {"bytes": 32197, "sha256": "f91b0509a92e00218c8c59aa61237b5b494641860af5e72fc9e30143d9590585"},
     "HTOPS_HPS_2607_PUF.csv": {"bytes": 16050806, "sha256": "cfc4fc46d15be4b61c0ee924e9b881b3fb742cd668270b3bd532efe5b5a6c380", "rows": 12755, "columns": 255, "schema_sha256": "a0c1a98b9695c414fe2d5f415e0b7fc8c92e2cc0af739d09eef9f452cdb62c3d"},

@@ -13,6 +13,10 @@ PUF, a 163-column replicate-weight file, and a 255-variable XLSX dictionary.
 Both CSVs contain 12,755 rows with no duplicates. Exact sizes, SHA-256 values,
 ordered schemas, and the dictionary-derived special-code mapping are pinned in
 the adjacent manifest and evidence JSON. No respondent rows are committed.
+The English questionnaire, Source and Accuracy statement, quality-measures
+workbook, and October 30 user note are each fixed by official URL, filename,
+byte size, last-modified time, and SHA-256; document identity drift therefore
+fails closed alongside package drift.
 
 The October 30 user note postdates the September 10 ZIP. It reports errors in
 the published Health1 and Housing3 tables, while its incorporated October 7
