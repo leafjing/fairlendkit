@@ -16,6 +16,7 @@ The canonical output reports:
 - covered applicants with alternative data available;
 - approval increment `tool approvals - baseline approvals`;
 - credit increment `tool approved requested credit - baseline approved requested credit`;
+- average incremental credit `credit increment / approval increment`;
 - approved bad rate, true-positive rate, and false-positive rate;
 - selection rates by the fixed comparison/reference grouping, selection-rate
   difference `comparison - reference`, and adverse-impact ratio
@@ -38,6 +39,10 @@ The checked-in result is
 Its two runtime fields are measurements from one invocation and will vary by
 machine; every impact, risk, and fairness value is deterministic and tested
 against the fixed input hash.
+
+The JSON also records the Python/runtime environment, all policy thresholds,
+the synthetic requested-credit range and increment, and the exact formulas for
+approval, credit, risk, and fairness metrics.
 
 The benchmark does not recommend a policy or threshold and does not establish
 fairness, legality, business value, or real-world impact.

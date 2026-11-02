@@ -23,6 +23,7 @@ def test_fixed_population_and_decision_outputs_are_reproducible():
     assert result.tool.approvals == 4598
     assert result.approval_increment == 247
     assert result.credit_increment == 2731500
+    assert result.average_incremental_credit == pytest.approx(2_731_500 / 247)
 
 
 def test_metrics_are_directly_recomputed_from_rows_and_decisions():
@@ -45,6 +46,11 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert "Synthetic simulation only" in payload["disclaimer"]
     assert payload["baseline_median_seconds"] >= 0
     assert payload["tool_median_seconds"] >= 0
+    assert payload["policy_assumptions"]["baseline_credit_score_minimum"] == 680
+    assert payload["formulas"]["credit_increment"] == (
+        "tool.approved_credit - baseline.approved_credit"
+    )
+    assert payload["runtime_environment"]["timer"] == "time.perf_counter_ns"
 
 
 def test_checked_in_artifact_matches_deterministic_result():
@@ -54,7 +60,11 @@ def test_checked_in_artifact_matches_deterministic_result():
             encoding="utf-8"
         )
     )
-    for runtime_field in ("baseline_median_seconds", "tool_median_seconds"):
+    for runtime_field in (
+        "baseline_median_seconds",
+        "tool_median_seconds",
+        "runtime_environment",
+    ):
         result.pop(runtime_field)
         artifact.pop(runtime_field)
     assert artifact == result

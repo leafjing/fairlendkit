@@ -1,5 +1,6 @@
 {
   "approval_increment": 247,
+  "average_incremental_credit": 11058.704453441296,
   "baseline": {
     "adverse_impact_ratio": 0.7830240080470594,
     "approvals": 4351,
@@ -11,15 +12,42 @@
     "selection_rate_difference": -0.10322645344643361,
     "true_positive_rate": 0.5290599887871426
   },
-  "baseline_median_seconds": 0.00026729,
+  "baseline_median_seconds": 0.000366701,
   "benchmark_id": "fairlendkit-simulated-impact-v1",
   "covered_applicants": 6329,
   "credit_increment": 2731500,
   "disclaimer": "Synthetic simulation only; not a pilot, customer outcome, production decision, causal estimate, or compliance conclusion.",
   "evidence_status": "simulation_not_production_evidence",
+  "formulas": {
+    "adverse_impact_ratio": "comparison selection rate / reference selection rate",
+    "approval_increment": "tool.approvals - baseline.approvals",
+    "approved_bad_rate": "approved unfavorable outcomes / approvals",
+    "average_incremental_credit": "credit_increment / approval_increment",
+    "credit_increment": "tool.approved_credit - baseline.approved_credit",
+    "false_positive_rate": "approved unfavorable outcomes / unfavorable outcomes",
+    "selection_rate_difference": "comparison selection rate - reference selection rate",
+    "true_positive_rate": "approved favorable outcomes / favorable outcomes"
+  },
   "input_sha256": "6eae1134ac5986dd53ba6baba01e339d66bba4bbdfeac378e757167e82ba77a9",
+  "policy_assumptions": {
+    "baseline_credit_score_minimum": 680,
+    "comparison_group": "fixed synthetic group; not a protected-class claim",
+    "requested_credit_increment": 500,
+    "requested_credit_maximum": 20000,
+    "requested_credit_minimum": 2000,
+    "second_look_alternative_score_minimum": 0.72,
+    "second_look_credit_score_maximum_exclusive": 680,
+    "second_look_credit_score_minimum": 640
+  },
   "population_size": 10000,
   "repetitions": 15,
+  "runtime_environment": {
+    "executable": "/usr/bin/python3",
+    "implementation": "CPython",
+    "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "timer": "time.perf_counter_ns"
+  },
   "seed": 20261102,
   "tool": {
     "adverse_impact_ratio": 0.7996940012359449,
@@ -32,5 +60,5 @@
     "selection_rate_difference": -0.0999877849323706,
     "true_positive_rate": 0.5658755372827509
   },
-  "tool_median_seconds": 0.00064517
+  "tool_median_seconds": 0.000828684
 }

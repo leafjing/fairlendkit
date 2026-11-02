@@ -6,8 +6,10 @@ from dataclasses import asdict, dataclass
 import hashlib
 import json
 import math
+import platform
 import random
 import statistics
+import sys
 import time
 from typing import Callable, Sequence
 
@@ -57,6 +59,10 @@ class BenchmarkResult:
     tool: PolicyMetrics
     approval_increment: int
     credit_increment: int
+    average_incremental_credit: float
+    policy_assumptions: dict[str, int | float | str]
+    formulas: dict[str, str]
+    runtime_environment: dict[str, str]
     disclaimer: str
 
     def canonical_json(self) -> str:
@@ -207,6 +213,37 @@ def run_benchmark(
         tool=tool_metrics,
         approval_increment=tool_metrics.approvals - baseline_metrics.approvals,
         credit_increment=tool_metrics.approved_credit - baseline_metrics.approved_credit,
+        average_incremental_credit=(
+            (tool_metrics.approved_credit - baseline_metrics.approved_credit)
+            / (tool_metrics.approvals - baseline_metrics.approvals)
+        ),
+        policy_assumptions={
+            "baseline_credit_score_minimum": 680,
+            "second_look_credit_score_minimum": 640,
+            "second_look_credit_score_maximum_exclusive": 680,
+            "second_look_alternative_score_minimum": 0.72,
+            "requested_credit_minimum": 2000,
+            "requested_credit_maximum": 20000,
+            "requested_credit_increment": 500,
+            "comparison_group": "fixed synthetic group; not a protected-class claim",
+        },
+        formulas={
+            "approval_increment": "tool.approvals - baseline.approvals",
+            "credit_increment": "tool.approved_credit - baseline.approved_credit",
+            "average_incremental_credit": "credit_increment / approval_increment",
+            "approved_bad_rate": "approved unfavorable outcomes / approvals",
+            "true_positive_rate": "approved favorable outcomes / favorable outcomes",
+            "false_positive_rate": "approved unfavorable outcomes / unfavorable outcomes",
+            "selection_rate_difference": "comparison selection rate - reference selection rate",
+            "adverse_impact_ratio": "comparison selection rate / reference selection rate",
+        },
+        runtime_environment={
+            "python": platform.python_version(),
+            "implementation": platform.python_implementation(),
+            "platform": platform.platform(),
+            "executable": sys.executable,
+            "timer": "time.perf_counter_ns",
+        },
         disclaimer=(
             "Synthetic simulation only; not a pilot, customer outcome, production "
             "decision, causal estimate, or compliance conclusion."
