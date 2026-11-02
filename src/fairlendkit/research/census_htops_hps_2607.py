@@ -40,7 +40,6 @@ EXPECTED = {
         "HWEIGHT": (80, 0, 0, 0, 0, 169.82246136495218, 1711612.8305694133,
                     "0eec8ab8d9a9870a0f9042411dc7b404642f9dbe00a88a2a3ed6b35365607a06"),
     },
-    "full_sample_weight_matches": {"PWEIGHT0": True, "HWEIGHT0": True},
     "variance_factor": (4, 80),
     "imputation": {
         "A_THHLD_NUMPER": (42, 12713), "A_THHLD_NUMKID": (91, 12664),
@@ -88,6 +87,21 @@ def validate_replicate_columns(columns: Sequence[str], prefix: str) -> None:
         raise Htops2607IntegrityError(f"HTOPS {prefix} replicate sequence changed")
 
 
+def validate_full_sample_weight_rows(
+    main_values: Sequence[str], weight_zero_values: Sequence[str], name: str,
+) -> None:
+    """Require the replicate file's weight 0 to equal the main weight row by row."""
+    if len(main_values) != EXPECTED["rows"] or len(weight_zero_values) != EXPECTED["rows"]:
+        raise Htops2607IntegrityError(f"HTOPS {name} full-sample weight row count changed")
+    for index, (main_value, weight_zero_value) in enumerate(
+        zip(main_values, weight_zero_values, strict=True)
+    ):
+        if main_value != weight_zero_value:
+            raise Htops2607IntegrityError(
+                f"HTOPS {name} full-sample weight differs at row {index}"
+            )
+
+
 def validate_summary(**evidence: object) -> None:
     """Fail closed unless every aggregate equals the reviewed official package."""
     for key in (
@@ -95,7 +109,7 @@ def validate_summary(**evidence: object) -> None:
         "replicate_sha256", "dictionary_sha256", "questionnaire_sha256",
         "source_accuracy_sha256", "quality_measures_sha256", "user_note_sha256", "main_schema_sha256",
         "replicate_schema_sha256", "special_rules_sha256", "base_weights",
-        "replicate_weights", "full_sample_weight_matches", "variance_factor",
+        "replicate_weights", "variance_factor",
         "imputation", "special_counts",
     ):
         actual = evidence.get(key)

@@ -5,7 +5,8 @@ import pytest
 
 from fairlendkit.research.census_htops_hps_2607 import (
     EXPECTED, VARIANCE_OUTPUTS_ENABLED, Htops2607IntegrityError, analysis_columns,
-    canonical_sha256, summarize_numeric, validate_replicate_columns, validate_summary,
+    canonical_sha256, summarize_numeric, validate_full_sample_weight_rows,
+    validate_replicate_columns, validate_summary,
 )
 
 
@@ -53,10 +54,27 @@ def test_replicates_are_strictly_one_through_eighty(prefix: str) -> None:
 
 def test_variance_semantics_are_pinned_but_not_implemented() -> None:
     assert EXPECTED["variance_factor"] == (4, 80)
-    assert EXPECTED["full_sample_weight_matches"] == {
-        "PWEIGHT0": True, "HWEIGHT0": True,
-    }
     assert VARIANCE_OUTPUTS_ENABLED is False
+
+
+@pytest.mark.parametrize("name", ["PWEIGHT", "HWEIGHT"])
+def test_full_sample_weight_zero_matches_main_rows(name: str) -> None:
+    values = tuple(str(index / 10) for index in range(EXPECTED["rows"]))
+    validate_full_sample_weight_rows(values, values, name)
+
+
+@pytest.mark.parametrize("name", ["PWEIGHT", "HWEIGHT"])
+def test_single_full_sample_weight_drift_fails(name: str) -> None:
+    main = ["1.0"] * EXPECTED["rows"]
+    weight_zero = main.copy()
+    weight_zero[EXPECTED["rows"] // 2] = "1.0001"
+    with pytest.raises(Htops2607IntegrityError, match="differs at row"):
+        validate_full_sample_weight_rows(main, weight_zero, name)
+
+
+def test_full_sample_weight_length_drift_fails() -> None:
+    with pytest.raises(Htops2607IntegrityError, match="row count"):
+        validate_full_sample_weight_rows(("1",), ("1",), "PWEIGHT")
 
 
 def test_schema_and_special_rules_artifact_matches_digests() -> None:
