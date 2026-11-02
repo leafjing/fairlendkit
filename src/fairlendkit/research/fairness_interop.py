@@ -141,11 +141,20 @@ def _execution_record(tool: str, status: ExecutionStatus) -> dict[str, object]:
         "execution_succeeded": "external_output_invalid",
     }
     return {
-        "status": status,
+        "execution_status": status,
         "reason_code": reason_by_status[status],
         "expected_package_identity": PACKAGE_IDENTITIES[tool],
         "identity_verified": False,
-        "command": None,
+        "command": [
+            "python",
+            "-m",
+            "fairlendkit.research.external_fairness_adapter",
+            "--tool",
+            tool,
+            "--input",
+            "fixed-synthetic-v1",
+        ],
+        "command_status": "planned_not_executed",
         "exit_status": None,
         "stdout_sha256": None,
         "stderr_sha256": None,
