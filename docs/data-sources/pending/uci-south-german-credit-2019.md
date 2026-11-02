@@ -116,6 +116,24 @@ authoritative candidate identity while retaining `evidence_incomplete`, null
 hashes, and an empty member list until the new isolated Run is independently
 reviewed.
 
+## UCI-M3 formal dataset-573 Harness Run
+
+The separately authorized dataset-573 Harness Run
+`uci573-formal-20261102t041415z-fe6d427` was executed once on 2026-11-02. It
+failed closed before retaining the archive because the final response omitted
+an authorized ZIP media type. The recorded lifecycle is
+`prepared -> started -> failed -> cleaned`; cleanup completed, the remaining
+bytes state is `absent`, quarantine is empty, and the permanent `.spent` marker
+prevents reuse.
+
+The authorization, audit, and `.spent` identities and the exact failure are
+recorded in
+[`../investigations/uci-south-german-credit-formal-run-2026-11-02.md`](../investigations/uci-south-german-credit-formal-run-2026-11-02.md).
+This failed Run supplies no archive or member hashes. It does not populate the
+manifest, authorize promotion, or supersede the candidate's
+`evidence_incomplete` state. The earlier unaudited preflight download remains
+non-admission evidence and must not be used to fill the manifest.
+
 ## Enablement plan
 
 - Target: `repository` as the first directly included risk-metric benchmark,
