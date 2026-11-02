@@ -8,11 +8,14 @@
 - Official user guide:
   <https://files.consumerfinance.gov/f/documents/cfpb_making-ends-meet_public-use-file_user-guide.pdf>
 - The current CFPB Public Data Inventory still lists Making Ends Meet as raw,
-  one-time data, but its Making Ends Meet link and historical public-data path
-  redirect to the CFPB data-research root; no stable package URL is pinned
-- Exact guide-defined candidate: Sample 6 Wave 1, fielded 2025-01-13 through
-  2025-03-28; official package identity and terms remain unavailable
-- License/redistribution: per-download public-use terms not yet captured
+  one-time data, while the public-data page redirects to the CFPB data-research
+  root; official Sample 1/3/4/5/6 archives were nevertheless recovered from
+  `files.consumerfinance.gov` and evaluated at `2026-11-02T05:05:26Z`
+- Exact evaluated release set: official Samples 1, 3, 4, 5, and 6 plus the July
+  2025 user guide; Sample 2 is intentionally excluded from the public release
+- License/redistribution: access is conditioned on CFPB's MEM Terms and
+  Conditions; project disposition is independently fixed to `external_only`
+  with `redistribution=prohibited`
 - Decision: none
 - Trust tier: A for publisher authority; admission remains incomplete
 
@@ -29,9 +32,10 @@ hashes, and an approved `quality_only` or `risk_eligible` outcome mapping.
 
 The latest metadata investigation is recorded in
 [`../investigations/cfpb-making-ends-meet-metadata-2026-11-02.md`](../investigations/cfpb-making-ends-meet-metadata-2026-11-02.md).
-It selects Sample 6 Wave 1 as the latest guide-defined evaluation target, while
-keeping package identity, terms, license, redistribution, and prescribed
-citation unverified because the active download page redirects.
+It identifies Sample 6 Wave 1 as the latest guide-defined wave. Subsequent
+official-file evaluation recovered Samples 1/3/4/5/6 from CFPB's file host.
+Exact URLs, filenames, terms identity, byte sizes, and hashes must be pinned by
+the superseding implementation evidence before this pending record closes.
 
 Sample 6 has 2,630 responses and intentionally oversamples several credit,
 income-area, and race/ethnicity-area proxy groups. Its online-only questions use
@@ -78,9 +82,9 @@ therefore pins only the official inventory and user guide. It uses
 scope `unverified`. Candidate status remains `evidence_incomplete`; the guide is
 evidence, not authorization to reconstruct, download, or redistribute a sample.
 
-Sample 6 Wave 1 is the provisional technical-evaluation target, but no source
-may be admitted until CFPB restores or identifies an official package page and
-active terms. Survey hardship is never a default label, and credit-derived
+Samples 1/3/4/5/6 have been technically evaluated from official CFPB archives,
+but remain `external_only` and non-redistributable under the project's stricter
+disposition. Survey hardship is never a default label, and credit-derived
 variables cannot become `risk_eligible` without explicit time alignment,
 outcome semantics, maturity, privacy, and censoring review.
 
