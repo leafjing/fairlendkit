@@ -23,7 +23,7 @@
     "selection_rate_difference": -0.03404367833387148,
     "true_positive_rate": 0.1468884320687722
   },
-  "baseline_median_seconds": 0.000429665,
+  "baseline_median_seconds": 0.000556385,
   "benchmark_id": "fairlendkit-simulated-impact-v1",
   "code_commit_basis": "81891a8",
   "config_sha256": "8e2fa5b4aa6af72c9dc77cb2f58f692d25964760bda7d93aecd83c63a1ccce7e",
@@ -67,7 +67,7 @@
     "selection_rate_difference": "comparison selection rate - reference selection rate",
     "true_positive_rate": "approved favorable outcomes / favorable outcomes"
   },
-  "generated_at_utc": "2026-11-02T06:41:23.152141+00:00",
+  "generated_at_utc": "2026-11-02T06:44:30.523137+00:00",
   "group_evidence": {
     "baseline": {
       "comparison": {
@@ -169,16 +169,16 @@
   },
   "runtime_statistics": {
     "baseline": {
-      "mean_seconds": 0.000437917,
-      "median_seconds": 0.000429665,
+      "mean_seconds": 0.0005322832666666667,
+      "median_seconds": 0.000556385,
       "repetitions": 15,
-      "stdev_seconds": 0.000040286410289327104
+      "stdev_seconds": 0.000049453814088741517
     },
     "tool": {
-      "mean_seconds": 0.0003660792,
-      "median_seconds": 0.000366851,
+      "mean_seconds": 0.0003849355333333333,
+      "median_seconds": 0.000374822,
       "repetitions": 15,
-      "stdev_seconds": 0.000040667556628981645
+      "stdev_seconds": 0.00003498298211961
     }
   },
   "scenario_expectations": {
@@ -188,7 +188,8 @@
     "expected_baseline_absolute_gap": 0.12,
     "expected_incremental_approvals": 350,
     "expected_tool_absolute_gap": 0.05,
-    "passed": false
+    "passed": false,
+    "reason_code": "impact_expectations_not_met"
   },
   "scenario_id": "fairlendkit-sim-impact-v1",
   "seed": 20261102,
@@ -204,5 +205,5 @@
     "selection_rate_difference": -0.029963862501568767,
     "true_positive_rate": 0.16090450383105961
   },
-  "tool_median_seconds": 0.000366851
+  "tool_median_seconds": 0.000374822
 }

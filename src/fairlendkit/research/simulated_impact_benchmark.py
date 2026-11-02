@@ -479,6 +479,11 @@ def run_benchmark(
             "expected_tool_absolute_gap": expectations.tool_absolute_gap,
             "actual_tool_absolute_gap": tool_gap,
             "passed": expectations_passed,
+            "reason_code": (
+                "impact_expectations_passed"
+                if expectations_passed
+                else "impact_expectations_not_met"
+            ),
         },
         publication_gate={
             "passed": publication_passed,

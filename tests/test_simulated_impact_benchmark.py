@@ -67,6 +67,9 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert payload["decision_set_digests"]["baseline_approved_count"] == 892
     assert payload["decision_set_digests"]["tool_approved_count"] == 979
     assert payload["scenario_expectations"]["passed"] is False
+    assert payload["scenario_expectations"]["reason_code"] == (
+        "impact_expectations_not_met"
+    )
     assert payload["publication_gate"]["candidate_copy_status"] == (
         "locked_pending_evidence"
     )
