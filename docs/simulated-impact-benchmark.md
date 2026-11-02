@@ -53,10 +53,17 @@ It additionally records the one-page assessment's analyst-effort and review-
 coverage assumptions as scenario inputs, never as wall-clock-derived savings.
 The executable policy produces 247 incremental approvals rather than the page's
 350-person scenario target; the artifact preserves the measured simulation
-result and does not rewrite it to match that target. Group sample sizes and 95%
+result and does not rewrite it to match that target. Consequently the candidate
+publication copy remains locked with reason code
+`scenario_expectations_not_reproduced`. Group sample sizes and 95%
 Wilson intervals accompany selection rates. The risk constraint, stable reason
 code, source identity, allowed use, generation timestamp, code basis, runtime
 mean, and runtime standard deviation are machine readable.
+
+The artifact also freezes the canonical-input SHA-256, baseline and tool
+approved-ID set digests, the synthetic outcome definition and observation
+window, zero risk tolerance, and expected-versus-actual approval and group-gap
+values. Targets are assertions, never inputs to the decision functions.
 
 The benchmark does not recommend a policy or threshold and does not establish
 fairness, legality, business value, or real-world impact.

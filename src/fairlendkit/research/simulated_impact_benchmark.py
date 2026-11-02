@@ -58,6 +58,7 @@ class BenchmarkResult:
     seed: int
     population_size: int
     input_sha256: str
+    input_file_sha256: str
     repetitions: int
     baseline_median_seconds: float
     tool_median_seconds: float
@@ -76,6 +77,9 @@ class BenchmarkResult:
     review_coverage_scenario: dict[str, int | float | str]
     group_evidence: dict[str, object]
     risk_constraint: dict[str, bool | float | str]
+    decision_set_digests: dict[str, str | int]
+    scenario_expectations: dict[str, int | float | bool]
+    publication_gate: dict[str, str | bool]
     data_provenance: dict[str, str]
     constraint_status: str
     reason_code: str
@@ -191,6 +195,18 @@ def _input_sha256(rows: Sequence[SimulatedApplicant]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _decision_set_sha256(
+    rows: Sequence[SimulatedApplicant], decisions: Sequence[bool]
+) -> str:
+    approved_ids = [
+        row.applicant_id
+        for row, decision in zip(rows, decisions, strict=True)
+        if decision
+    ]
+    payload = json.dumps(approved_ids, separators=(",", ":")).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _runtime_statistics(
     function: Callable[[Sequence[SimulatedApplicant]], tuple[bool, ...]],
     rows: Sequence[SimulatedApplicant],
@@ -257,6 +273,15 @@ def run_benchmark(
     baseline_runtime = _runtime_statistics(baseline_decisions, rows, repetitions)
     tool_runtime = _runtime_statistics(tool_decisions, rows, repetitions)
     risk_passed = tool_metrics.approved_bad_rate <= baseline_metrics.approved_bad_rate
+    input_sha256 = _input_sha256(rows)
+    baseline_gap = abs(baseline_metrics.selection_rate_difference)
+    tool_gap = abs(tool_metrics.selection_rate_difference)
+    expectations_passed = (
+        tool_metrics.approvals - baseline_metrics.approvals == 350
+        and math.isclose(baseline_gap, 0.12, abs_tol=1e-12)
+        and math.isclose(tool_gap, 0.05, abs_tol=1e-12)
+    )
+    publication_passed = risk_passed and expectations_passed
     return BenchmarkResult(
         benchmark_id=BENCHMARK_ID,
         scenario_id=SCENARIO_ID,
@@ -266,7 +291,8 @@ def run_benchmark(
         evidence_status="simulation_not_production_evidence",
         seed=seed,
         population_size=population_size,
-        input_sha256=_input_sha256(rows),
+        input_sha256=input_sha256,
+        input_file_sha256=input_sha256,
         repetitions=repetitions,
         baseline_median_seconds=float(baseline_runtime["median_seconds"]),
         tool_median_seconds=float(tool_runtime["median_seconds"]),
@@ -342,17 +368,52 @@ def run_benchmark(
         },
         risk_constraint={
             "rule": "tool approved bad rate <= baseline approved bad rate",
+            "outcome_definition": "unfavorable_outcome = not synthetic favorable_outcome",
+            "observation_window": "same generated cross-section; no post-decision observations",
+            "formula": "approved unfavorable outcomes / approved applicants",
+            "allowed_absolute_tolerance": 0.0,
             "baseline_approved_bad_rate": baseline_metrics.approved_bad_rate,
             "tool_approved_bad_rate": tool_metrics.approved_bad_rate,
             "passed": risk_passed,
+        },
+        decision_set_digests={
+            "baseline_approved_count": baseline_metrics.approvals,
+            "baseline_approved_ids_sha256": _decision_set_sha256(rows, baseline),
+            "tool_approved_count": tool_metrics.approvals,
+            "tool_approved_ids_sha256": _decision_set_sha256(rows, tool),
+        },
+        scenario_expectations={
+            "expected_incremental_approvals": 350,
+            "actual_incremental_approvals": tool_metrics.approvals - baseline_metrics.approvals,
+            "expected_baseline_absolute_gap": 0.12,
+            "actual_baseline_absolute_gap": baseline_gap,
+            "expected_tool_absolute_gap": 0.05,
+            "actual_tool_absolute_gap": tool_gap,
+            "passed": expectations_passed,
+        },
+        publication_gate={
+            "passed": publication_passed,
+            "status": "passed" if publication_passed else "failed",
+            "reason_code": (
+                "all_publication_gates_passed"
+                if publication_passed
+                else "scenario_expectations_not_reproduced"
+            ),
+            "candidate_copy_status": (
+                "publishable" if publication_passed else "locked_not_publishable"
+            ),
         },
         data_provenance={
             "identity": "deterministic synthetic applicants generated in repository",
             "allowed_use": "simulation and test only",
             "customer_data": "none",
         },
-        constraint_status="passed" if risk_passed else "failed",
-        reason_code="constraints_passed" if risk_passed else "risk_constraint_failed",
+        constraint_status="passed" if publication_passed else "failed",
+        reason_code=(
+            "all_publication_gates_passed"
+            if publication_passed
+            else "scenario_expectations_not_reproduced"
+        ),
         disclaimer=(
             "Synthetic simulation only; not a pilot, customer outcome, production "
             "decision, causal estimate, or compliance conclusion."

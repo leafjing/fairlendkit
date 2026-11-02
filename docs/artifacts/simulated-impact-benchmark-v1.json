@@ -23,10 +23,19 @@
     "selection_rate_difference": -0.10322645344643361,
     "true_positive_rate": 0.5290599887871426
   },
-  "baseline_median_seconds": 0.000391329,
+  "baseline_median_seconds": 0.000406169,
   "benchmark_id": "fairlendkit-simulated-impact-v1",
   "code_commit_basis": "81891a8",
-  "constraint_status": "passed",
+  "config_summary": {
+    "credit_amounts": "same pre-decision requested_credit for baseline and tool",
+    "evaluation_sample": "same deterministic input_sha256 for baseline and tool",
+    "group_definition": "same fixed synthetic comparison_group for baseline and tool",
+    "outcome_label": "same synthetic favorable_outcome for baseline and tool",
+    "population_size": 10000,
+    "risk_rule": "tool approved bad rate <= baseline approved bad rate",
+    "time_window": "same single generated cross-section; no temporal split"
+  },
+  "constraint_status": "failed",
   "covered_applicants": 6329,
   "credit_increment": 2731500,
   "data_provenance": {
@@ -34,7 +43,14 @@
     "customer_data": "none",
     "identity": "deterministic synthetic applicants generated in repository"
   },
+  "decision_set_digests": {
+    "baseline_approved_count": 4351,
+    "baseline_approved_ids_sha256": "b270b4545e28951335274e7ec0f1f28e0a4f267a9fada3e62f0f15dc5d5fa8cc",
+    "tool_approved_count": 4598,
+    "tool_approved_ids_sha256": "4184903660f9855f45a391546e718076f119d1bb7552a6301efa26c5702c9a06"
+  },
   "disclaimer": "Synthetic simulation only; not a pilot, customer outcome, production decision, causal estimate, or compliance conclusion.",
+  "evidence_class": "simulation_not_production_evidence",
   "evidence_status": "simulation_not_production_evidence",
   "formulas": {
     "adverse_impact_ratio": "comparison selection rate / reference selection rate",
@@ -46,7 +62,7 @@
     "selection_rate_difference": "comparison selection rate - reference selection rate",
     "true_positive_rate": "approved favorable outcomes / favorable outcomes"
   },
-  "generated_at_utc": "2026-11-02T06:24:25.986920+00:00",
+  "generated_at_utc": "2026-11-02T06:30:48.854709+00:00",
   "group_evidence": {
     "baseline": {
       "comparison": {
@@ -89,6 +105,7 @@
       }
     }
   },
+  "input_file_sha256": "6eae1134ac5986dd53ba6baba01e339d66bba4bbdfeac378e757167e82ba77a9",
   "input_sha256": "6eae1134ac5986dd53ba6baba01e339d66bba4bbdfeac378e757167e82ba77a9",
   "policy_assumptions": {
     "baseline_credit_score_minimum": 680,
@@ -101,7 +118,13 @@
     "second_look_credit_score_minimum": 640
   },
   "population_size": 10000,
-  "reason_code": "constraints_passed",
+  "publication_gate": {
+    "candidate_copy_status": "locked_not_publishable",
+    "passed": false,
+    "reason_code": "scenario_expectations_not_reproduced",
+    "status": "failed"
+  },
+  "reason_code": "scenario_expectations_not_reproduced",
   "repetitions": 15,
   "review_coverage_scenario": {
     "additional_people": 8000,
@@ -113,7 +136,11 @@
     "tool_rate": 1.0
   },
   "risk_constraint": {
+    "allowed_absolute_tolerance": 0.0,
     "baseline_approved_bad_rate": 0.34934497816593885,
+    "formula": "approved unfavorable outcomes / approved applicants",
+    "observation_window": "same generated cross-section; no post-decision observations",
+    "outcome_definition": "unfavorable_outcome = not synthetic favorable_outcome",
     "passed": true,
     "rule": "tool approved bad rate <= baseline approved bad rate",
     "tool_approved_bad_rate": 0.34145280556763813
@@ -127,17 +154,26 @@
   },
   "runtime_statistics": {
     "baseline": {
-      "mean_seconds": 0.00035949513333333335,
-      "median_seconds": 0.000391329,
+      "mean_seconds": 0.00042170773333333335,
+      "median_seconds": 0.000406169,
       "repetitions": 15,
-      "stdev_seconds": 0.000051154263286743995
+      "stdev_seconds": 0.00006442879126542581
     },
     "tool": {
-      "mean_seconds": 0.000730294,
-      "median_seconds": 0.000747392,
+      "mean_seconds": 0.0009753916666666667,
+      "median_seconds": 0.000809355,
       "repetitions": 15,
-      "stdev_seconds": 0.00006361254738874802
+      "stdev_seconds": 0.00048258656262931826
     }
+  },
+  "scenario_expectations": {
+    "actual_baseline_absolute_gap": 0.10322645344643361,
+    "actual_incremental_approvals": 247,
+    "actual_tool_absolute_gap": 0.0999877849323706,
+    "expected_baseline_absolute_gap": 0.12,
+    "expected_incremental_approvals": 350,
+    "expected_tool_absolute_gap": 0.05,
+    "passed": false
   },
   "scenario_id": "fairlendkit-sim-impact-v1",
   "seed": 20261102,
@@ -152,15 +188,5 @@
     "selection_rate_difference": -0.0999877849323706,
     "true_positive_rate": 0.5658755372827509
   },
-  "tool_median_seconds": 0.000747392,
-  "evidence_class": "simulation_not_production_evidence",
-  "config_summary": {
-    "evaluation_sample": "same deterministic input_sha256 for baseline and tool",
-    "outcome_label": "same synthetic favorable_outcome for baseline and tool",
-    "time_window": "same single generated cross-section; no temporal split",
-    "risk_rule": "tool approved bad rate <= baseline approved bad rate",
-    "credit_amounts": "same pre-decision requested_credit for baseline and tool",
-    "group_definition": "same fixed synthetic comparison_group for baseline and tool",
-    "population_size": 10000
-  }
+  "tool_median_seconds": 0.000809355
 }

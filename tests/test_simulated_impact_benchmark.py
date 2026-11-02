@@ -58,8 +58,16 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert payload["review_coverage_scenario"]["baseline_people"] == 2000
     assert payload["review_coverage_scenario"]["tool_people"] == 10000
     assert payload["risk_constraint"]["passed"] is True
-    assert payload["constraint_status"] == "passed"
-    assert payload["reason_code"] == "constraints_passed"
+    assert payload["constraint_status"] == "failed"
+    assert payload["reason_code"] == "scenario_expectations_not_reproduced"
+    assert payload["input_file_sha256"] == payload["input_sha256"]
+    assert payload["decision_set_digests"]["baseline_approved_count"] == 4351
+    assert payload["decision_set_digests"]["tool_approved_count"] == 4598
+    assert payload["scenario_expectations"]["passed"] is False
+    assert payload["publication_gate"]["candidate_copy_status"] == (
+        "locked_not_publishable"
+    )
+    assert payload["risk_constraint"]["allowed_absolute_tolerance"] == 0.0
     assert payload["config_summary"]["population_size"] == 10000
     assert "same deterministic" in payload["config_summary"]["evaluation_sample"]
     assert payload["group_evidence"]["tool"]["reference"]["sample_size"] > 0
