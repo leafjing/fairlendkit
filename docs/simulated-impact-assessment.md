@@ -1,6 +1,6 @@
-# FairLendKit 模拟影响评估（情景基准）
+# FairLendKit 情景影响评估（可复算基准）
 
-> 状态：待 benchmark 产物回填。本文全部业务影响数字均为可复算的情景模拟，
+> 状态：待 benchmark 产物回填。本文全部业务影响数字均为可复算的情景评估，
 > 不是客户试点、生产部署、历史交易或已实现商业成效。
 
 ## 1. 三层证据必须分开
@@ -10,11 +10,12 @@
 2. **具体贡献**：可陈述已完成的数据源评估、隐私和标识符隔离、权重与插补
    校验、时间泄漏防护、可复现测试及 fail-closed 门禁。这些是可审计交付，
    但本身不等于客户业务成效。
-3. **FairLendKit 模拟结果**：只能基于本页固定输入和公式报告，并始终标注
-   “模拟评估”。benchmark 未生成前，结果是情景目标，不是实测结果。
+3. **FairLendKit 情景结果**：只能基于本页固定输入和公式报告。机器可读
+   evidence class 必须表明它不是生产证据。benchmark 未生成前，数字只是验收
+   期望，不是已观测结果。
 
 当前没有在本页批准任何无来源的“行业平均提升”数字。外部证据缺失时，应写
-“行业量化证据待补”，不得用下述模拟数字替代。
+“行业量化证据待补”，不得用下述情景数字替代。
 
 ## 2. 固定情景
 
@@ -24,15 +25,19 @@
 - 原人工公平性复核：`2` 名分析师 × `5` 个工作日
 - FairLendKit 辅助流程：`2` 名分析师 × `2` 个工作日
 - 原人工抽查覆盖：`2,000` 人
-- 模拟流程覆盖：`10,000` 人
-- 模拟新增批准：`350` 人
+- 工具流程覆盖：`10,000` 人
 - 平均每笔授信额假设：`8,000` 美元
-- 受保护群体批准率差距情景：`12` 个百分点降至 `5` 个百分点
-- 风险约束：固定风险阈值，且总体坏账率不得劣于基线
+- 决策风险阈值：预测 12 个月坏账概率 `<= 0.20`
+- 坏账 outcome：决策后 12 个月内出现 `90+ DPD` 或 charge-off 时为 `1`，
+  否则为 `0`；未完成 12 个月观察窗口的行不得进入风险分母
+- 风险容差：工具批准集坏账率不得高于基线批准集坏账率，绝对容差 `0.0000`
+- 公平性指标：固定 protected/reference 两组的批准率绝对差
+- 决策输入：固定逐行特征、预测风险、成熟 outcome、群体和稳定行 ID；基线与
+  工具流程使用同一份输入、同一阈值和同一分母
 
-“新增批准 350 人”和“差距降至 5 个百分点”是情景输入，不是从当前客户或
-生产数据测得。若 benchmark 无法在风险约束下复现，必须报告失败，不得保留
-这些结果数字。
+`350` 个新增批准、基线差距 `12pp` 和工具差距 `5pp` 仅是验收期望。它们不得
+进入决策函数或作为结果字段的输入；必须从固定逐行决策重新计算。任一期望未
+满足时，benchmark 必须失败，不得把期望值复制到结果中。
 
 ## 3. 公式与可复算结果
 
@@ -45,7 +50,7 @@ person_hours_saved = 80 - 32 = 48
 time_reduction_rate = 48 / 80 = 60%
 ```
 
-结论：模拟后处理与验证人时由 `80` 降至 `32`，减少 `48` 人时，即 `60%`。
+结论：情景后处理与验证人时由 `80` 降至 `32`，减少 `48` 人时，即 `60%`。
 
 ### 覆盖人数
 
@@ -57,28 +62,48 @@ coverage_increase = 100% - 20% = 80 percentage points
 coverage_multiple = 10,000 / 2,000 = 5×
 ```
 
-结论：模拟覆盖增加 `8,000` 人，由 `20%` 提升至 `100%`，增加 `80` 个百分点，
+结论：情景覆盖增加 `8,000` 人，由 `20%` 提升至 `100%`，增加 `80` 个百分点，
 相当于原覆盖人数的 `5` 倍。
 
 ### 批准与授信
 
 ```text
-approval_rate_increase = 350 / 10,000 = 3.5 percentage points
-incremental_credit = 350 × $8,000 = $2,800,000
+baseline_approved = count(row where baseline_decision == "approve")
+tool_approved = count(row where tool_decision == "approve")
+incremental_approvals = tool_approved - baseline_approved
+approval_rate_increase = incremental_approvals / 10,000
+incremental_credit = incremental_approvals × $8,000
 ```
 
-结论：仅在风险约束成立时，模拟新增批准 `350` 人，批准率增加 `3.5` 个百分点；
-按平均 `8,000` 美元估算，模拟新增授信为 `280` 万美元。
+benchmark 预设断言为 `incremental_approvals == 350`；只有逐行计算命中该断言
+且风险门禁通过时，才可报告批准率增加 `3.5` 个百分点及情景新增授信 `280`
+万美元。还必须分别报告新增批准集合和取消批准集合的数量及确定性摘要。
 
 ### 公平性约束
 
 ```text
-approval_rate_gap_reduction = 12 pp - 5 pp = 7 percentage points
-relative_gap_reduction = 7 / 12 = 58.3%
+approval_rate(group, policy) = approved(group, policy) / eligible(group)
+approval_rate_gap(policy) = abs(rate(protected, policy) - rate(reference, policy))
+gap_reduction = gap(baseline) - gap(tool)
+relative_gap_reduction = gap_reduction / gap(baseline)
 ```
 
-结论：情景中的受保护群体批准率差距减少 `7` 个百分点，相对减少约 `58.3%`。
-必须同时报告各群体样本量、批准率、差距定义和区间；不得只报告改善百分比。
+benchmark 预设断言为 `gap(baseline) == 0.12` 且 `gap(tool) == 0.05`。命中时，
+差距减少 `7` 个百分点、相对减少约 `58.3%`。必须同时报告各群体固定分母、
+批准数、批准率和差距；不得只报告改善百分比。
+
+### 风险非劣效门禁
+
+```text
+matured_approved(policy) = approved rows whose 12-month outcome is observed
+bad_rate(policy) = sum(y_bad for matured_approved(policy)) / count(matured_approved(policy))
+risk_delta = bad_rate(tool) - bad_rate(baseline)
+risk_gate_pass = risk_delta <= 0.0000
+```
+
+任一批准集的成熟 outcome 分母为零时，以 `impact_risk_denominator_empty` 失败；
+风险恶化时以 `impact_risk_noninferiority_failed` 失败；输入含未定义 outcome、窗口
+或阈值时以 `impact_outcome_contract_invalid` 失败。失败时不得发布批准或授信收益。
 
 ## 4. benchmark 必须产出的证据
 
@@ -86,20 +111,23 @@ relative_gap_reduction = 7 / 12 = 58.3%
 
 - `scenario_id`、代码 commit、配置摘要、随机种子、运行环境和时间戳；
 - `evidence_class=simulation_not_production_evidence`；
+- 完整运行命令、输入文件 SHA-256、配置 SHA-256 和有序稳定行 ID 摘要；
 - 基线与工具流程的 wall-clock 时间、重复次数、均值及离散程度；
 - `baseline_person_hours=80` 与 `tool_assisted_person_hours=32`，并标注为情景
   人工投入假设，而非由 wall-clock 自动推导；
 - 总申请人数、基线覆盖人数、工具覆盖人数及覆盖率；
-- 基线与模拟批准人数、批准率及新增批准数；
-- 平均授信额假设及新增授信公式；
-- 基线与模拟总体坏账率、风险阈值和“不得恶化”校验结果；
+- 基线与工具批准人数、批准率、净新增批准数，以及新增/取消批准集合各自的
+  SHA-256 摘要；
+- `incremental_approvals` 与 `incremental_credit` 的公式标识、输入值和结果；
+- outcome 定义、12 个月观察窗口、`0.20` 风险阈值、成熟分母、两组坏账率、
+  `risk_delta`、`0.0000` 容差和 risk reason code；
 - 各受保护群体样本量、批准率、批准率差距及不确定性；
 - 数据来源身份、允许用途，以及是否为合成、公开 benchmark 或真实试用数据；
 - 任一约束失败时的 fail-closed 状态和稳定 reason code。
 
 工具运行时间与分析师人时是不同指标，禁止用一次脚本运行的秒数直接证明
 “节省 48 人时”。人时数字只有在任务分解、人员数、工作日和重复执行记录均
-被固定后才可作为模拟估算报告。
+被固定后才可作为情景估算报告。
 
 ## 5. 发布门禁
 
@@ -109,22 +137,28 @@ relative_gap_reduction = 7 / 12 = 58.3%
 - 基线与工具流程使用完全相同的评估样本、标签、时间窗口、风险阈值、
   额度假设和群体定义；
 - 审查员确认所有数字可由 artifact 或本页公式得到；
+- `350`、`0.12` 和 `0.05` 只出现在期望断言中，决策函数和结果输入不读取
+  这些期望值；
 - 风险指标没有恶化，公平性结果不是通过隐藏拒绝、改变分母或删除群体得到；
-- 文案显著包含“模拟”“情景”“估算”，不出现“客户实现”“生产提升”或
-  “已创造 280 万美元”等事实性措辞；
-- 外部行业数字有独立来源，不与 FairLendKit 模拟结果混写。
+- 对外文案显著标识为“情景评估”和“非生产证据”，不出现“客户实现”、
+  “生产提升”或“已创造 280 万美元”等事实性措辞；
+- 外部行业数字有独立来源，不与 FairLendKit 情景结果混写。
 
 所有输出的证据类别必须是
 `simulation_not_production_evidence`。在门禁关闭前，批准状态为
 `simulation_only / not_customer_validated`。
 
-## 6. 批准文案
+## 6. 锁定的候选文案模板
 
-> 在一个包含 10,000 名申请人的可复算情景模拟中，FairLendKit 将公平性
+以下文字尚未批准发布。只有 benchmark artifact 全部门禁通过、结果字段由逐行
+决策计算且审查员签字后，才可将占位状态改为 `publishable`：
+
+> 在一个包含 10,000 名申请人的可复算情景评估中，FairLendKit 将公平性
 > 后处理与验证的估算人工投入从 80 人时降至 32 人时，减少 60%；将评估覆盖
 > 从 2,000 人的人工抽查扩展至全部 10,000 人。在固定风险阈值且总体坏账率
-> 不恶化的模拟约束下，情景策略新增批准 350 人；按平均每笔 8,000 美元估算，
-> 对应 280 万美元模拟新增授信。受保护群体批准率差距在该情景中由 12 个百分
-> 点降至 5 个百分点。上述结果是情景模拟，不代表客户试点或生产成效。
+> 不恶化的约束下，情景策略新增批准 350 人；按平均每笔 8,000 美元估算，
+> 对应 280 万美元情景新增授信。受保护群体批准率差距在该情景中由 12 个百分
+> 点降至 5 个百分点。上述结果属于非生产情景证据，不代表客户试点或生产成效。
 
-禁止删去最后一句限定，也不得把“估算人工投入”改写为已观测客户工时。
+禁止删去最后一句限定，也不得把“估算人工投入”改写为已观测客户工时。artifact
+未通过前，该模板的状态必须保持 `locked_pending_evidence`。
