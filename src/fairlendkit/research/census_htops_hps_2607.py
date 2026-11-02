@@ -12,6 +12,7 @@ ADOPTED = False
 DISPOSITION = "external_only"
 USAGE = "quality_only"
 REDISTRIBUTION = "prohibited"
+VARIANCE_OUTPUTS_ENABLED = False
 IDENTIFIER_COLUMNS = ("SCRAMID",)
 
 EXPECTED = {
@@ -34,11 +35,13 @@ EXPECTED = {
         "HWEIGHT": (0, 0, 0, 0, 638.1644723523074, 1058697.3650488455),
     },
     "replicate_weights": {
-        "PWEIGHT": (81, 0, 0, 0, 0, 167.2803393650417, 6225349.31742791,
-                    "ae2920900fce974234dc1b01a05dc60ec69e7a4f58c45d60c56064764e84be04"),
-        "HWEIGHT": (81, 0, 0, 0, 0, 169.82246136495218, 1711612.8305694133,
-                    "5615fb504696d0e5a0ba2a2c79637c42f483cbd6f87db8bdb96242f55ef76517"),
+        "PWEIGHT": (80, 0, 0, 0, 0, 167.2803393650417, 6225349.31742791,
+                    "1a2bcb4f1689dc858bb0fe4d23f0a43773b23a8dd6cb92a039ed3d226b2b0ff8"),
+        "HWEIGHT": (80, 0, 0, 0, 0, 169.82246136495218, 1711612.8305694133,
+                    "0eec8ab8d9a9870a0f9042411dc7b404642f9dbe00a88a2a3ed6b35365607a06"),
     },
+    "full_sample_weight_matches": {"PWEIGHT0": True, "HWEIGHT0": True},
+    "variance_factor": (4, 80),
     "imputation": {
         "A_THHLD_NUMPER": (42, 12713), "A_THHLD_NUMKID": (91, 12664),
         "A_TAGE": (962, 11793), "A_TBIRTH_YEAR": (379, 12376),
@@ -78,6 +81,13 @@ def analysis_columns(columns: Sequence[str]) -> tuple[str, ...]:
     return tuple(column for column in columns if column not in IDENTIFIER_COLUMNS)
 
 
+def validate_replicate_columns(columns: Sequence[str], prefix: str) -> None:
+    """Require full weight 0 followed by exactly replicate weights 1 through 80."""
+    expected = (prefix + "0",) + tuple(prefix + str(index) for index in range(1, 81))
+    if tuple(columns) != expected:
+        raise Htops2607IntegrityError(f"HTOPS {prefix} replicate sequence changed")
+
+
 def validate_summary(**evidence: object) -> None:
     """Fail closed unless every aggregate equals the reviewed official package."""
     for key in (
@@ -85,7 +95,8 @@ def validate_summary(**evidence: object) -> None:
         "replicate_sha256", "dictionary_sha256", "questionnaire_sha256",
         "source_accuracy_sha256", "quality_measures_sha256", "user_note_sha256", "main_schema_sha256",
         "replicate_schema_sha256", "special_rules_sha256", "base_weights",
-        "replicate_weights", "imputation", "special_counts",
+        "replicate_weights", "full_sample_weight_matches", "variance_factor",
+        "imputation", "special_counts",
     ):
         actual = evidence.get(key)
         expected = EXPECTED[key]

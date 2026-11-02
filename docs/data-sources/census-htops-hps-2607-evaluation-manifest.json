@@ -23,6 +23,7 @@
     "filename": "2607_HTOPS_Household_Pulse_User_Notes_10302026.pdf",
     "bytes": 283812,
     "sha256": "186816441c17c109e35b8916c7bea31a0d22336bec98256af6f8b4408ce2d0c8",
+    "accessed_utc": "2026-11-02T05:52:43Z",
     "last_modified_utc": "2026-10-30T16:00:27Z",
     "puf_effect": "none; the note explicitly states that the underlying PUF is not affected",
     "affected_published_tables": ["Health1", "Housing3", "Transportation3"]
@@ -33,6 +34,7 @@
       "filename": "HTOPS_2607_Questionnaire_ENGLISH.pdf",
       "bytes": 397247,
       "sha256": "ab59743a68470c64aba42dfa8b72ab1ffce9eba8b34a69b0d5bbe53232b6896c",
+      "accessed_utc": "2026-11-02T05:52:43Z",
       "last_modified_utc": "2026-09-24T13:02:14Z"
     },
     "source_and_accuracy": {
@@ -40,6 +42,7 @@
       "filename": "HTOPS_2607_Source_and_Accuracy.pdf",
       "bytes": 1279166,
       "sha256": "5b17eb1e2b01fe59eb434366a257da979be01c651be14b23f55d83747c644360",
+      "accessed_utc": "2026-11-02T05:52:43Z",
       "last_modified_utc": "2026-09-24T12:47:12Z"
     },
     "quality_measures": {
@@ -47,6 +50,7 @@
       "filename": "HTOPS_2607_Quality_Measures.xlsx",
       "bytes": 12763,
       "sha256": "da5533fef6ca2e9b73457dc8faaf589ef96217d0f9e9d94f08ff2821a77a50bb",
+      "accessed_utc": "2026-11-02T05:52:43Z",
       "last_modified_utc": "2026-09-24T12:47:11Z"
     }
   },
@@ -61,8 +65,11 @@
     "HWEIGHT": [0, 0, 0, 0, 638.1644723523074, 1058697.3650488455]
   },
   "replicate_weights": {
-    "PWEIGHT": [81, 0, 0, 0, 0, 167.2803393650417, 6225349.31742791, "ae2920900fce974234dc1b01a05dc60ec69e7a4f58c45d60c56064764e84be04"],
-    "HWEIGHT": [81, 0, 0, 0, 0, 169.82246136495218, 1711612.8305694133, "5615fb504696d0e5a0ba2a2c79637c42f483cbd6f87db8bdb96242f55ef76517"]
+    "full_sample": {"PWEIGHT0_equals_PWEIGHT": true, "HWEIGHT0_equals_HWEIGHT": true},
+    "sequence": "PWEIGHT1..PWEIGHT80 and HWEIGHT1..HWEIGHT80",
+    "variance_factor": "4/80",
+    "PWEIGHT": [80, 0, 0, 0, 0, 167.2803393650417, 6225349.31742791, "1a2bcb4f1689dc858bb0fe4d23f0a43773b23a8dd6cb92a039ed3d226b2b0ff8"],
+    "HWEIGHT": [80, 0, 0, 0, 0, 169.82246136495218, 1711612.8305694133, "0eec8ab8d9a9870a0f9042411dc7b404642f9dbe00a88a2a3ed6b35365607a06"]
   },
   "imputation_flags": {
     "A_THHLD_NUMPER": [42, 12713], "A_THHLD_NUMKID": [91, 12664],

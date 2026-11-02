@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 
 from fairlendkit.research.census_htops_hps_2607 import (
-    EXPECTED, Htops2607IntegrityError, analysis_columns, canonical_sha256,
-    summarize_numeric, validate_summary,
+    EXPECTED, VARIANCE_OUTPUTS_ENABLED, Htops2607IntegrityError, analysis_columns,
+    canonical_sha256, summarize_numeric, validate_replicate_columns, validate_summary,
 )
 
 
@@ -33,6 +33,30 @@ def test_identifier_is_removed_and_aliases_fail() -> None:
 
 def test_numeric_summary() -> None:
     assert summarize_numeric(("", "nan", "0", "-1", "2")) == (1, 1, 1, 1, -1.0, 2.0)
+
+
+@pytest.mark.parametrize("prefix", ["PWEIGHT", "HWEIGHT"])
+def test_replicates_are_strictly_one_through_eighty(prefix: str) -> None:
+    valid_columns = (prefix + "0",) + tuple(prefix + str(index) for index in range(1, 81))
+    validate_replicate_columns(valid_columns, prefix)
+    variants = (
+        valid_columns[1:],
+        valid_columns + (prefix + "81",),
+        valid_columns[:20] + valid_columns[21:],
+        valid_columns[:2] + (valid_columns[2],) + valid_columns[2:],
+        (prefix + "1", prefix + "0") + valid_columns[2:],
+    )
+    for drifted in variants:
+        with pytest.raises(Htops2607IntegrityError, match="replicate sequence"):
+            validate_replicate_columns(drifted, prefix)
+
+
+def test_variance_semantics_are_pinned_but_not_implemented() -> None:
+    assert EXPECTED["variance_factor"] == (4, 80)
+    assert EXPECTED["full_sample_weight_matches"] == {
+        "PWEIGHT0": True, "HWEIGHT0": True,
+    }
+    assert VARIANCE_OUTPUTS_ENABLED is False
 
 
 def test_schema_and_special_rules_artifact_matches_digests() -> None:

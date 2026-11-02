@@ -34,9 +34,15 @@ from features, outputs, logs, fixtures, and cross-wave/source linkage.
 
 ## Weights, imputation, and special responses
 
-`PWEIGHT` and `HWEIGHT`, plus 81 person and 81 household replicate weights
-(`0` through `80`), are finite and positive. Exact ranges and per-column
-statistics digests fail closed. Eight `A_*` allocation flags distinguish
+`PWEIGHT` and `HWEIGHT` are the full-sample weights. `PWEIGHT0` and `HWEIGHT0`
+match them row by row and are not replicates. Exactly 80 person and 80 household
+replicate weights (`1` through `80`) are finite and positive; missing, extra,
+duplicated, or reordered columns fail closed. Exact ranges and per-column
+statistics digests fail closed. The Source and Accuracy statement specifies
+successive-difference replication with variance `4/80 * sum((theta_i -
+theta_full)^2)`. This project does not implement that estimator, so this
+evaluation must not output standard errors or confidence intervals. Eight
+`A_*` allocation flags distinguish
 allocated (`1`) from non-allocated (`2`) values and are pinned separately.
 
 The PUF has no blank cells. Dictionary-defined `-88/-88.0` “Not in universe”
