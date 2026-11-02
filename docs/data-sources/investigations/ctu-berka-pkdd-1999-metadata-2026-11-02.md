@@ -62,8 +62,9 @@ evaluation in `feat/ctu-berka-financial-evaluation@7fefb5e` independently
 recorded `A=203`, `B=31`, `C=403`, and `D=45`. Thus the finished-only A/B task
 contains 234 loans (`203/31`), while CTU's overall summary is exactly
 `A+C=606` and `B+D=76`. `C` and `D` are unfinished-loan states and must not be
-silently combined with the finished-loan task. These content measurements
-remain subject to independent review of `7fefb5e`.
+silently combined with the finished-loan task. These content measurements were
+independently approved in superseding implementation `25ccbd0` and merged
+through PR #49 as `main@c4420494918ba185609c170cd65068076dc7c54d`.
 
 CTU explicitly warns that ignoring time causes target leakage: future
 transaction balances can perfectly separate good and bad loans, and loan date

@@ -62,7 +62,9 @@ and `D=45`: finished-only A/B is 234 (`203/31`), while the overall summary is
 task. The same snapshot measured 1,079,680 live rows versus the page's
 1,090,086 catalog value during access from `2026-11-02T04:48:08Z` through
 `2026-11-02T04:48:28Z`, confirming the need for access-time snapshot hashes.
-These measurements are pending independent review of that commit.
+The original implementation identity was superseded by `25ccbd0`, independently
+approved, and merged through PR #49 as
+`main@c4420494918ba185609c170cd65068076dc7c54d`.
 
 The final superseding implementation `25ccbd0` applies the strict cutoff
 `trans.date < loan.date`: 17,621 eligible pre-loan transactions across all 234
