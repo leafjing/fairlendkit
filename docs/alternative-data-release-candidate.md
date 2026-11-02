@@ -87,9 +87,12 @@ The final RC handoff identifies the single RC commit containing this evidence.
 
 The release is prepared as version `0.1.0rc1`, tag `v0.1.0rc1`, and a GitHub
 prerelease only. The reviewed merge strategy is a merge commit so the approved
-lineage remains directly auditable. The tag must be an annotated signed tag;
-the signer type and public-key fingerprint are recorded in the final evidence,
-and both local signature verification and GitHub `--verify-tag` are mandatory.
+lineage remains directly auditable. The tag must be an annotated SSH-signed tag
+using a GitHub-verifiable maintainer identity; there is no unsigned fallback.
+Only the public-key fingerprint and verification result are recorded. Both
+local signature verification and GitHub `--verify-tag` are mandatory. If no
+eligible SSH signing identity is configured, merge may proceed after approval,
+but tag and prerelease creation remain blocked.
 
 Rollback uses a new revert PR against the merge commit. A public tag is not
 moved, reused, or deleted during ordinary rollback. Withdrawal is represented
