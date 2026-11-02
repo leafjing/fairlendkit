@@ -23,7 +23,7 @@
     "selection_rate_difference": -0.03404367833387148,
     "true_positive_rate": 0.1468884320687722
   },
-  "baseline_median_seconds": 0.00045326,
+  "baseline_median_seconds": 0.000458928,
   "benchmark_id": "fairlendkit-simulated-impact-v1",
   "code_commit_basis": "81891a8",
   "config_sha256": "8e2fa5b4aa6af72c9dc77cb2f58f692d25964760bda7d93aecd83c63a1ccce7e",
@@ -67,7 +67,7 @@
     "selection_rate_difference": "comparison selection rate - reference selection rate",
     "true_positive_rate": "approved favorable outcomes / favorable outcomes"
   },
-  "generated_at_utc": "2026-11-02T06:35:46.777743+00:00",
+  "generated_at_utc": "2026-11-02T06:37:21.030633+00:00",
   "group_evidence": {
     "baseline": {
       "comparison": {
@@ -126,7 +126,7 @@
   },
   "population_size": 10000,
   "publication_gate": {
-    "candidate_copy_status": "locked_not_publishable",
+    "candidate_copy_status": "locked_pending_evidence",
     "external_summary_candidate": "在包含10,000名申请人的固定样本量化评估中，FairLendKit按显式流程工时假设将后处理工作量由80人时测算为32人时，预计减少60%；评估覆盖情景由2,000人扩展至10,000人。固定逐行策略派生出87个新增批准，按每笔8,000美元假设对应696,000美元授信机会。",
     "external_summary_footnote": "结果基于固定样本、流程工时和逐行授信额度，尚未经过客户生产环境试点验证；当前候选文案因预设期望未复现而锁定，不得发布。",
     "passed": false,
@@ -169,16 +169,16 @@
   },
   "runtime_statistics": {
     "baseline": {
-      "mean_seconds": 0.00045817713333333335,
-      "median_seconds": 0.00045326,
+      "mean_seconds": 0.00045249,
+      "median_seconds": 0.000458928,
       "repetitions": 15,
-      "stdev_seconds": 0.000028336773016364313
+      "stdev_seconds": 0.000030206294668022898
     },
     "tool": {
-      "mean_seconds": 0.0003674795333333333,
-      "median_seconds": 0.000358247,
+      "mean_seconds": 0.00035691926666666664,
+      "median_seconds": 0.000347943,
       "repetitions": 15,
-      "stdev_seconds": 0.00004282883185236431
+      "stdev_seconds": 0.000035158271354520476
     }
   },
   "scenario_expectations": {
@@ -204,5 +204,5 @@
     "selection_rate_difference": -0.029963862501568767,
     "true_positive_rate": 0.16090450383105961
   },
-  "tool_median_seconds": 0.000358247
+  "tool_median_seconds": 0.000347943
 }

@@ -71,6 +71,7 @@ copy candidate uses the reader-facing terms “固定样本量化评估”, “�
 “测算”, carries a production-pilot disclaimer, and avoids claims of realized
 customer impact. It reports the derived 87 approvals—not the unreproduced
 350-person expectation—and remains locked while the publication gate fails.
+The exact machine-readable state is `locked_pending_evidence`.
 
 The benchmark does not recommend a policy or threshold and does not establish
 fairness, legality, business value, or real-world impact.

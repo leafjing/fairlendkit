@@ -67,7 +67,7 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert payload["decision_set_digests"]["tool_approved_count"] == 979
     assert payload["scenario_expectations"]["passed"] is False
     assert payload["publication_gate"]["candidate_copy_status"] == (
-        "locked_not_publishable"
+        "locked_pending_evidence"
     )
     external_copy = payload["publication_gate"]["external_summary_candidate"]
     assert "量化评估" in external_copy

@@ -474,7 +474,7 @@ def run_benchmark(
             "status": "passed" if publication_passed else "failed",
             "reason_code": publication_reason,
             "candidate_copy_status": (
-                "publishable" if publication_passed else "locked_not_publishable"
+                "publishable" if publication_passed else "locked_pending_evidence"
             ),
             "external_summary_candidate": (
                 "在包含10,000名申请人的固定样本量化评估中，FairLendKit按显式流程"
