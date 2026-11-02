@@ -83,7 +83,9 @@ class BenchmarkResult:
     baseline: PolicyMetrics
     tool: PolicyMetrics
     approval_increment: int
+    incremental_approvals: int
     credit_increment: int
+    credit_increase_usd: int
     average_incremental_credit: float
     policy_assumptions: dict[str, int | float | str]
     config_summary: dict[str, int | str]
@@ -438,7 +440,9 @@ def run_benchmark(
         baseline=baseline_metrics,
         tool=tool_metrics,
         approval_increment=approval_increment,
+        incremental_approvals=approval_increment,
         credit_increment=credit_increment,
+        credit_increase_usd=credit_increment,
         average_incremental_credit=float(FIXED_CREDIT_AMOUNT_USD),
         policy_assumptions={
             "baseline_credit_score_minimum": 680,

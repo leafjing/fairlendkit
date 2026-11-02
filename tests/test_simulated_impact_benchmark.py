@@ -24,7 +24,9 @@ def test_fixed_population_and_decision_outputs_are_reproducible():
     assert result.baseline.approvals == 4351
     assert result.tool.approvals == 4598
     assert result.approval_increment == 247
+    assert result.incremental_approvals == 247
     assert result.credit_increment == 1_976_000
+    assert result.credit_increase_usd == 1_976_000
     assert result.average_incremental_credit == 8_000
 
 

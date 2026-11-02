@@ -39,6 +39,7 @@
   "constraint_status": "failed",
   "covered_applicants": 6329,
   "credit_increment": 1976000,
+  "credit_increase_usd": 1976000,
   "data_provenance": {
     "allowed_use": "simulation and test only",
     "customer_data": "none",
@@ -113,6 +114,7 @@
   },
   "input_file_sha256": "cb57ee569995fbcbf61fe63202d5a37a9b4f2a738e7b8aafd0a912657ed9434f",
   "input_sha256": "cb57ee569995fbcbf61fe63202d5a37a9b4f2a738e7b8aafd0a912657ed9434f",
+  "incremental_approvals": 247,
   "policy_assumptions": {
     "fixed_credit_amount_usd": 8000,
     "baseline_credit_score_minimum": 680,
