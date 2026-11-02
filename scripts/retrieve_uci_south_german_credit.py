@@ -42,6 +42,7 @@ MAX_UNCOMPRESSED_SIZE = 65_536
 EXPECTED_UNCOMPRESSED_SIZE = 58_644
 RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 EOCD = b"PK\x05\x06"
+LOCAL_FILE_HEADER = b"PK\x03\x04"
 
 
 @dataclass(frozen=True)
@@ -417,7 +418,8 @@ def _download(path: Path, transport: Transport, policy: Policy) -> dict[str, obj
     assert response is not None
     length = response.headers.get("content-length")
     media_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
-    if media_type not in ALLOWED_MEDIA_TYPES:
+    missing_type_for_exact_package = not media_type and url == policy.package_url
+    if media_type not in ALLOWED_MEDIA_TYPES and not missing_type_for_exact_package:
         raise ValueError("response media type is not an authorized ZIP type")
     if length is not None:
         try:
@@ -461,6 +463,8 @@ def _download(path: Path, transport: Transport, policy: Policy) -> dict[str, obj
 
 def _validate_and_extract(path: Path, run_dir: Path, policy: Policy) -> list[dict[str, object]]:
     data = path.read_bytes()
+    if not data.startswith(LOCAL_FILE_HEADER):
+        raise ValueError("ZIP local-file signature is missing")
     _validate_eocd(data)
     with zipfile.ZipFile(path) as archive:
         infos = archive.infolist()

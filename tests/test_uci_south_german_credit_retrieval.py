@@ -133,6 +133,56 @@ def test_valid_redirected_retrieval_is_quarantined_read_only(tmp_path):
     assert json.loads(audit_payload)["states"][-1]["state"] == "succeeded"
 
 
+def test_exact_package_without_content_type_is_fully_validated(tmp_path):
+    data = archive_bytes()
+    transport = FakeTransport([harness.Response(200, {}, (data,))])
+    quarantine, audit = roots(tmp_path)
+    result = harness._retrieve_once(
+        run_id="missing-content-type",
+        quarantine_root=quarantine,
+        audit_root=audit,
+        transport=transport,
+        policy=policy(data),
+    )
+    assert result["final_url"] == harness.PACKAGE_URL
+    assert result["http"]["content-type"] is None
+    assert result["http"]["content-length"] is None
+    assert result["compressed_size"] == len(data)
+    assert json.loads((audit / "missing-content-type.json").read_text())["states"][-1][
+        "state"
+    ] == "succeeded"
+
+
+def test_missing_content_type_is_not_allowed_for_redirect_target(tmp_path):
+    data = archive_bytes()
+    assert_failed_once(
+        tmp_path,
+        data=data,
+        responses=[
+            harness.Response(302, {"location": "/different.zip"}, ()),
+            harness.Response(200, {}, (data,)),
+        ],
+    )
+
+
+def test_missing_content_type_still_rejects_non_zip_and_wrong_members(tmp_path):
+    non_zip = b"x" * 128
+    assert_failed_once(
+        tmp_path / "non-zip",
+        data=non_zip,
+        responses=[harness.Response(200, {}, (non_zip,))],
+        test_policy=policy(non_zip),
+    )
+
+    wrong = archive_bytes({"a.txt": b"alpha\n", "b.txt": b"beta\n", "wrong.txt": b"gamma\n"})
+    assert_failed_once(
+        tmp_path / "wrong-members",
+        data=wrong,
+        responses=[harness.Response(200, {}, (wrong,))],
+        test_policy=policy(wrong),
+    )
+
+
 @pytest.mark.parametrize(
     "location",
     [
