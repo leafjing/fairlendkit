@@ -71,8 +71,8 @@ baseline_approved = count(row where baseline_decision == "approve")
 tool_approved = count(row where tool_decision == "approve")
 incremental_approvals = tool_approved - baseline_approved
 approval_rate_increase = incremental_approvals / eligible_count
-average_credit_amount = 8000
-incremental_credit = average_credit_amount * incremental_approvals
+fixed_credit_amount_usd = 8000
+credit_increase_usd = incremental_approvals * fixed_credit_amount_usd
 ```
 
 只有逐行计算和风险门禁通过时，才可由 artifact 注入批准率变化及按固定平均
@@ -117,9 +117,10 @@ risk_gate_pass = risk_delta <= 0.0000
 - 总申请人数、基线覆盖人数、工具覆盖人数及覆盖率；
 - 基线与工具批准人数、批准率、净新增批准数，以及新增/取消批准集合各自的
   SHA-256 摘要；
-- `incremental_approvals`、`average_credit_amount=8000` 与
-  `incremental_credit = average_credit_amount * incremental_approvals` 的公式
-  标识、输入值和结果；
+- `incremental_approvals`、`fixed_credit_amount_usd=8000` 与
+  `credit_increase_usd = incremental_approvals * fixed_credit_amount_usd` 的公式
+  标识、输入值和结果；固定额度假设必须写入 artifact 配置并纳入配置
+  SHA-256；
 - outcome 定义、12 个月观察窗口、`0.20` 风险阈值、成熟分母、两组坏账率、
   `risk_delta`、`0.0000` 容差和 risk reason code；
 - 各受保护群体样本量、批准率、批准率差距及不确定性；
@@ -157,7 +158,7 @@ risk_gate_pass = risk_delta <= 0.0000
 > 假设，基线与工具辅助流程分别估算为 80 和 32 人时，对应预计减少 60%；评估
 > 覆盖由 `{baseline_covered_count}` 人扩展至 `{tool_covered_count}` 人。在既定
 > 风险约束通过校验时，测算可支持 `{incremental_approvals}` 个净新增
-> 批准，对应 `{incremental_credit}` 授信机会；固定决策记录派生的受保护群体
+> 批准，对应 `{credit_increase_usd}` 授信机会；固定决策记录派生的受保护群体
 > 批准率差距由 `{baseline_approval_rate_gap}` 变为 `{tool_approval_rate_gap}`。
 
 候选文案必须紧邻以下底注，二者不得拆分：
