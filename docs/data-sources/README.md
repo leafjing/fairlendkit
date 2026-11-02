@@ -19,3 +19,4 @@ Completed content evaluations:
 - [EIA RECS 2020 v7](eia-recs-2020-v7-evaluation.md)
 - [CTU/Berka PKDD'99 `financial`](ctu-berka-financial-evaluation.md)
 - [Federal Reserve SHED 2024](federal-reserve-shed-2024-evaluation.md)
+- [CFPB Making Ends Meet](cfpb-making-ends-meet-evaluation.md)
