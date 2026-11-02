@@ -162,4 +162,3 @@ Before any adapter or benchmark is approved, the implementation must:
 - quarantine current and prior-year case identifiers;
 - enforce `external_only`, `quality_only`, and redistribution prohibited; and
 - document any difference between the 12,295-report sample and retrieved rows.
-
