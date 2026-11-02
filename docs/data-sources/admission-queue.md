@@ -135,8 +135,9 @@ dictionary, and relevant utility semantics are the strongest after UCI.
   credit default.
 - Blocking before approval: official ZIP/member hashes and shape, data-
   dictionary and replicate-weight member identities, exact weight/special-code
-  aggregates, identifier containment, and the semantic effect of the
-  2026-10-30 user note on the 2026-09-10 ZIP.
+  aggregates, identifier containment, and validation of the September 10
+  race/ethnicity changes and disclosure-avoidance recodes. The October 7 and
+  October 30 corrections affect published tables, not the underlying PUF.
 - Required bespoke retrieval: July-cycle-only ZIP contract, member whitelist,
   survey/replicate-weight validation, wave isolation, and an independently
   approved variance contract. It cannot pool 2025 longitudinal or another 2026

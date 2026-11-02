@@ -49,10 +49,21 @@ HEAD observations at `2026-11-02`:
 - quality measures: 12,763 bytes, Office Open XML workbook, last modified
   `2026-09-24T12:47:11Z`.
 
-The publisher supplies no immutable release ID or checksum. The later user note
-does not identify replacement ZIP bytes and must not be treated as a package
-revision. Content evaluation must pin the exact archive hash, member inventory,
-member hashes, and retrieval time, and must explain the user note's effect.
+The publisher supplies no immutable release ID or checksum. The official user
+note fixes the relationship between the September ZIP and later corrections:
+
+- the October 30 correction affects the published `Health1` and `Housing3`
+  tables only, and explicitly does not affect the underlying PUF;
+- the October 7 correction affects the published `Transportation3` table only,
+  and explicitly does not affect the underlying PUF; and
+- the September 10 notice records changes to July race/ethnicity variables
+  caused by questionnaire changes, together with disclosure-avoidance recoding.
+
+The October corrections therefore do not identify replacement ZIP bytes and
+must not be treated as package revisions. The September race/ethnicity schema
+and recodes are part of the selected July PUF identity and must be fixed by the
+content evaluator. Retrieval evidence must pin the exact archive hash, member
+inventory, member hashes, and retrieval time.
 
 ## Dictionary, weights, and variance
 
@@ -152,6 +163,8 @@ Before approval, implementation must:
 - validate all weight, replicate-weight, missing, special-code, and imputation
   aggregates;
 - quarantine every respondent/case/household identifier;
-- document the October 30 user note's exact semantic effect;
+- enforce the September 10 race/ethnicity schema and disclosure-avoidance
+  recodes, while recording that the October 7 and October 30 table corrections
+  do not alter the underlying PUF;
 - enforce `external_only`, `quality_only`, and no redistribution; and
 - avoid committing any raw or transformed respondent rows.
