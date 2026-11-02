@@ -51,6 +51,7 @@ class PolicyMetrics:
 class BenchmarkResult:
     benchmark_id: str
     scenario_id: str
+    evidence_class: str
     code_commit_basis: str
     generated_at_utc: str
     evidence_status: str
@@ -68,6 +69,7 @@ class BenchmarkResult:
     credit_increment: int
     average_incremental_credit: float
     policy_assumptions: dict[str, int | float | str]
+    config_summary: dict[str, int | str]
     formulas: dict[str, str]
     runtime_environment: dict[str, str]
     analyst_effort_scenario: dict[str, int | float | str]
@@ -258,6 +260,7 @@ def run_benchmark(
     return BenchmarkResult(
         benchmark_id=BENCHMARK_ID,
         scenario_id=SCENARIO_ID,
+        evidence_class="simulation_not_production_evidence",
         code_commit_basis=CODE_COMMIT_BASIS,
         generated_at_utc=datetime.now(timezone.utc).isoformat(),
         evidence_status="simulation_not_production_evidence",
@@ -286,6 +289,15 @@ def run_benchmark(
             "requested_credit_maximum": 20000,
             "requested_credit_increment": 500,
             "comparison_group": "fixed synthetic group; not a protected-class claim",
+        },
+        config_summary={
+            "evaluation_sample": "same deterministic input_sha256 for baseline and tool",
+            "outcome_label": "same synthetic favorable_outcome for baseline and tool",
+            "time_window": "same single generated cross-section; no temporal split",
+            "risk_rule": "tool approved bad rate <= baseline approved bad rate",
+            "credit_amounts": "same pre-decision requested_credit for baseline and tool",
+            "group_definition": "same fixed synthetic comparison_group for baseline and tool",
+            "population_size": population_size,
         },
         formulas={
             "approval_increment": "tool.approvals - baseline.approvals",

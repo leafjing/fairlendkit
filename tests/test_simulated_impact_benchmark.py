@@ -43,6 +43,7 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     payload = json.loads(result.canonical_json())
     assert payload["benchmark_id"] == "fairlendkit-simulated-impact-v1"
     assert payload["evidence_status"] == "simulation_not_production_evidence"
+    assert payload["evidence_class"] == "simulation_not_production_evidence"
     assert "Synthetic simulation only" in payload["disclaimer"]
     assert payload["baseline_median_seconds"] >= 0
     assert payload["tool_median_seconds"] >= 0
@@ -59,6 +60,8 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert payload["risk_constraint"]["passed"] is True
     assert payload["constraint_status"] == "passed"
     assert payload["reason_code"] == "constraints_passed"
+    assert payload["config_summary"]["population_size"] == 10000
+    assert "same deterministic" in payload["config_summary"]["evaluation_sample"]
     assert payload["group_evidence"]["tool"]["reference"]["sample_size"] > 0
     assert payload["group_evidence"]["tool"]["comparison"]["sample_size"] > 0
 

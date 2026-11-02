@@ -26,6 +26,11 @@ Every JSON result carries the machine-readable status
 `simulation_not_production_evidence` in addition to the plain-language
 disclaimer.
 
+The required `evidence_class` field carries that exact value. A machine-
+readable configuration summary also states that baseline and tool use the same
+sample, outcome label, time window, risk rule, pre-decision credit amounts, and
+group definition.
+
 Runtime varies with the machine and is never treated as a fixed impact claim.
 All other values are tied to the canonical synthetic-input SHA-256. Reproduce
 the artifact with:
