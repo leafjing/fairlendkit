@@ -40,6 +40,17 @@ No. The adverse impact ratio threshold is used only as a screening heuristic.
 The current flag is emitted only when the ratio is defined and the two source
 selection rates pass their reliability gates.
 
+The default `0.8` comes from the four-fifths rule in U.S. employment-selection
+guidance, where the EEOC describes it as a rule of thumb rather than a legal
+definition. It is not a universal credit-law threshold or safe harbor. A flag
+does not prove discrimination, and no flag does not prove fairness or
+compliance. Review the underlying rates, denominators, effect size, uncertainty,
+missingness, conditional or risk-adjusted comparisons, sensitivity checks, and
+the documented human assessment before deciding what follow-up is warranted.
+
+See [Methodology and guardrails](methodology-and-guardrails.md#four-fifths-rule)
+for sources and the complete credit-use boundary.
+
 ## Is the output reproducible?
 
 The checked-in synthetic example fixes its input, configuration, timestamp,

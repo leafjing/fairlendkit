@@ -108,10 +108,26 @@ reference group. Reversing those roles changes metric direction.
   rate is zero. A zero comparison rate with a positive reference rate is the
   defined value `0`.
 
-The four-fifths rule (`AIR < 0.8`) is only a screening heuristic. Crossing the
-threshold is neither proof of unlawful discrimination nor proof of compliance.
-AIR must be reported with both selection rates, group counts, uncertainty, and
-limitations.
+The configurable default `0.8` comes from the four-fifths rule in the U.S.
+employment-selection [Uniform Guidelines on Employee Selection
+Procedures](https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XIV/part-1607),
+not from a universal credit-law threshold. The EEOC describes the rule as a
+[rule of thumb rather than a legal
+definition](https://www.eeoc.gov/laws/guidance/questions-and-answers-clarify-and-provide-common-interpretation-uniform-guidelines#q12).
+
+FairLendKit retains `AIR < 0.8` only as a configurable, reliability-gated
+screening signal for practitioner triage. A value below `0.8` does not prove
+discrimination, illegality, or non-compliance. A value at or above `0.8`, or the
+absence of a flag, does not prove fairness, compliance, legality, or a safe
+harbor.
+
+AIR must be reported with both selection rates, group denominators, absolute
+rate difference or other effect size, confidence intervals or documented
+uncertainty, missing and excluded counts, and reliability limitations. Credit
+interpretation also requires predeclared conditional or risk-adjusted analysis,
+overlap and sensitivity checks where appropriate, and human review. Those
+analyses remain associational and do not establish cause, intent, business
+necessity, or a legal conclusion.
 
 ### Demographic parity difference
 

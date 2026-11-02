@@ -6,7 +6,27 @@ FairLendKit reports observed statistical evidence for practitioner review. It do
 
 ## Four-fifths rule
 
-The adverse impact ratio and four-fifths rule are screening heuristics. Crossing a threshold is neither proof of unlawful discrimination nor proof of compliance. Reports must display underlying selection rates, group sample sizes, uncertainty, and limitations alongside the ratio.
+The four-fifths rule originates in the U.S. employment-selection
+[Uniform Guidelines on Employee Selection
+Procedures](https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XIV/part-1607).
+The EEOC characterizes it as a [rule of thumb, not a legal
+definition](https://www.eeoc.gov/laws/guidance/questions-and-answers-clarify-and-provide-common-interpretation-uniform-guidelines#q12).
+FairLendKit does not treat that employment rule as a universal credit-law
+threshold.
+
+In a credit audit, the configurable AIR `0.8` threshold is only a
+reliability-gated screening signal. A flag is not a finding of discrimination,
+illegality, or non-compliance. A ratio at or above `0.8`, or no emitted flag, is
+not proof of fairness, compliance, legality, or a safe harbor. The threshold
+must not be described as a pass/fail rule.
+
+Reviewers must examine both selection rates, group denominators, absolute rate
+difference or another effect size, confidence intervals or documented
+uncertainty, missing/excluded records, and reliability limitations. Where the
+data support it, interpretation also considers preregistered conditional or
+risk-adjusted comparisons, overlap diagnostics, and sensitivity analyses.
+These remain associational and must be followed by accountable human review;
+they do not establish cause, intent, business necessity, or a legal conclusion.
 
 ## Proxy-risk screening
 

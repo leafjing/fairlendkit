@@ -58,7 +58,14 @@ The proportion of records in an audit group receiving the configured favorable d
 
 ### Adverse impact ratio
 
-The comparison group's selection rate divided by the reference group's selection rate. The comparison direction and any undefined denominator must remain explicit. The four-fifths rule applied to this ratio is a screening heuristic, not a compliance test.
+The comparison group's selection rate divided by the reference group's
+selection rate. The comparison direction and any undefined denominator must
+remain explicit. The configurable `0.8` four-fifths threshold originates in
+employment-selection guidance and is retained only as a reliability-gated
+credit screening signal. It is not a legal threshold, discrimination finding,
+compliance test, or safe harbor. Interpret it with the supporting rates,
+denominators, effect size, uncertainty, missingness, conditional/risk-adjusted
+analysis where appropriate, sensitivity checks, and human review.
 
 ### Potential proxy-risk indicator
 
