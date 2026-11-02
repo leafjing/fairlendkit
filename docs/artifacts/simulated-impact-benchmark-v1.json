@@ -1,0 +1,36 @@
+{
+  "approval_increment": 247,
+  "baseline": {
+    "adverse_impact_ratio": 0.7830240080470594,
+    "approvals": 4351,
+    "approved_bad_rate": 0.34934497816593885,
+    "approved_credit": 47585000,
+    "comparison_selection_rate": 0.37252412392077194,
+    "false_positive_rate": 0.3269520326952033,
+    "reference_selection_rate": 0.47575057736720555,
+    "selection_rate_difference": -0.10322645344643361,
+    "true_positive_rate": 0.5290599887871426
+  },
+  "baseline_median_seconds": 0.00026729,
+  "benchmark_id": "fairlendkit-simulated-impact-v1",
+  "covered_applicants": 6329,
+  "credit_increment": 2731500,
+  "disclaimer": "Synthetic simulation only; not a pilot, customer outcome, production decision, causal estimate, or compliance conclusion.",
+  "evidence_status": "simulation_not_production_evidence",
+  "input_sha256": "6eae1134ac5986dd53ba6baba01e339d66bba4bbdfeac378e757167e82ba77a9",
+  "population_size": 10000,
+  "repetitions": 15,
+  "seed": 20261102,
+  "tool": {
+    "adverse_impact_ratio": 0.7996940012359449,
+    "approvals": 4598,
+    "approved_bad_rate": 0.34145280556763813,
+    "approved_credit": 50316500,
+    "comparison_selection_rate": 0.39918740477399695,
+    "false_positive_rate": 0.3377070337707034,
+    "reference_selection_rate": 0.49917518970636754,
+    "selection_rate_difference": -0.0999877849323706,
+    "true_positive_rate": 0.5658755372827509
+  },
+  "tool_median_seconds": 0.00064517
+}

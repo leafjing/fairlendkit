@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -44,6 +45,19 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert "Synthetic simulation only" in payload["disclaimer"]
     assert payload["baseline_median_seconds"] >= 0
     assert payload["tool_median_seconds"] >= 0
+
+
+def test_checked_in_artifact_matches_deterministic_result():
+    result = json.loads(run_benchmark().canonical_json())
+    artifact = json.loads(
+        Path("docs/artifacts/simulated-impact-benchmark-v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    for runtime_field in ("baseline_median_seconds", "tool_median_seconds"):
+        result.pop(runtime_field)
+        artifact.pop(runtime_field)
+    assert artifact == result
 
 
 def test_invalid_population_repetitions_and_shape_fail_closed():

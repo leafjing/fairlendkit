@@ -33,5 +33,11 @@ the artifact with:
 python scripts/run_simulated_impact_benchmark.py
 ```
 
+The checked-in result is
+[`artifacts/simulated-impact-benchmark-v1.json`](artifacts/simulated-impact-benchmark-v1.json).
+Its two runtime fields are measurements from one invocation and will vary by
+machine; every impact, risk, and fairness value is deterministic and tested
+against the fixed input hash.
+
 The benchmark does not recommend a policy or threshold and does not establish
 fairness, legality, business value, or real-world impact.
