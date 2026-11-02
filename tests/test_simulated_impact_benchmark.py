@@ -17,25 +17,24 @@ def test_fixed_population_and_decision_outputs_are_reproducible():
     second = generate_simulated_applicants()
     assert first == second
     result = run_benchmark(repetitions=1)
-    assert result.input_sha256 == "6eae1134ac5986dd53ba6baba01e339d66bba4bbdfeac378e757167e82ba77a9"
+    assert result.input_sha256 == "53f8e9a5aa9eb6b9b5cc5fc7f282b144b8add52b6725b1dd3aad899ab7006fc3"
     assert result.covered_applicants == 6329
-    assert result.baseline.approvals == 4351
-    assert result.tool.approvals == 4598
-    assert result.approval_increment == 247
-    assert result.credit_increment == 2731500
-    assert result.average_incremental_credit == pytest.approx(2_731_500 / 247)
+    assert result.baseline.approvals == 892
+    assert result.tool.approvals == 979
+    assert result.approval_increment == 87
+    assert result.credit_increment == 696_000
+    assert result.average_incremental_credit == 8_000
 
 
 def test_metrics_are_directly_recomputed_from_rows_and_decisions():
     rows = generate_simulated_applicants()
     baseline = policy_metrics(rows, baseline_decisions(rows))
     tool = policy_metrics(rows, tool_decisions(rows))
-    assert tool.approvals - baseline.approvals == 247
-    assert tool.approved_credit - baseline.approved_credit == 2_731_500
-    assert baseline.approved_bad_rate == pytest.approx(0.34934497816593885)
-    assert tool.approved_bad_rate == pytest.approx(0.34145280556763813)
-    assert baseline.adverse_impact_ratio == pytest.approx(0.7830240080470594)
-    assert tool.adverse_impact_ratio == pytest.approx(0.7996940012359449)
+    assert tool.approvals - baseline.approvals == 87
+    assert baseline.approved_bad_rate == pytest.approx(0.11883408071748879)
+    assert tool.approved_bad_rate == pytest.approx(0.1205311542390194)
+    assert baseline.adverse_impact_ratio == pytest.approx(0.6682109677493104)
+    assert tool.adverse_impact_ratio == pytest.approx(0.7268557376172784)
 
 
 def test_output_labels_simulation_and_runtime_is_measurement_only():
@@ -49,7 +48,7 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert payload["tool_median_seconds"] >= 0
     assert payload["policy_assumptions"]["baseline_credit_score_minimum"] == 680
     assert payload["formulas"]["credit_increment"] == (
-        "tool.approved_credit - baseline.approved_credit"
+        "approval_increment * assumed_average_credit"
     )
     assert payload["runtime_environment"]["timer"] == "time.perf_counter_ns"
     assert payload["scenario_id"] == "fairlendkit-sim-impact-v1"
@@ -57,12 +56,15 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert payload["analyst_effort_scenario"]["tool_assisted_person_hours"] == 32
     assert payload["review_coverage_scenario"]["baseline_people"] == 2000
     assert payload["review_coverage_scenario"]["tool_people"] == 10000
-    assert payload["risk_constraint"]["passed"] is True
+    assert payload["risk_constraint"]["passed"] is False
+    assert payload["risk_constraint"]["reason_code"] == (
+        "impact_risk_noninferiority_failed"
+    )
     assert payload["constraint_status"] == "failed"
-    assert payload["reason_code"] == "scenario_expectations_not_reproduced"
+    assert payload["reason_code"] == "impact_risk_noninferiority_failed"
     assert payload["input_file_sha256"] == payload["input_sha256"]
-    assert payload["decision_set_digests"]["baseline_approved_count"] == 4351
-    assert payload["decision_set_digests"]["tool_approved_count"] == 4598
+    assert payload["decision_set_digests"]["baseline_approved_count"] == 892
+    assert payload["decision_set_digests"]["tool_approved_count"] == 979
     assert payload["scenario_expectations"]["passed"] is False
     assert payload["publication_gate"]["candidate_copy_status"] == (
         "locked_not_publishable"
@@ -72,6 +74,8 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert "预计" in external_copy
     assert "模拟" not in external_copy
     assert "已实现" not in external_copy
+    assert "87个新增批准" in external_copy
+    assert "696,000美元" in external_copy
     assert "尚未经过客户生产环境试点验证" in (
         payload["publication_gate"]["external_summary_footnote"]
     )

@@ -21,6 +21,9 @@ CODE_COMMIT_BASIS = "81891a8"
 SEED = 20261102
 POPULATION_SIZE = 10_000
 REPETITIONS = 15
+RISK_THRESHOLD = 0.20
+ASSUMED_AVERAGE_CREDIT = 8_000
+RUN_COMMAND = "PYTHONPATH=src python3 scripts/run_simulated_impact_benchmark.py"
 
 
 @dataclass(frozen=True)
@@ -31,6 +34,9 @@ class SimulatedApplicant:
     alternative_score: float
     alternative_data_available: bool
     favorable_outcome: bool
+    predicted_bad_probability: float
+    outcome_matured_12m: bool
+    bad_12m: bool
     requested_credit: int
 
 
@@ -59,6 +65,9 @@ class BenchmarkResult:
     population_size: int
     input_sha256: str
     input_file_sha256: str
+    config_sha256: str
+    stable_row_ids_sha256: str
+    run_command: str
     repetitions: int
     baseline_median_seconds: float
     tool_median_seconds: float
@@ -115,6 +124,9 @@ def generate_simulated_applicants(
                 alternative_score=round(alternative_score, 12),
                 alternative_data_available=available,
                 favorable_outcome=favorable,
+                predicted_bad_probability=round(1 - favorable_probability, 12),
+                outcome_matured_12m=True,
+                bad_12m=not favorable,
                 requested_credit=requested_credit,
             )
         )
@@ -122,18 +134,24 @@ def generate_simulated_applicants(
 
 
 def baseline_decisions(rows: Sequence[SimulatedApplicant]) -> tuple[bool, ...]:
-    return tuple(row.credit_score >= 680 for row in rows)
+    return tuple(
+        row.credit_score >= 680 and row.predicted_bad_probability <= RISK_THRESHOLD
+        for row in rows
+    )
 
 
 def tool_decisions(rows: Sequence[SimulatedApplicant]) -> tuple[bool, ...]:
     """Simulated policy: baseline plus a narrow, predeclared second-look rule."""
 
     return tuple(
-        row.credit_score >= 680
-        or (
-            640 <= row.credit_score < 680
-            and row.alternative_data_available
-            and row.alternative_score >= 0.72
+        row.predicted_bad_probability <= RISK_THRESHOLD
+        and (
+            row.credit_score >= 680
+            or (
+                640 <= row.credit_score < 680
+                and row.alternative_data_available
+                and row.alternative_score >= 0.72
+            )
         )
         for row in rows
     )
@@ -207,6 +225,26 @@ def _decision_set_sha256(
     return hashlib.sha256(payload).hexdigest()
 
 
+def _id_set_sha256(ids: Sequence[int]) -> str:
+    return hashlib.sha256(json.dumps(sorted(ids), separators=(",", ":")).encode()).hexdigest()
+
+
+def _config_sha256(population_size: int) -> str:
+    config = {
+        "seed": SEED,
+        "population_size": population_size,
+        "risk_threshold": RISK_THRESHOLD,
+        "assumed_average_credit": ASSUMED_AVERAGE_CREDIT,
+        "baseline_credit_score_minimum": 680,
+        "second_look_credit_score_minimum": 640,
+        "second_look_credit_score_maximum_exclusive": 680,
+        "second_look_alternative_score_minimum": 0.72,
+    }
+    return hashlib.sha256(
+        json.dumps(config, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
 def _runtime_statistics(
     function: Callable[[Sequence[SimulatedApplicant]], tuple[bool, ...]],
     rows: Sequence[SimulatedApplicant],
@@ -274,6 +312,18 @@ def run_benchmark(
     tool_runtime = _runtime_statistics(tool_decisions, rows, repetitions)
     risk_passed = tool_metrics.approved_bad_rate <= baseline_metrics.approved_bad_rate
     input_sha256 = _input_sha256(rows)
+    baseline_ids = {
+        row.applicant_id
+        for row, decision in zip(rows, baseline, strict=True)
+        if decision
+    }
+    tool_ids = {
+        row.applicant_id
+        for row, decision in zip(rows, tool, strict=True)
+        if decision
+    }
+    added_ids = sorted(tool_ids - baseline_ids)
+    canceled_ids = sorted(baseline_ids - tool_ids)
     baseline_gap = abs(baseline_metrics.selection_rate_difference)
     tool_gap = abs(tool_metrics.selection_rate_difference)
     expectations_passed = (
@@ -282,6 +332,17 @@ def run_benchmark(
         and math.isclose(tool_gap, 0.05, abs_tol=1e-12)
     )
     publication_passed = risk_passed and expectations_passed
+    publication_reason = (
+        "all_publication_gates_passed"
+        if publication_passed
+        else (
+            "impact_risk_noninferiority_failed"
+            if not risk_passed
+            else "scenario_expectations_not_reproduced"
+        )
+    )
+    approval_increment = tool_metrics.approvals - baseline_metrics.approvals
+    credit_increment = approval_increment * ASSUMED_AVERAGE_CREDIT
     return BenchmarkResult(
         benchmark_id=BENCHMARK_ID,
         scenario_id=SCENARIO_ID,
@@ -293,6 +354,9 @@ def run_benchmark(
         population_size=population_size,
         input_sha256=input_sha256,
         input_file_sha256=input_sha256,
+        config_sha256=_config_sha256(population_size),
+        stable_row_ids_sha256=_id_set_sha256([row.applicant_id for row in rows]),
+        run_command=RUN_COMMAND,
         repetitions=repetitions,
         baseline_median_seconds=float(baseline_runtime["median_seconds"]),
         tool_median_seconds=float(tool_runtime["median_seconds"]),
@@ -300,17 +364,16 @@ def run_benchmark(
         covered_applicants=sum(row.alternative_data_available for row in rows),
         baseline=baseline_metrics,
         tool=tool_metrics,
-        approval_increment=tool_metrics.approvals - baseline_metrics.approvals,
-        credit_increment=tool_metrics.approved_credit - baseline_metrics.approved_credit,
-        average_incremental_credit=(
-            (tool_metrics.approved_credit - baseline_metrics.approved_credit)
-            / (tool_metrics.approvals - baseline_metrics.approvals)
-        ),
+        approval_increment=approval_increment,
+        credit_increment=credit_increment,
+        average_incremental_credit=float(ASSUMED_AVERAGE_CREDIT),
         policy_assumptions={
             "baseline_credit_score_minimum": 680,
             "second_look_credit_score_minimum": 640,
             "second_look_credit_score_maximum_exclusive": 680,
             "second_look_alternative_score_minimum": 0.72,
+            "predicted_12m_bad_probability_maximum": RISK_THRESHOLD,
+            "assumed_average_credit": ASSUMED_AVERAGE_CREDIT,
             "requested_credit_minimum": 2000,
             "requested_credit_maximum": 20000,
             "requested_credit_increment": 500,
@@ -327,8 +390,8 @@ def run_benchmark(
         },
         formulas={
             "approval_increment": "tool.approvals - baseline.approvals",
-            "credit_increment": "tool.approved_credit - baseline.approved_credit",
-            "average_incremental_credit": "credit_increment / approval_increment",
+            "credit_increment": "approval_increment * assumed_average_credit",
+            "average_incremental_credit": "assumed_average_credit",
             "approved_bad_rate": "approved unfavorable outcomes / approvals",
             "true_positive_rate": "approved favorable outcomes / favorable outcomes",
             "false_positive_rate": "approved unfavorable outcomes / unfavorable outcomes",
@@ -367,13 +430,24 @@ def run_benchmark(
             "tool": _group_evidence(rows, tool),
         },
         risk_constraint={
-            "rule": "tool approved bad rate <= baseline approved bad rate",
-            "outcome_definition": "unfavorable_outcome = not synthetic favorable_outcome",
-            "observation_window": "same generated cross-section; no post-decision observations",
-            "formula": "approved unfavorable outcomes / approved applicants",
+            "rule": "risk_delta <= allowed_absolute_tolerance",
+            "decision_risk_threshold": RISK_THRESHOLD,
+            "outcome_definition": "bad_12m = 90+ DPD or charge-off within 12 months",
+            "observation_window": "12 months after decision; only matured rows enter denominator",
+            "formula": "sum(bad_12m for matured approved) / matured approved count",
             "allowed_absolute_tolerance": 0.0,
+            "baseline_matured_approved_count": baseline_metrics.approvals,
+            "tool_matured_approved_count": tool_metrics.approvals,
             "baseline_approved_bad_rate": baseline_metrics.approved_bad_rate,
             "tool_approved_bad_rate": tool_metrics.approved_bad_rate,
+            "risk_delta": (
+                tool_metrics.approved_bad_rate - baseline_metrics.approved_bad_rate
+            ),
+            "reason_code": (
+                "impact_risk_noninferiority_passed"
+                if risk_passed
+                else "impact_risk_noninferiority_failed"
+            ),
             "passed": risk_passed,
         },
         decision_set_digests={
@@ -381,10 +455,14 @@ def run_benchmark(
             "baseline_approved_ids_sha256": _decision_set_sha256(rows, baseline),
             "tool_approved_count": tool_metrics.approvals,
             "tool_approved_ids_sha256": _decision_set_sha256(rows, tool),
+            "added_approved_count": len(added_ids),
+            "added_approved_ids_sha256": _id_set_sha256(added_ids),
+            "canceled_approved_count": len(canceled_ids),
+            "canceled_approved_ids_sha256": _id_set_sha256(canceled_ids),
         },
         scenario_expectations={
             "expected_incremental_approvals": 350,
-            "actual_incremental_approvals": tool_metrics.approvals - baseline_metrics.approvals,
+            "actual_incremental_approvals": approval_increment,
             "expected_baseline_absolute_gap": 0.12,
             "actual_baseline_absolute_gap": baseline_gap,
             "expected_tool_absolute_gap": 0.05,
@@ -394,19 +472,15 @@ def run_benchmark(
         publication_gate={
             "passed": publication_passed,
             "status": "passed" if publication_passed else "failed",
-            "reason_code": (
-                "all_publication_gates_passed"
-                if publication_passed
-                else "scenario_expectations_not_reproduced"
-            ),
+            "reason_code": publication_reason,
             "candidate_copy_status": (
                 "publishable" if publication_passed else "locked_not_publishable"
             ),
             "external_summary_candidate": (
                 "在包含10,000名申请人的固定样本量化评估中，FairLendKit按显式流程"
                 "工时假设将后处理工作量由80人时测算为32人时，预计减少60%；评估"
-                "覆盖情景由2,000人扩展至10,000人。固定逐行策略派生出247个新增批准，"
-                "对应2,731,500美元授信机会。"
+                f"覆盖情景由2,000人扩展至10,000人。固定逐行策略派生出{approval_increment}"
+                f"个新增批准，按每笔8,000美元假设对应{credit_increment:,}美元授信机会。"
             ),
             "external_summary_footnote": (
                 "结果基于固定样本、流程工时和逐行授信额度，尚未经过客户生产环境"
@@ -419,11 +493,7 @@ def run_benchmark(
             "customer_data": "none",
         },
         constraint_status="passed" if publication_passed else "failed",
-        reason_code=(
-            "all_publication_gates_passed"
-            if publication_passed
-            else "scenario_expectations_not_reproduced"
-        ),
+        reason_code=publication_reason,
         disclaimer=(
             "Synthetic simulation only; not a pilot, customer outcome, production "
             "decision, causal estimate, or compliance conclusion."
