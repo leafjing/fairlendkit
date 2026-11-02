@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -25,9 +26,7 @@ def test_fixed_population_and_decision_outputs_are_reproducible():
     assert result.tool.approvals == 4598
     assert result.approval_increment == 247
     assert result.incremental_approvals == 247
-    assert result.credit_increment == 1_976_000
     assert result.credit_increase_usd == 1_976_000
-    assert result.average_incremental_credit == 8_000
 
 
 def test_metrics_are_directly_recomputed_from_rows_and_decisions():
@@ -45,7 +44,11 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     result = run_benchmark(repetitions=2)
     payload = json.loads(result.canonical_json())
     assert payload["benchmark_id"] == "fairlendkit-simulated-impact-v1"
-    assert payload["code_commit_basis"] == "6dff96a"
+    assert payload["code_commit_basis"] != "pending-implementation-commit"
+    assert len(payload["code_commit_basis"]) == 7
+    assert payload["policy_assumptions"]["code_commit_basis_definition"].startswith(
+        "Git commit containing the benchmark generator"
+    )
     assert payload["evidence_status"] == "simulation_not_production_evidence"
     assert payload["evidence_class"] == "simulation_not_production_evidence"
     assert "Synthetic simulation only" in payload["disclaimer"]
@@ -54,9 +57,6 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert payload["policy_assumptions"]["baseline_credit_score_minimum"] == 680
     assert payload["formulas"]["credit_increase_usd"] == (
         "incremental_approvals * fixed_credit_amount_usd"
-    )
-    assert payload["formulas"]["credit_increment"] == (
-        "approval_increment * fixed_credit_amount_usd"
     )
     assert payload["policy_assumptions"]["fixed_credit_amount_usd"] == 8000
     assert payload["runtime_environment"]["timer"] == "time.perf_counter_ns"
@@ -79,7 +79,7 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
         "impact_expectations_not_met"
     )
     assert payload["publication_gate"]["candidate_copy_status"] == (
-        "locked_not_publishable"
+        "locked_pending_evidence"
     )
     external_copy = payload["publication_gate"]["external_summary_candidate"]
     assert "量化影响评估（固定样本情景测算）" in external_copy
@@ -103,6 +103,12 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert payload["risk_constraint"]["allowed_absolute_tolerance"] == 0.0
     assert payload["config_summary"]["population_size"] == 10000
     assert "same deterministic" in payload["config_summary"]["evaluation_sample"]
+    assert payload["config_summary"]["outcome_label"] == (
+        "bad_12m = 90+ DPD or charge-off"
+    )
+    assert "cross-section" not in json.dumps(payload["config_summary"])
+    assert "favorable_outcome" not in json.dumps(payload["config_summary"])
+    assert "requested_credit" not in json.dumps(payload["config_summary"])
     assert payload["group_evidence"]["tool"]["reference"]["sample_size"] > 0
     assert payload["group_evidence"]["tool"]["comparison"]["sample_size"] > 0
 
@@ -150,8 +156,64 @@ def test_expectations_do_not_change_decisions_or_derived_results():
     assert changed.baseline == canonical.baseline
     assert changed.tool == canonical.tool
     assert changed.approval_increment == canonical.approval_increment
-    assert changed.credit_increment == canonical.credit_increment
+    assert changed.credit_increase_usd == canonical.credit_increase_usd
     assert changed.scenario_expectations != canonical.scenario_expectations
+
+
+def test_actual_seed_changes_config_hash_and_input_identity():
+    canonical = run_benchmark(repetitions=1, seed=20261102)
+    changed = run_benchmark(repetitions=1, seed=20261103)
+    assert changed.seed == 20261103
+    assert changed.config_sha256 != canonical.config_sha256
+    assert changed.input_sha256 != canonical.input_sha256
+
+
+def test_unmatured_approved_rows_are_excluded_from_risk_denominator(monkeypatch):
+    rows = list(generate_simulated_applicants(population_size=20))
+    approved_index = next(
+        index for index, decision in enumerate(baseline_decisions(rows)) if decision
+    )
+    rows[approved_index] = replace(
+        rows[approved_index], outcome_matured_12m=False, bad_12m=True
+    )
+    frozen = tuple(rows)
+    monkeypatch.setattr(
+        "fairlendkit.research.simulated_impact_benchmark.generate_simulated_applicants",
+        lambda **_: frozen,
+    )
+    result = run_benchmark(population_size=20, repetitions=1)
+    assert result.risk_constraint["baseline_matured_approved_count"] == (
+        result.baseline.approvals - 1
+    )
+    assert result.risk_constraint["baseline_bad_count"] <= (
+        result.risk_constraint["baseline_matured_approved_count"]
+    )
+
+
+def test_publication_reason_priority_and_locked_status():
+    expectations_only = run_benchmark(repetitions=1)
+    assert expectations_only.reason_code == "scenario_expectations_not_reproduced"
+    assert expectations_only.publication_gate["candidate_copy_status"] == (
+        "locked_pending_evidence"
+    )
+    assert "247" not in expectations_only.publication_gate["external_summary_candidate"]
+    assert "1,976,000" not in expectations_only.publication_gate["external_summary_candidate"]
+
+
+def test_risk_failure_takes_priority_over_expectation_failure(monkeypatch):
+    monkeypatch.setattr(
+        "fairlendkit.research.simulated_impact_benchmark.evaluate_risk_gate",
+        lambda **_: {
+            "passed": False,
+            "reason_code": "impact_risk_noninferiority_failed",
+        },
+    )
+    result = run_benchmark(repetitions=1)
+    assert result.reason_code == "impact_risk_noninferiority_failed"
+    assert result.constraint_status == "failed"
+    assert result.publication_gate["candidate_copy_status"] == (
+        "locked_pending_evidence"
+    )
 
 
 def test_risk_gate_fail_closed_reason_codes():

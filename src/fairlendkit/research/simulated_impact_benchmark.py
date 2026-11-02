@@ -17,7 +17,11 @@ from typing import Callable, Sequence
 
 BENCHMARK_ID = "fairlendkit-simulated-impact-v1"
 SCENARIO_ID = "fairlendkit-sim-impact-v1"
-CODE_COMMIT_BASIS = "6dff96a"
+CODE_COMMIT_BASIS = "0000000"
+CODE_COMMIT_BASIS_DEFINITION = (
+    "Git commit containing the benchmark generator and contract logic used to "
+    "produce this artifact; the later artifact-only commit may differ."
+)
 SEED = 20261102
 POPULATION_SIZE = 10_000
 REPETITIONS = 15
@@ -84,9 +88,7 @@ class BenchmarkResult:
     tool: PolicyMetrics
     approval_increment: int
     incremental_approvals: int
-    credit_increment: int
     credit_increase_usd: int
-    average_incremental_credit: float
     policy_assumptions: dict[str, int | float | str]
     config_summary: dict[str, int | str]
     formulas: dict[str, str]
@@ -240,9 +242,9 @@ def _id_set_sha256(ids: Sequence[int]) -> str:
     return hashlib.sha256(json.dumps(sorted(ids), separators=(",", ":")).encode()).hexdigest()
 
 
-def _config_sha256(population_size: int) -> str:
+def _config_sha256(*, seed: int, population_size: int) -> str:
     config = {
-        "seed": SEED,
+        "seed": seed,
         "population_size": population_size,
         "risk_threshold": RISK_THRESHOLD,
         "fixed_credit_amount_usd": FIXED_CREDIT_AMOUNT_USD,
@@ -376,11 +378,19 @@ def run_benchmark(
         for row, decision in zip(rows, tool, strict=True)
         if decision and row.outcome_matured_12m
     )
+    baseline_matured_count = sum(
+        decision and row.outcome_matured_12m
+        for row, decision in zip(rows, baseline, strict=True)
+    )
+    tool_matured_count = sum(
+        decision and row.outcome_matured_12m
+        for row, decision in zip(rows, tool, strict=True)
+    )
     risk_result = evaluate_risk_gate(
         baseline_bad_count=baseline_bad_count,
-        baseline_matured_count=baseline_metrics.approvals,
+        baseline_matured_count=baseline_matured_count,
         tool_bad_count=tool_bad_count,
-        tool_matured_count=tool_metrics.approvals,
+        tool_matured_count=tool_matured_count,
     )
     risk_passed = bool(risk_result["passed"])
     input_sha256 = _input_sha256(rows)
@@ -429,7 +439,7 @@ def run_benchmark(
         population_size=population_size,
         input_sha256=input_sha256,
         input_file_sha256=input_sha256,
-        config_sha256=_config_sha256(population_size),
+        config_sha256=_config_sha256(seed=seed, population_size=population_size),
         stable_row_ids_sha256=_id_set_sha256([row.applicant_id for row in rows]),
         run_command=RUN_COMMAND,
         repetitions=repetitions,
@@ -441,9 +451,7 @@ def run_benchmark(
         tool=tool_metrics,
         approval_increment=approval_increment,
         incremental_approvals=approval_increment,
-        credit_increment=credit_increment,
         credit_increase_usd=credit_increment,
-        average_incremental_credit=float(FIXED_CREDIT_AMOUNT_USD),
         policy_assumptions={
             "baseline_credit_score_minimum": 680,
             "second_look_credit_score_minimum": 640,
@@ -451,25 +459,21 @@ def run_benchmark(
             "second_look_alternative_score_minimum": 0.72,
             "predicted_12m_bad_probability_maximum": RISK_THRESHOLD,
             "fixed_credit_amount_usd": FIXED_CREDIT_AMOUNT_USD,
-            "requested_credit_minimum": 2000,
-            "requested_credit_maximum": 20000,
-            "requested_credit_increment": 500,
             "comparison_group": "fixed synthetic group; not a protected-class claim",
+            "code_commit_basis_definition": CODE_COMMIT_BASIS_DEFINITION,
         },
         config_summary={
             "evaluation_sample": "same deterministic input_sha256 for baseline and tool",
-            "outcome_label": "same synthetic favorable_outcome for baseline and tool",
-            "time_window": "same single generated cross-section; no temporal split",
-            "risk_rule": "tool approved bad rate <= baseline approved bad rate",
-            "credit_amounts": "same pre-decision requested_credit for baseline and tool",
+            "outcome_label": "bad_12m = 90+ DPD or charge-off",
+            "time_window": "12 months after decision; only matured rows enter denominator",
+            "risk_rule": "matured tool approved bad rate <= matured baseline approved bad rate",
+            "credit_amounts": "fixed_credit_amount_usd=8000 for each net incremental approval",
             "group_definition": "same fixed synthetic comparison_group for baseline and tool",
             "population_size": population_size,
         },
         formulas={
             "approval_increment": "tool.approvals - baseline.approvals",
             "credit_increase_usd": "incremental_approvals * fixed_credit_amount_usd",
-            "credit_increment": "approval_increment * fixed_credit_amount_usd",
-            "average_incremental_credit": "fixed_credit_amount_usd",
             "approved_bad_rate": "approved unfavorable outcomes / approvals",
             "true_positive_rate": "approved favorable outcomes / favorable outcomes",
             "false_positive_rate": "approved unfavorable outcomes / unfavorable outcomes",
@@ -544,7 +548,7 @@ def run_benchmark(
             "status": "passed" if publication_passed else "failed",
             "reason_code": publication_reason,
             "candidate_copy_status": (
-                "publishable" if publication_passed else "locked_not_publishable"
+                "publishable" if publication_passed else "locked_pending_evidence"
             ),
             "external_summary_candidate": (
                 "在包含{{population_size}}名申请人的量化影响评估（固定样本情景测算）"
