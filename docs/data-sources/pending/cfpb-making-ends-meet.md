@@ -10,7 +10,8 @@
 - The current CFPB Public Data Inventory still lists Making Ends Meet as raw,
   one-time data, but its Making Ends Meet link and historical public-data path
   redirect to the CFPB data-research root; no stable package URL is pinned
-- Exact release/version: sample-specific public-use files, not yet selected
+- Exact guide-defined candidate: Sample 6 Wave 1, fielded 2025-01-13 through
+  2025-03-28; official package identity and terms remain unavailable
 - License/redistribution: per-download public-use terms not yet captured
 - Decision: none
 - Trust tier: A for publisher authority; admission remains incomplete
@@ -25,6 +26,18 @@ Required evidence: one exact official sample/wave and package, codebook,
 questionnaire, file manifest, public-use agreement, redistribution/automated-
 access terms, survey-to-credit-record time alignment, privacy restrictions,
 hashes, and an approved `quality_only` or `risk_eligible` outcome mapping.
+
+The latest metadata investigation is recorded in
+[`../investigations/cfpb-making-ends-meet-metadata-2026-11-02.md`](../investigations/cfpb-making-ends-meet-metadata-2026-11-02.md).
+It selects Sample 6 Wave 1 as the latest guide-defined evaluation target, while
+keeping package identity, terms, license, redistribution, and prescribed
+citation unverified because the active download page redirects.
+
+Sample 6 has 2,630 responses and intentionally oversamples several credit,
+income-area, and race/ethnicity-area proxy groups. Its online-only questions use
+`_online` weights; other questions use `_paper` weights. These strata and
+weights require explicit representation/proxy reporting and cannot be used as
+individual risk labels.
 
 ## Enablement plan
 
@@ -65,10 +78,11 @@ therefore pins only the official inventory and user guide. It uses
 scope `unverified`. Candidate status remains `evidence_incomplete`; the guide is
 evidence, not authorization to reconstruct, download, or redistribute a sample.
 
-No sample is selected until CFPB restores or identifies an official package
-page with sample identity and terms. Survey hardship is never a default label,
-and credit-derived variables cannot become `risk_eligible` without explicit
-time alignment, outcome semantics, maturity, privacy, and censoring review.
+Sample 6 Wave 1 is the provisional technical-evaluation target, but no source
+may be admitted until CFPB restores or identifies an official package page and
+active terms. Survey hardship is never a default label, and credit-derived
+variables cannot become `risk_eligible` without explicit time alignment,
+outcome semantics, maturity, privacy, and censoring review.
 
 An unsent official inquiry is prepared at
 [`cfpb-making-ends-meet-request.md`](../contact-drafts/cfpb-making-ends-meet-request.md).

@@ -181,7 +181,9 @@ dictionary, and relevant utility semantics are the strongest after UCI.
 ### 6. CFPB Making Ends Meet
 
 - Candidate: [`cfpb-making-ends-meet`](pending/cfpb-making-ends-meet.md)
-- Current gate: Q0, blocked before package selection.
+- Current gate: latest guide-defined target selected as Sample 6 Wave 1
+  (2025-01-13 through 2025-03-28), but the official download/terms page now
+  redirects and no stable package URL or active terms are pinned.
 - Evidence ready: official Public Data Inventory entry and public-use-file user
   guide; an official inquiry draft exists but has not been sent.
 - Intended use: financial-well-being, bill-payment, liquidity, coverage, and
