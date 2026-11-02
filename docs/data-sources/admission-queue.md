@@ -97,7 +97,10 @@ source.
 ### 2. EIA RECS 2020 public microdata v7
 
 - Candidate: [`eia-recs-2020-v7`](pending/eia-recs-2020-v7.md)
-- Current gate: Q0, retrieval contract not yet approved.
+- Current gate: Q1 metadata contract. The 2026-11-02 metadata-only recheck
+  reconfirmed the official v7 CSV, codebook, and methodology endpoints, exact
+  HEAD sizes/media types/validators, January 2024 version context, and EIA
+  public-domain/reuse guidance. No file body was read.
 - Evidence ready: authoritative v7 CSV, codebook and method-guide URLs; observed
   byte sizes; affirmative EIA reuse guidance with a third-party-material caveat;
   documented main/replicate weights, imputation indicators, billing-coverage
@@ -105,7 +108,7 @@ source.
 - Intended use: utility coverage, annual consumption/expenditure quality,
   imputation, weighted representation, and proxy-pathway research. It is not a
   payment ledger or credit outcome source.
-- Blocking before Q1: stable release/revision identity or documented project
+- Blocking before Q2: stable release/revision identity or documented project
   snapshot rule, publisher checksum policy, automated-access review, exact
   schema/null-token plan, confirmation of third-party content, and an approved
   60-replicate-weight calculation contract with golden fixtures.

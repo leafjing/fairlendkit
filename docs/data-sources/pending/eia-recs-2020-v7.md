@@ -66,6 +66,14 @@ column inventory, and confirmation that no member is third-party remain open.
 Status stays `evidence_incomplete`; manifest-level and member-level
 redistribution remain `unverified` despite a credible path to `repository`.
 
+The 2026-11-02 metadata recheck is recorded in
+[`../investigations/eia-recs-2020-v7-metadata-2026-11-02.md`](../investigations/eia-recs-2020-v7-metadata-2026-11-02.md).
+It reconfirms all three fixed endpoint sizes, media types, modification times,
+and validators without reading their bodies. It also confirms the official
+July 2022 / June 2023 / January 2024 release history and EIA reuse terms. No DOI,
+immutable publisher release ID, or publisher checksum was found, so those
+fields remain null.
+
 ## Field, weight, and imputation evidence
 
 The official v7 codebook was inspected as documentation only; the row-level CSV
