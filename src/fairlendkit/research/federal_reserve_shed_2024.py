@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
-from typing import Mapping, Sequence
+from typing import Iterable, Mapping, Sequence
 
 ADMISSION_STATUS = "evidence_incomplete"
 ADOPTED = False
@@ -11,9 +13,38 @@ DISPOSITION = "external_only"
 USAGE = "quality_only"
 REDISTRIBUTION = "prohibited"
 IDENTIFIER_COLUMN = "shedid"
+SPECIAL_RESPONSE_RULES = {
+    "not_asked": {
+        "UNION100": ("Not asked",),
+        "ind1": ("-2",),
+        "ppcm0160": ("Not asked",),
+        "ppcm1301": ("Not asked",),
+    },
+    "dont_know": {
+        "A6": ("Don't know",),
+        "CH2A": ("Don't know",),
+        "D47": ("Don't know",),
+        "E2A": ("Don't know",),
+        "K0": ("Don't know",),
+        "SL13": ("Don't know",),
+        "SL3": ("Don't know",),
+        "SL4": ("Don't know",),
+        "ppfs1482": ("Don't know",),
+    },
+    "refused": {
+        "CH2A": ("Refused",),
+        "ND1_e": ("Refused",),
+        "UNION100": ("Refused",),
+        "ind1": ("-1",),
+        "ppcm0160": ("Refused",),
+        "ppcm1301": ("Refused",),
+    },
+}
 EXPECTED = {
     "rows": 12295,
     "columns": 751,
+    "schema_sha256": "63fd0317d14b9634f9dafd3f3a63932c2c40d41d764c220d01cad34a4cbde6e9",
+    "identifier_index": 0,
     "archive_sha256": "b455d02356a0c01a02d7f478c02d772515491564e905ce13db55f272f83567c1",
     "csv_sha256": "82897c55a7c3dc1c056270506714d174732215927419f7d571400612cdd30819",
     "weights": {
@@ -24,12 +55,50 @@ EXPECTED = {
     },
     "missingness": (2159319, 254, 497),
     "imputation_flags": (342, 4204890, 0, 4191995, 12895),
+    "special_response_rules_sha256": "0c90a8ee99195f8a7e2bffa869722fb7a2b41d360d7c9f5f913674bb35e70b42",
     "special_responses": {"not_asked": 20300, "dont_know": 4313, "refused": 537},
 }
 
 
 class Shed2024IntegrityError(ValueError):
     """Raised when aggregate evidence differs from the reviewed SHED package."""
+
+
+def canonical_sha256(value: object) -> str:
+    """Hash JSON-compatible evidence with one deterministic representation."""
+    encoded = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def schema_sha256(columns: Sequence[str]) -> str:
+    """Hash the ordered, case-sensitive schema without retaining respondent rows."""
+    return canonical_sha256(list(columns))
+
+
+def special_response_rules_sha256(
+    rules: Mapping[str, Mapping[str, Sequence[str]]],
+) -> str:
+    """Hash the codebook-derived column/value mapping deterministically."""
+    canonical = {
+        category: [[column, list(values)] for column, values in sorted(columns.items())]
+        for category, columns in sorted(rules.items())
+    }
+    return canonical_sha256(canonical)
+
+
+def summarize_special_responses(
+    rows: Iterable[Mapping[str, str]],
+    rules: Mapping[str, Mapping[str, Sequence[str]]] = SPECIAL_RESPONSE_RULES,
+) -> dict[str, int]:
+    """Count only codebook-mapped special answers; blanks remain separate."""
+    counts = {category: 0 for category in rules}
+    required = {column for columns in rules.values() for column in columns}
+    for row in rows:
+        if not required.issubset(row):
+            raise Shed2024IntegrityError("special-response source column is missing")
+        for category, columns in rules.items():
+            counts[category] += sum(row[column] in values for column, values in columns.items())
+    return counts
 
 
 def summarize_numeric(values: Sequence[str]) -> tuple[int, int, int, int, float, float]:
@@ -60,21 +129,32 @@ def validate_summary(
     *,
     rows: int,
     columns: int,
+    schema_sha256: str,
     archive_sha256: str,
     csv_sha256: str,
+    identifier_column: str,
+    identifier_index: int,
     identifier_nulls: int,
     identifier_unique: int,
     weights: Mapping[str, Sequence[int | float]],
     missingness: Sequence[int],
     imputation_flags: Sequence[int],
+    special_response_rules_sha256: str,
     special_responses: Mapping[str, int],
 ) -> None:
     """Fail closed on package, identifier, weight, or aggregate-evidence drift."""
     if (rows, columns) != (EXPECTED["rows"], EXPECTED["columns"]):
         raise Shed2024IntegrityError("SHED shape changed")
+    if schema_sha256 != EXPECTED["schema_sha256"]:
+        raise Shed2024IntegrityError("SHED ordered schema changed")
     if archive_sha256 != EXPECTED["archive_sha256"] or csv_sha256 != EXPECTED["csv_sha256"]:
         raise Shed2024IntegrityError("SHED package or CSV SHA-256 changed")
-    if identifier_nulls != 0 or identifier_unique != rows:
+    if (
+        identifier_column != IDENTIFIER_COLUMN
+        or identifier_index != EXPECTED["identifier_index"]
+        or identifier_nulls != 0
+        or identifier_unique != rows
+    ):
         raise Shed2024IntegrityError("SHED identifier is missing or non-unique")
     if {name: tuple(values) for name, values in weights.items()} != EXPECTED["weights"]:
         raise Shed2024IntegrityError("SHED weight statistics changed")
@@ -82,12 +162,15 @@ def validate_summary(
         raise Shed2024IntegrityError("SHED missingness changed")
     if tuple(imputation_flags) != EXPECTED["imputation_flags"]:
         raise Shed2024IntegrityError("SHED imputation flags changed")
+    if special_response_rules_sha256 != EXPECTED["special_response_rules_sha256"]:
+        raise Shed2024IntegrityError("SHED special-response mapping changed")
     if dict(special_responses) != EXPECTED["special_responses"]:
         raise Shed2024IntegrityError("SHED special-response counts changed")
 
 
 def analysis_columns(columns: Sequence[str]) -> tuple[str, ...]:
     """Remove the longitudinal identifier from bounded aggregate analysis."""
-    if IDENTIFIER_COLUMN not in columns:
+    identifier_matches = [column for column in columns if column.casefold() == IDENTIFIER_COLUMN]
+    if identifier_matches != [IDENTIFIER_COLUMN]:
         raise Shed2024IntegrityError("shedid is required for isolation checks")
     return tuple(column for column in columns if column != IDENTIFIER_COLUMN)

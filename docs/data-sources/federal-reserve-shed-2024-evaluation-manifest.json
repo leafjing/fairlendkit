@@ -27,8 +27,19 @@
     "bytes": 848401,
     "sha256": "caa1b19f87539e3746654fd71d7d003b4db7f9d74e7a0c302ff4a8517c05339d"
   },
-  "shape": {"rows": 12295, "columns": 751, "duplicate_rows": 0},
-  "identifier": {"column": "shedid", "missing": 0, "unique": 12295, "analysis_use": "prohibited"},
+  "shape": {
+    "rows": 12295,
+    "columns": 751,
+    "duplicate_rows": 0,
+    "ordered_schema_sha256": "63fd0317d14b9634f9dafd3f3a63932c2c40d41d764c220d01cad34a4cbde6e9"
+  },
+  "identifier": {
+    "column": "shedid",
+    "zero_based_index": 0,
+    "missing": 0,
+    "unique": 12295,
+    "analysis_use": "prohibited"
+  },
   "weight_stat_fields": ["missing", "non_finite", "zero", "negative", "minimum", "maximum"],
   "weights": {
     "weight": [0, 0, 0, 0, 0.1788, 3.5159],
@@ -44,7 +55,37 @@
     "not_imputed_0": 4191995,
     "imputed_1": 12895
   },
-  "special_response_counts": {"not_asked": 20300, "dont_know": 4313, "refused": 537},
+  "special_response_evidence": {
+    "rules_sha256": "0c90a8ee99195f8a7e2bffa869722fb7a2b41d360d7c9f5f913674bb35e70b42",
+    "rules": {
+      "not_asked": {
+        "UNION100": ["Not asked"],
+        "ind1": ["-2"],
+        "ppcm0160": ["Not asked"],
+        "ppcm1301": ["Not asked"]
+      },
+      "dont_know": {
+        "A6": ["Don't know"],
+        "CH2A": ["Don't know"],
+        "D47": ["Don't know"],
+        "E2A": ["Don't know"],
+        "K0": ["Don't know"],
+        "SL13": ["Don't know"],
+        "SL3": ["Don't know"],
+        "SL4": ["Don't know"],
+        "ppfs1482": ["Don't know"]
+      },
+      "refused": {
+        "CH2A": ["Refused"],
+        "ND1_e": ["Refused"],
+        "UNION100": ["Refused"],
+        "ind1": ["-1"],
+        "ppcm0160": ["Refused"],
+        "ppcm1301": ["Refused"]
+      }
+    },
+    "counts": {"not_asked": 20300, "dont_know": 4313, "refused": 537}
+  },
   "terms": {
     "status": "redistribution_unverified",
     "website_policy_url": "https://www.federalreserve.gov/website-linking-policies.htm",

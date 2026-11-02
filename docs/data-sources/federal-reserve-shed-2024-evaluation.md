@@ -12,11 +12,16 @@ The official Board SHED page links the exact 2024 CSV ZIP and codebook pinned in
 the adjacent manifest. The page identifies the codebook as last updated May 28,
 2025. The unencrypted ZIP has one member, `public2024.csv`: 12,295 rows and 751
 columns, with no duplicate rows. No raw or transformed respondent rows are
-committed.
+committed. The ordered, case-sensitive schema is pinned by SHA-256, so a renamed,
+reordered, added, or removed field fails closed rather than passing on shape
+alone.
 
 The longitudinal `shedid` is non-null and unique in this snapshot. It is used
 only for local integrity checks and is prohibited from features, outputs, logs,
-fixtures, or cross-source linkage. State, age, gender, race/ethnicity, education,
+fixtures, or cross-source linkage. Its exact name and zero-based position `0`
+are pinned; analysis-column construction removes exactly one case-sensitive
+`shedid` and rejects missing or case-colliding variants. State, age, gender,
+race/ethnicity, education,
 income, disability, employment, housing, family, credit, debt, and hardship
 fields are sensitive or proxy-bearing and require disclosure controls.
 
@@ -33,6 +38,9 @@ complete. Blanks retain their field-specific skip/nonresponse meaning. The 342
 `*_iflag` columns contain 4,191,995 zeros (“not imputed”) and 12,895 ones
 (“imputed”), with no blanks. Codebook-labelled responses are separate from
 missingness: 20,300 “not asked”, 4,313 “don't know”, and 537 “refused” cells.
+These totals are derived from the manifest's codebook-specific column/value
+mapping, including the unlabeled `ind1` codes `-2` and `-1`; the mapping has its
+own deterministic SHA-256 and any column, value, or category drift fails closed.
 
 ## Fitness and boundaries
 
