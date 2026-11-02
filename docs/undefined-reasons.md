@@ -25,7 +25,7 @@ reason or turn it into a legal or compliance conclusion.
 | `zero_unfavorable_outcome_weight` | Unfavorable observed outcomes have no positive total weight. | Unfavorable outcomes exist, but their eligible weights sum to zero. |
 | `no_favorable_decisions` | No favorable decisions are available for this metric. | Precision has no favorable decisions. |
 | `zero_favorable_decision_weight` | Favorable decisions have no positive total weight. | Favorable decisions exist, but their eligible weights sum to zero. |
-| `constant_score` | Eligible scores are constant, so ranking discrimination is undefined. | AUC has both outcome classes but no score variation. |
+| `constant_score` | Eligible scores are constant, so ranking discrimination is undefined. | Reserved for backward-compatible reading of older payloads. New AUC calculations define a constant-score sample with both positive-weight outcome classes as `0.5`. |
 | `metric_not_applicable` | The metric does not apply to the configured score semantics. | The configured score semantics do not support the metric. |
 | `comparison_metric_undefined` | The comparison-group input metric is undefined. | A directed disparity cannot be calculated because its comparison-group input is undefined. |
 | `reference_metric_undefined` | The reference-group input metric is undefined. | A directed disparity cannot be calculated because its reference-group input is undefined. |

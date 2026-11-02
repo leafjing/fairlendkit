@@ -122,6 +122,28 @@ def test_roc_auc_counts_ties_and_supports_weights():
     assert result.value == pytest.approx(0.875)
 
 
+def test_roc_auc_constant_scores_are_chance_with_both_outcome_classes():
+    result = roc_auc([True, False, True, False], [0.4, 0.4, 0.4, 0.4])
+
+    assert result.value == 0.5
+    assert result.numerator == 2.0
+    assert result.denominator == 4.0
+    assert result.undefined_reason is None
+
+
+def test_weighted_roc_auc_constant_scores_are_chance_with_both_weighted_classes():
+    result = roc_auc(
+        [True, False, True, False],
+        [0.4, 0.4, 0.4, 0.4],
+        [2.0, 1.0, 1.0, 3.0],
+    )
+
+    assert result.value == 0.5
+    assert result.numerator == pytest.approx(2 / 3)
+    assert result.denominator == pytest.approx(4 / 3)
+    assert result.undefined_reason is None
+
+
 @pytest.mark.parametrize(
     ("outcomes", "scores"),
     [
@@ -146,11 +168,15 @@ def test_unweighted_roc_auc_fast_path_is_exactly_pairwise_equivalent(
         ([True, True], [0.2, 0.3], None, "no_unfavorable_outcomes"),
         ([True, False], [0.2, 0.3], [0.0, 1.0], "zero_favorable_outcome_weight"),
         ([True, False], [0.2, 0.3], [1.0, 0.0], "zero_unfavorable_outcome_weight"),
-        ([True, False], [0.2, 0.2], None, "constant_score"),
     ],
 )
 def test_roc_auc_uses_typed_undefined_reasons(outcomes, scores, weights, reason):
     assert roc_auc(outcomes, scores, weights).undefined_reason == reason
+
+
+def test_roc_auc_constant_valid_scores_do_not_hide_an_invalid_row():
+    with pytest.raises((TypeError, ValueError), match="finite"):
+        roc_auc([True, False, True], [0.4, 0.4, float("nan")])
 
 
 def test_reference_group_reversal_changes_direction():

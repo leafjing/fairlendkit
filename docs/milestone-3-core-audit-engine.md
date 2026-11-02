@@ -161,7 +161,7 @@ favorable decision. Optional weights use the existing normalization contract.
 | `false_positive_rate` | `FP / (FP + TN)` | overall, group | Undefined when there are no unfavorable outcomes or their total weight is zero. |
 | `false_negative_rate` | `FN / (TP + FN)` | overall, group | Same denominator state as true-positive rate. |
 | `brier_score` | weighted mean of `(p_favorable - y_favorable)^2` | overall, group | Only for `score_type="probability"`; otherwise `metric_not_applicable`. Undefined for empty population or zero total weight. Probability orientation follows `score_direction`: lower-is-more-favorable input is transformed to `1 - score`. |
-| `roc_auc` | weighted probability that a favorable outcome ranks more favorable than an unfavorable outcome, with ties worth `0.5` | overall, group | Undefined for no favorable outcomes, no unfavorable outcomes, corresponding zero class weight, or constant eligible score. Ranking order follows `score_direction`. |
+| `roc_auc` | weighted probability that a favorable outcome ranks more favorable than an unfavorable outcome, with ties worth `0.5` | overall, group | Undefined for no favorable outcomes, no unfavorable outcomes, or corresponding zero class weight. Constant eligible scores with both positive-weight classes are all ties and therefore produce defined AUC `0.5`. Ranking order follows `score_direction`. |
 | `selection_rate_difference` | comparison selection rate minus reference selection rate | comparison | Undefined if either source metric is undefined. This is the canonical name; it supersedes the older alias `demographic_parity_difference`. |
 | `adverse_impact_ratio` | comparison selection rate divided by reference selection rate | comparison | Undefined if either input is undefined or defined reference rate is zero. |
 | `demographic_parity_difference` | comparison selection rate minus reference selection rate | comparison | Required 2.0 compatibility alias for the name exposed by schema 1.0; value and evidence must exactly equal `selection_rate_difference`. It must not produce a second flag. |
@@ -202,7 +202,9 @@ migrated 1.0 payloads and must never be emitted by `run_audit`.
 The canonical undefined-reason vocabulary must be extended with:
 
 - `no_favorable_decisions` and `zero_favorable_decision_weight` for precision;
-- `constant_score` for AUC without rank variation;
+- `constant_score` remains readable for backward compatibility, but new AUC
+  calculations with constant scores and both positive-weight outcome classes
+  return defined value `0.5`;
 - `metric_not_applicable` for score-type applicability;
 - `component_metric_undefined` for a compound metric such as equalized odds;
 - `insufficient_valid_resamples` for uncertainty only, never as the observed
