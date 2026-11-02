@@ -17,7 +17,7 @@ from typing import Callable, Sequence
 
 BENCHMARK_ID = "fairlendkit-simulated-impact-v1"
 SCENARIO_ID = "fairlendkit-sim-impact-v1"
-CODE_COMMIT_BASIS = "81891a8"
+CODE_COMMIT_BASIS = "0f8cbd6"
 SEED = 20261102
 POPULATION_SIZE = 10_000
 REPETITIONS = 15
