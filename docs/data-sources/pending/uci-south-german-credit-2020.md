@@ -118,15 +118,27 @@
 
 ## Reproducibility
 
-- Run ID: `UCI573-20261102T0408Z-01` (one network attempt, completed)
+- Preflight Run ID: `UCI573-20261102T0408Z-01`; permanently retired because
+  it did not use the controlled Harness audit lifecycle. Its observed hashes
+  and content findings are non-admission evidence only.
+- Formal Harness Run ID: `uci573-formal-20261102t041415z-fe6d427`; permanently
+  spent after the official response omitted an authorized ZIP media type. Its
+  state sequence was `prepared`, `started`, `failed`, `cleaned`; cleanup
+  completed and no source bytes remain. Authorization SHA-256 is
+  `e7a190821ba0e6f8252bc63fc180ca8d3c6dffa48f4023e897dfec33e0a607e5`,
+  audit SHA-256 is
+  `8c497a2bef7076694b29bb24da75f3f8c0eb8d524e7a2f900fdc427fd495950a`,
+  and the permanent `.spent` SHA-256 is
+  `c60a409ccef2944d1b9440288fdca537e93febf40de548d5fa13a37854b821fa`.
 - Expected filenames and byte sizes: archive 13,130 bytes; `codetable.txt`
   3,154; `read_SouthGermanCredit.R` 7,550; `SouthGermanCredit.asc` 47,940
-- Repository-computed SHA-256 after authorized retrieval: archive
-  `0b40d40eb7321693d559e247a556f88a6cc8df8489c3cb2ae084db7592584551`;
-  member hashes are pinned in the companion manifest
-- Integrity checks: three UTF-8, unencrypted regular members; 58,644 total
-  uncompressed bytes; 1,000 data rows, 21 columns, fixed row width, zero blank
-  cells, zero exact duplicate rows, and numeric values only
+- Repository-computed SHA-256 after authorized retrieval: unavailable; the
+  formal Harness Run failed before retaining an archive, so all companion
+  manifest `repository_sha256` values remain `null`
+- Non-admission preflight observations: three UTF-8, unencrypted regular
+  members; 58,644 total uncompressed bytes; 1,000 data rows, 21 columns, fixed
+  row width, zero blank cells, zero exact duplicate rows, and numeric values
+  only. These observations support content assessment but not promotion.
 - Label check: 300 `bad` (`0`) and 700 `good` (`1`)
 - Deterministic preparation steps: whitespace-delimited header plus 1,000 rows;
   apply the official R/code-table mappings without changing raw categories
@@ -169,8 +181,8 @@
 - Required controls and limitations: pin hashes, retain category semantics,
   document class oversampling and historical scope, and apply disclosure
   controls to outputs
-- Decision evidence and signatures: coder evidence complete; independent
-  reviewer decision pending
+- Decision evidence and signatures: content assessment complete; formal
+  retrieval failed and admission evidence remains incomplete
 
 ## Enablement plan
 
