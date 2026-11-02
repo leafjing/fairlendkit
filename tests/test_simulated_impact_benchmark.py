@@ -49,9 +49,13 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert payload["baseline_median_seconds"] >= 0
     assert payload["tool_median_seconds"] >= 0
     assert payload["policy_assumptions"]["baseline_credit_score_minimum"] == 680
-    assert payload["formulas"]["credit_increment"] == (
-        "approval_increment * assumed_average_credit"
+    assert payload["formulas"]["credit_increase_usd"] == (
+        "incremental_approvals * fixed_credit_amount_usd"
     )
+    assert payload["formulas"]["credit_increment"] == (
+        "approval_increment * fixed_credit_amount_usd"
+    )
+    assert payload["policy_assumptions"]["fixed_credit_amount_usd"] == 8000
     assert payload["runtime_environment"]["timer"] == "time.perf_counter_ns"
     assert payload["scenario_id"] == "fairlendkit-sim-impact-v1"
     assert payload["analyst_effort_scenario"]["baseline_person_hours"] == 80

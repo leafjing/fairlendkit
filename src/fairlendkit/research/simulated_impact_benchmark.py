@@ -22,7 +22,7 @@ SEED = 20261102
 POPULATION_SIZE = 10_000
 REPETITIONS = 15
 RISK_THRESHOLD = 0.20
-ASSUMED_AVERAGE_CREDIT = 8_000
+FIXED_CREDIT_AMOUNT_USD = 8_000
 RUN_COMMAND = "PYTHONPATH=src python3 scripts/run_simulated_impact_benchmark.py"
 
 
@@ -243,7 +243,7 @@ def _config_sha256(population_size: int) -> str:
         "seed": SEED,
         "population_size": population_size,
         "risk_threshold": RISK_THRESHOLD,
-        "assumed_average_credit": ASSUMED_AVERAGE_CREDIT,
+        "fixed_credit_amount_usd": FIXED_CREDIT_AMOUNT_USD,
         "baseline_credit_score_minimum": 680,
         "second_look_credit_score_minimum": 640,
         "second_look_credit_score_maximum_exclusive": 680,
@@ -415,7 +415,7 @@ def run_benchmark(
         )
     )
     approval_increment = tool_metrics.approvals - baseline_metrics.approvals
-    credit_increment = approval_increment * ASSUMED_AVERAGE_CREDIT
+    credit_increment = approval_increment * FIXED_CREDIT_AMOUNT_USD
     return BenchmarkResult(
         benchmark_id=BENCHMARK_ID,
         scenario_id=SCENARIO_ID,
@@ -439,14 +439,14 @@ def run_benchmark(
         tool=tool_metrics,
         approval_increment=approval_increment,
         credit_increment=credit_increment,
-        average_incremental_credit=float(ASSUMED_AVERAGE_CREDIT),
+        average_incremental_credit=float(FIXED_CREDIT_AMOUNT_USD),
         policy_assumptions={
             "baseline_credit_score_minimum": 680,
             "second_look_credit_score_minimum": 640,
             "second_look_credit_score_maximum_exclusive": 680,
             "second_look_alternative_score_minimum": 0.72,
             "predicted_12m_bad_probability_maximum": RISK_THRESHOLD,
-            "assumed_average_credit": ASSUMED_AVERAGE_CREDIT,
+            "fixed_credit_amount_usd": FIXED_CREDIT_AMOUNT_USD,
             "requested_credit_minimum": 2000,
             "requested_credit_maximum": 20000,
             "requested_credit_increment": 500,
@@ -463,8 +463,9 @@ def run_benchmark(
         },
         formulas={
             "approval_increment": "tool.approvals - baseline.approvals",
-            "credit_increment": "approval_increment * assumed_average_credit",
-            "average_incremental_credit": "assumed_average_credit",
+            "credit_increase_usd": "incremental_approvals * fixed_credit_amount_usd",
+            "credit_increment": "approval_increment * fixed_credit_amount_usd",
+            "average_incremental_credit": "fixed_credit_amount_usd",
             "approved_bad_rate": "approved unfavorable outcomes / approvals",
             "true_positive_rate": "approved favorable outcomes / favorable outcomes",
             "false_positive_rate": "approved unfavorable outcomes / unfavorable outcomes",

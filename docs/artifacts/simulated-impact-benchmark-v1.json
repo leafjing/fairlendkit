@@ -26,7 +26,7 @@
   "baseline_median_seconds": 0.000535034,
   "benchmark_id": "fairlendkit-simulated-impact-v1",
   "code_commit_basis": "81891a8",
-  "config_sha256": "8e2fa5b4aa6af72c9dc77cb2f58f692d25964760bda7d93aecd83c63a1ccce7e",
+  "config_sha256": "fb0ff04c92060607f0662956b60a01b8015e27adcaf06f15da04252fdd999226",
   "config_summary": {
     "credit_amounts": "same pre-decision requested_credit for baseline and tool",
     "evaluation_sample": "same deterministic input_sha256 for baseline and tool",
@@ -61,8 +61,9 @@
     "adverse_impact_ratio": "comparison selection rate / reference selection rate",
     "approval_increment": "tool.approvals - baseline.approvals",
     "approved_bad_rate": "approved unfavorable outcomes / approvals",
-    "average_incremental_credit": "assumed_average_credit",
-    "credit_increment": "approval_increment * assumed_average_credit",
+    "average_incremental_credit": "fixed_credit_amount_usd",
+    "credit_increase_usd": "incremental_approvals * fixed_credit_amount_usd",
+    "credit_increment": "approval_increment * fixed_credit_amount_usd",
     "false_positive_rate": "approved unfavorable outcomes / unfavorable outcomes",
     "selection_rate_difference": "comparison selection rate - reference selection rate",
     "true_positive_rate": "approved favorable outcomes / favorable outcomes"
@@ -113,7 +114,7 @@
   "input_file_sha256": "cb57ee569995fbcbf61fe63202d5a37a9b4f2a738e7b8aafd0a912657ed9434f",
   "input_sha256": "cb57ee569995fbcbf61fe63202d5a37a9b4f2a738e7b8aafd0a912657ed9434f",
   "policy_assumptions": {
-    "assumed_average_credit": 8000,
+    "fixed_credit_amount_usd": 8000,
     "baseline_credit_score_minimum": 680,
     "comparison_group": "fixed synthetic group; not a protected-class claim",
     "predicted_12m_bad_probability_maximum": 0.2,
