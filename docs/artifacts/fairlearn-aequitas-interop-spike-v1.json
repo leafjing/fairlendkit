@@ -1,17 +1,139 @@
 {
-  "artifact_schema": "fairlendkit.fairness_interop_spike.v1",
-  "evidence_status": "synthetic_semantic_spike_not_external_validation",
+  "acceptance_rules": [
+    "fairlearn_not_executed_fails_closed",
+    "aequitas_not_executed_fails_closed",
+    "dependency_identity_mismatch_fails_before_comparison",
+    "execution_failure_emits_no_totals",
+    "constant_two_class_auc_is_half_for_supported_implementations",
+    "undefined_auc_cases_are_not_coerced",
+    "aequitas_auc_is_metric_not_supported",
+    "fixture_values_cannot_promote_external_execution_status"
+  ],
+  "artifact_schema": "fairlendkit.fairness_interop_spike.v2",
+  "candidate_copy_status": "locked_research_only",
+  "comparison_totals": {
+    "execution_failures": null,
+    "matches": null,
+    "mismatches": null,
+    "not_comparable": null
+  },
+  "comparisons_emitted": false,
+  "constraint_status": "failed",
+  "evidence_class": "external_interoperability_spike_not_production_validation",
+  "evidence_status": "synthetic_semantic_spike_external_not_executed",
+  "execution_failure_total": null,
   "external_execution": {
     "aequitas": {
+      "command": null,
+      "ended_at_utc": null,
+      "exit_status": null,
+      "expected_package_identity": {
+        "artifact": "aequitas-1.1.0-py3-none-any.whl",
+        "license": "MIT",
+        "package": "aequitas",
+        "sha256": "a99b8031a499577251fb26fae2ff20f2b23b2ad759cc8657b8afaae53bbc0b33",
+        "source_url": "https://pypi.org/project/aequitas/1.1.0/",
+        "version": "1.1.0"
+      },
+      "identity_verified": false,
+      "normalized_values": null,
+      "raw_output": null,
+      "reason_code": "external_not_executed",
       "reported_values": null,
-      "status": "not_executed_no_runtime_dependency"
+      "started_at_utc": null,
+      "status": "not_executed",
+      "stderr_sha256": null,
+      "stdout_sha256": null,
+      "value_match": null
     },
     "fairlearn": {
+      "command": null,
+      "ended_at_utc": null,
+      "exit_status": null,
+      "expected_package_identity": {
+        "artifact": "fairlearn-0.15.0-py3-none-any.whl",
+        "license": "MIT",
+        "package": "fairlearn",
+        "sha256": "4f4656c25af384fc3369db719231680c4e83beb2e6e075e5dc3c2b27d06455c9",
+        "source_url": "https://pypi.org/project/fairlearn/0.15.0/",
+        "version": "0.15.0"
+      },
+      "identity_verified": false,
+      "normalized_values": null,
+      "raw_output": null,
+      "reason_code": "external_not_executed",
       "reported_values": null,
-      "status": "not_executed_no_runtime_dependency"
+      "started_at_utc": null,
+      "status": "not_executed",
+      "stderr_sha256": null,
+      "stdout_sha256": null,
+      "value_match": null
     }
   },
   "fairlendkit": {
+    "auc_contract_cases": [
+      {
+        "case_id": "constant_two_class_unweighted",
+        "denominator": 1.0,
+        "numerator": 0.5,
+        "reason_code": null,
+        "status": "defined",
+        "value": 0.5,
+        "weight_mode": "unweighted"
+      },
+      {
+        "case_id": "constant_two_class_weighted",
+        "denominator": 1.3125,
+        "numerator": 0.65625,
+        "reason_code": null,
+        "status": "defined",
+        "value": 0.5,
+        "weight_mode": "weighted"
+      },
+      {
+        "case_id": "mixed_ties",
+        "denominator": 2.0,
+        "numerator": 1.5,
+        "reason_code": null,
+        "status": "defined",
+        "value": 0.75,
+        "weight_mode": "unweighted"
+      },
+      {
+        "case_id": "single_class",
+        "denominator": null,
+        "numerator": null,
+        "reason_code": "no_unfavorable_outcomes",
+        "status": "undefined",
+        "value": null,
+        "weight_mode": "unweighted"
+      },
+      {
+        "case_id": "zero_unfavorable_class_weight",
+        "denominator": 0.0,
+        "numerator": null,
+        "reason_code": "zero_unfavorable_outcome_weight",
+        "status": "undefined",
+        "value": null,
+        "weight_mode": "weighted"
+      },
+      {
+        "case_id": "empty_sample",
+        "denominator": null,
+        "numerator": null,
+        "reason_code": "empty_population",
+        "status": "undefined",
+        "value": null,
+        "weight_mode": "unweighted"
+      },
+      {
+        "case_id": "invalid_score",
+        "reason_code": "invalid_score",
+        "status": "undefined",
+        "value": null,
+        "weight_mode": "unweighted"
+      }
+    ],
     "comparison": {
       "roc_auc": 0.75,
       "selection_rate": 0.5
@@ -88,32 +210,32 @@
     "sha256": "9135aa7546900ffffe927b4603718c29250547f9b5198a246fb0d370304481a1"
   },
   "limitations": [
-    "No Fairlearn or Aequitas package was imported or executed.",
-    "This artifact is not a performance benchmark or production-data result.",
-    "External version and license identities belong to the separately reviewed comparison document."
+    "No Fairlearn or Aequitas package was installed, imported, or executed.",
+    "No external normalized value, value match, total, or compatibility conclusion is emitted.",
+    "This artifact uses only fixed synthetic rows and is not production validation."
   ],
-  "result_sha256": "c14c512c29211709c8e70baba73110b301b334e621255ead2ba024f7b3fa39ab",
-  "semantic_differences": [
-    {
-      "aequitas": "candidate mapping must distinguish predicted prevalence from population share of predicted positives",
-      "concept": "group_selection_rate",
-      "fairlearn": "requires explicit sensitive_features and selection-rate metric configuration",
-      "fairlendkit": "explicit favorable-decision rate per named group",
-      "interop_gate": "do_not_compare_until_denominator_and_favorable_label_match"
-    },
-    {
-      "aequitas": "reference-group disparity configuration must be explicit",
-      "concept": "selection_rate_ratio",
-      "fairlearn": "default between-groups ratio may choose extrema rather than the configured reference group",
-      "fairlendkit": "directed comparison_group / reference_group",
-      "interop_gate": "do_not_treat_equal_numbers_as_equal_semantics_without_reference_identity"
-    },
-    {
-      "aequitas": "package execution not performed in this dependency-free spike",
-      "concept": "undefined_and_constant_score_auc",
-      "fairlearn": "package execution not performed in this dependency-free spike",
-      "fairlendkit": "constant scores with both positive-weight classes are defined AUC 0.5; absent or zero-weight class is undefined",
-      "interop_gate": "preserve_package_status_and_reason_instead_of_coercing_undefined_to_zero"
+  "match_total": null,
+  "metric_support": {
+    "roc_auc": {
+      "aequitas": {
+        "api": null,
+        "execution_status": "not_executed",
+        "normalized_value": null,
+        "reason_code": "metric_not_supported",
+        "support_status": "metric_not_supported",
+        "value_match": null
+      },
+      "fairlearn": {
+        "api": "MetricFrame(metrics=sklearn.metrics.roc_auc_score, ...)",
+        "execution_status": "not_executed",
+        "normalized_value": null,
+        "reason_code": "external_not_executed",
+        "value_match": null
+      }
     }
-  ]
+  },
+  "mismatch_total": null,
+  "not_comparable_total": null,
+  "reason_code": "external_not_executed",
+  "result_sha256": "db00ed628ee02fcf960d08662e5a90ac37e0dcfd5a567bf4a04101a146f7dac4"
 }
