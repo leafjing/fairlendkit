@@ -21,6 +21,10 @@ The canonical output reports:
   difference `comparison - reference`, and adverse-impact ratio
   `comparison / reference`.
 
+Every JSON result carries the machine-readable status
+`simulation_not_production_evidence` in addition to the plain-language
+disclaimer.
+
 Runtime varies with the machine and is never treated as a fixed impact claim.
 All other values are tied to the canonical synthetic-input SHA-256. Reproduce
 the artifact with:

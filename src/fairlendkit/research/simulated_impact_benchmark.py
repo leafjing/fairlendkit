@@ -45,6 +45,7 @@ class PolicyMetrics:
 @dataclass(frozen=True)
 class BenchmarkResult:
     benchmark_id: str
+    evidence_status: str
     seed: int
     population_size: int
     input_sha256: str
@@ -194,6 +195,7 @@ def run_benchmark(
     tool_metrics = policy_metrics(rows, tool)
     return BenchmarkResult(
         benchmark_id=BENCHMARK_ID,
+        evidence_status="simulation_not_production_evidence",
         seed=seed,
         population_size=population_size,
         input_sha256=_input_sha256(rows),

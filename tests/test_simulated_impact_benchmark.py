@@ -40,6 +40,7 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     result = run_benchmark(repetitions=2)
     payload = json.loads(result.canonical_json())
     assert payload["benchmark_id"] == "fairlendkit-simulated-impact-v1"
+    assert payload["evidence_status"] == "simulation_not_production_evidence"
     assert "Synthetic simulation only" in payload["disclaimer"]
     assert payload["baseline_median_seconds"] >= 0
     assert payload["tool_median_seconds"] >= 0
