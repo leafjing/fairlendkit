@@ -11,7 +11,7 @@ page for each topic; it does not replace the normative contracts.
 - [Frequently asked questions](faq.md)
 - [Limitations and responsible use](limitations.md)
 - [Product roadmap](roadmap.md)
-- [Simulated impact assessment](simulated-impact-assessment.md)
+- [Quantified impact assessment](simulated-impact-assessment.md)
 
 ## Configure and interpret an audit
 
