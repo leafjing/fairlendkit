@@ -17,7 +17,7 @@ from typing import Callable, Sequence
 
 BENCHMARK_ID = "fairlendkit-simulated-impact-v1"
 SCENARIO_ID = "fairlendkit-sim-impact-v1"
-CODE_COMMIT_BASIS = "0000000"
+CODE_COMMIT_BASIS = "961ffbd"
 CODE_COMMIT_BASIS_DEFINITION = (
     "Git commit containing the benchmark generator and contract logic used to "
     "produce this artifact; the later artifact-only commit may differ."
@@ -27,7 +27,10 @@ POPULATION_SIZE = 10_000
 REPETITIONS = 15
 RISK_THRESHOLD = 0.20
 FIXED_CREDIT_AMOUNT_USD = 8_000
-RUN_COMMAND = "PYTHONPATH=src python3 scripts/run_simulated_impact_benchmark.py"
+RUN_COMMAND = (
+    "PYTHONPATH=src python3 scripts/run_simulated_impact_benchmark.py "
+    "--output docs/artifacts/simulated-impact-benchmark-v1.json"
+)
 
 
 @dataclass(frozen=True)
