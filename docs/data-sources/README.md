@@ -18,3 +18,4 @@ Completed content evaluations:
 - [UCI South German Credit](uci-south-german-credit-2020.md)
 - [EIA RECS 2020 v7](eia-recs-2020-v7-evaluation.md)
 - [CTU/Berka PKDD'99 `financial`](ctu-berka-financial-evaluation.md)
+- [CFPB Making Ends Meet](cfpb-making-ends-meet-evaluation.md)
