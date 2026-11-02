@@ -120,11 +120,22 @@ def test_paper2_execution_gate_cannot_compute_dgp_or_statistics():
     assert "paper2.statistics" not in source
 
 
-def test_repository_documentation_does_not_disclose_host_home_paths():
-    forbidden_fragments = ("/home/", "/Users/", "\\Users\\")
+def test_repository_documentation_does_not_disclose_host_archive_paths():
+    host_username = Path.home().name
+    forbidden_fragments = (
+        "/home/",
+        "/Users/",
+        "\\Users\\",
+        "/tmp/",
+        "/var/tmp/",
+        "uci-south-german-credit-live/correspondence/",
+    )
 
     for document_path in Path("docs").glob("**/*.md"):
         document = document_path.read_text()
         assert not any(
             fragment in document for fragment in forbidden_fragments
-        ), f"{document_path} discloses a host-specific home path"
+        ), f"{document_path} discloses a host-specific absolute path"
+        assert host_username not in document, (
+            f"{document_path} discloses the current host username"
+        )
