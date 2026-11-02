@@ -4,11 +4,8 @@ Status: **not authorized for sending**. This checklist freezes the reviewed
 draft identity and the unresolved delivery controls. It is not a send command,
 authorization, network probe, or approval to create an account or public case.
 
-Previously reviewed content baseline:
+Reviewed content baseline:
 `docs/alternative-data-credit-assessment@83bc839a9b9dbff3abcfec463dbab5f24744b23b`.
-The current payload adds the unresolved `522`/`573` relationship question and
-supersedes that baseline; its new identities below require independent review
-before any send authorization.
 
 ## Recipient channel and source evidence
 
@@ -44,8 +41,8 @@ Frozen identities:
 
 - Subject: `South German Credit package response headers, version, and provenance metadata`
 - Subject SHA-256: `811065e2ed3d8d60f13aea3a1af06628d08d2b98c14581da59474abd08cbfc75`
-- Body byte count: `3518`
-- Body SHA-256: `55be8e7481a80c3e59441eb6283dd2f04a41c7d684f74d1fb5ff7e896fd239f4`
+- Body byte count: `3123`
+- Body SHA-256: `55145d11856aa4d6d67174b12fed4c1b77b642cba262b3a904f3c852b6bcb528`
 
 Before any authorized send, an independent reviewer must reproduce both hashes
 from the reviewed commit. Any byte change requires a new content review and a

@@ -38,23 +38,17 @@ which headers a `GET` response would return.
    and publisher-issued checksum (including algorithm and value)? Is the object
    at the official package URL immutable, and, if it can change in place, is
    there an official revision history?
-5. UCI currently exposes dataset identifiers `522` and `573`. What is the
-   relationship between them? Please confirm whether either identifier
-   supersedes, migrates, mirrors, or revises the other, and provide the
-   authoritative version, license, package URL, and publisher checksum for each
-   identifier. We are not treating `573` as a replacement for `522` without
-   your confirmation.
-6. Can you confirm the authoritative ZIP member names and exact uncompressed
+5. Can you confirm the authoritative ZIP member names and exact uncompressed
    sizes? Is there a publisher member manifest or per-member checksum, and may
    future revisions add, remove, or replace members or change the container or
    compression policy?
-7. Can you confirm the authoritative original source/citation and the exact
+6. Can you confirm the authoritative original source/citation and the exact
    semantics of the `good` and `bad` target values, including the observation
    or performance horizon and when the outcome was determined?
-8. Does the repository have additional documentation for the 1973–1975 sample,
+7. Does the repository have additional documentation for the 1973–1975 sample,
    sampling/oversampling procedure, decision or index time, and the provenance
    of the personal-status/sex and age fields?
-9. Beyond the displayed CC BY 4.0 license, are there privacy, re-identification,
+8. Beyond the displayed CC BY 4.0 license, are there privacy, re-identification,
    attribution, automated-analysis, or redistribution restrictions that apply
    to the archive or any member?
 
