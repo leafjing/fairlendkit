@@ -103,6 +103,21 @@ headers; then a new contract, authorization, run ID, and independent approval.
 The existing media-type allowlist is not widened and the consumed Run ID is
 never reused.
 
+## UCI-M2 successor-endpoint evidence
+
+Custice subsequently supplied UCI dataset ID 573, DOI `10.24432/C5QG88`, and
+package `south+german+credit+update.zip`. The metadata-only HEAD evidence is
+recorded in
+[`../investigations/uci-south-german-credit-successor-endpoint-2026-11-02.md`](../investigations/uci-south-german-credit-successor-endpoint-2026-11-02.md).
+The DOI resolves to UCI's dataset 573 update record, so this is a materially new
+endpoint rather than permission to retry the spent dataset-522 Run.
+
+No GET or body read was performed. The dataset-573 package HEAD is reachable but
+again omits media type, length, validators, and checksum. The existing manifest
+therefore remains pinned to dataset 522 and `evidence_incomplete` until an
+independent review decides whether 573 is a successor release and approves a
+new single-use retrieval contract and Run ID.
+
 ## Enablement plan
 
 - Target: `repository` as the first directly included risk-metric benchmark,

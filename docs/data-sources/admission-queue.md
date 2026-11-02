@@ -77,6 +77,11 @@ Every candidate advances through these gates in order:
   independently review a new offline-only Harness revision that records safe
   status/redirect/header-presence evidence before rejecting a response. Only
   then may a new contract, authorization, and Run ID be proposed.
+- Successor endpoint evidence: custice supplied dataset ID 573, DOI
+  `10.24432/C5QG88`, and `south+german+credit+update.zip`. Metadata-only HEAD
+  confirms the official UCI host and DOI chain without reading a body. Treat it
+  as a new endpoint requiring independent supersession and execution review,
+  never as reuse or retry of the spent dataset-522 Run.
 - Q3 must resolve: actual hashes and member/schema identity, unexpected fields,
   direct/quasi-identifier risk, package notices, release-date discrepancy,
   original provenance, label horizon, sampling, and time semantics.
