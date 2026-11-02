@@ -1,9 +1,12 @@
 import pytest
 
 from fairlendkit.research.cfpb_making_ends_meet import (
+    ADMISSION_STATUS,
+    ADOPTED,
     DISPOSITION,
     REDISTRIBUTION,
     SAMPLES,
+    TERMS_STATUS,
     USAGE,
     MakingEndsMeetIntegrityError,
     analysis_columns,
@@ -35,6 +38,9 @@ def test_all_reviewed_samples_validate_as_external_quality_only() -> None:
     assert DISPOSITION == "external_only"
     assert USAGE == "quality_only"
     assert REDISTRIBUTION == "prohibited"
+    assert ADMISSION_STATUS == "evidence_incomplete"
+    assert ADOPTED is False
+    assert TERMS_STATUS == "archived_unverified"
     assert set(SAMPLES) == {1, 3, 4, 5, 6}
 
 

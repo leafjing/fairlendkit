@@ -2,10 +2,13 @@
   "candidate_id": "cfpb-making-ends-meet",
   "release": "sample-specific public-use files; July 2025 user guide",
   "accessed_utc": "2026-11-02T05:12:28Z",
+  "admission_status": "evidence_incomplete",
+  "adopted": false,
   "disposition": "external_only",
-  "usage": "quality_only",
+  "usage": "provisional_quality_only_boundary",
   "publisher_page": "https://www.consumerfinance.gov/data-research/making-ends-meet-survey-data/public-data/",
   "terms": {
+    "status": "archived_unverified",
     "upstream_condition": "A copy of the CFPB agreement must be transmitted to or incorporated into an agreement with any recipient when MEM data are repackaged, modified, or distributed.",
     "project_redistribution": "prohibited",
     "archived_snapshot_url": "https://web.archive.org/web/20260924134643id_/https://www.consumerfinance.gov/data-research/making-ends-meet-survey-data/public-data/",
@@ -121,5 +124,6 @@
     }
   },
   "raw_or_transformed_data_committed": false,
+  "formal_admission": "prohibited_until_active_cfpb_terms_are_verified",
   "redistribution": "prohibited"
 }

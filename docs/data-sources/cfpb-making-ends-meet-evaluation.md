@@ -1,9 +1,10 @@
 # CFPB Making Ends Meet public-use file evaluation
 
 Evaluation date: 2026-11-02; evidence refreshed at `2026-11-02T05:12:28Z`.
-Disposition: `external_only`; permitted project use: `quality_only`. Project
-redistribution is `prohibited`. No raw, sampled, or transformed respondent data
-is committed.
+Admission status: `evidence_incomplete`; this dataset is not formally adopted.
+`external_only + quality_only` is a provisional research boundary, not an
+admission decision. Project redistribution is `prohibited`. No raw, sampled,
+or transformed respondent data is committed.
 
 ## Official artifacts and structure
 
@@ -53,13 +54,18 @@ modified, or distributed data must receive or incorporate the agreement.
 Analyses may not be represented as CFPB views or official government material,
 and the data/output must not be used as the basis for decisions or courses of
 action. Because the live public-data page now redirects to the general research
-page, this evaluation pins the original terms URL, an archived official-page
-snapshot, and its decoded HTML hash alongside every package identity. The
-upstream agreement describes conditions that would apply to a recipient; it is
-not project authorization to distribute. FairLendKit's separate disposition is
-`external_only`, with redistribution prohibited.
+page, this evaluation pins the original terms URL and an archived official-page
+snapshot with its decoded HTML hash. That evidence is
+`terms_status=archived_unverified`: it preserves the historical text but cannot
+replace active CFPB terms or authorize admission. The archived upstream
+agreement describes conditions that would apply to a recipient; it is not
+project authorization to distribute. FairLendKit therefore does not formally
+adopt or redistribute the files. Any retained evaluation is bounded to
+provisional `external_only + quality_only` research pending active-term
+verification.
 
-Suitable uses are weighted aggregate research on financial well-being, bill
+If active CFPB terms are later verified, suitable uses would be weighted
+aggregate research on financial well-being, bill
 payment difficulty, liquidity, survey coverage, attrition, missingness,
 privacy transformations, and proxy pathways. Prohibited uses include individual
 scoring or underwriting, eligibility/adverse-action decisions, reidentification,

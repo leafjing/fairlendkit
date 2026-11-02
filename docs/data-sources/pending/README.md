@@ -39,11 +39,11 @@ documented credit outcome may satisfy the risk-outcome contract.
 2. [Census HTOPS/HPS](census-htops-hps.md)
 3. [EIA RECS 2020 v7](eia-recs-2020-v7.md)
 4. [Census/HUD AHS 2023 PUF](census-ahs-2023-puf.md)
-5. [CTU/Berka PKDD'99 (`external_only` evaluation)](../ctu-berka-financial-evaluation.md)
-6. [CFPB Making Ends Meet (`external_only` evaluation)](../cfpb-making-ends-meet-evaluation.md)
+5. [CFPB Making Ends Meet (active terms unavailable)](cfpb-making-ends-meet.md)
+6. [CTU/Berka PKDD'99 (`external_only` evaluation)](../ctu-berka-financial-evaluation.md)
 7. [UCI South German Credit (dataset 573, adopted quality-only benchmark)](../uci-south-german-credit-2020.md)
 
-Pending records 1–4 remain `evidence_incomplete`. Items 5–7 are listed only to
+Pending records 1–5 remain `evidence_incomplete`. Items 6–7 are listed only to
 route stale discovery to their completed records. Priority controls
 investigation order, not trust, admission, or preferred analytical conclusion.
 

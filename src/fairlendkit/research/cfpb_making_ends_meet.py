@@ -7,6 +7,9 @@ from typing import Mapping, Sequence
 
 DISPOSITION = "external_only"
 USAGE = "quality_only"
+ADMISSION_STATUS = "evidence_incomplete"
+ADOPTED = False
+TERMS_STATUS = "archived_unverified"
 IDENTIFIER_COLUMN = "ID"
 REDISTRIBUTION = "prohibited"
 WEIGHT_STAT_FIELDS = ("missing", "non_finite", "zero", "negative", "minimum", "maximum")
