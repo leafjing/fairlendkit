@@ -4,6 +4,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RELEASE_NOTES = REPO_ROOT / "docs" / "releases" / "v0.1.0rc1.md"
@@ -46,7 +48,14 @@ tag_stub
     assert not tag_marker.exists()
 
 
-def test_each_pr_identity_field_drift_stops_before_merge_stub(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "changed_field",
+    ("headRefOid", "baseRefOid", "reviewDecision", "mergeStateStatus"),
+)
+def test_each_pr_identity_field_drift_stops_before_merge_stub(
+    tmp_path: Path,
+    changed_field: str,
+) -> None:
     text = RELEASE_NOTES.read_text(encoding="utf-8")
     for field in ("headRefOid", "baseRefOid", "reviewDecision", "mergeStateStatus"):
         assert f"jq -r .{field}" in text
@@ -57,12 +66,11 @@ def test_each_pr_identity_field_drift_stops_before_merge_stub(tmp_path: Path) ->
         "reviewDecision": "APPROVED",
         "mergeStateStatus": "CLEAN",
     }
-    for changed_field in expected:
-        payload = dict(expected)
-        payload[changed_field] = "DRIFTED"
-        marker = tmp_path / f"merge-ran-{changed_field}"
-        result = _run_bash(
-            f"""
+    payload = dict(expected)
+    payload[changed_field] = "DRIFTED"
+    marker = tmp_path / f"merge-ran-{changed_field}"
+    result = _run_bash(
+        f"""
 set -euo pipefail
 PR_STATE={json.dumps(json.dumps(payload))}
 test "$(printf '%s' "$PR_STATE" | jq -r .headRefOid)" = reviewed-release-sha
@@ -71,11 +79,11 @@ test "$(printf '%s' "$PR_STATE" | jq -r .reviewDecision)" = APPROVED
 test "$(printf '%s' "$PR_STATE" | jq -r .mergeStateStatus)" = CLEAN
 touch {marker}
 """,
-            tmp_path,
-        )
+        tmp_path,
+    )
 
-        assert result.returncode != 0, changed_field
-        assert not marker.exists(), changed_field
+    assert result.returncode != 0, changed_field
+    assert not marker.exists(), changed_field
 
 
 def test_matching_pr_identity_fields_reach_merge_stub(tmp_path: Path) -> None:
