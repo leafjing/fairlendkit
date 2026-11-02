@@ -85,6 +85,7 @@ relative_gap_reduction = 7 / 12 = 58.3%
 程序化 benchmark 必须输出一个机器可读 artifact，至少包含：
 
 - `scenario_id`、代码 commit、配置摘要、随机种子、运行环境和时间戳；
+- `evidence_class=simulation_not_production_evidence`；
 - 基线与工具流程的 wall-clock 时间、重复次数、均值及离散程度；
 - `baseline_person_hours=80` 与 `tool_assisted_person_hours=32`，并标注为情景
   人工投入假设，而非由 wall-clock 自动推导；
@@ -105,13 +106,17 @@ relative_gap_reduction = 7 / 12 = 58.3%
 对外使用本页数字前必须同时满足：
 
 - benchmark artifact 可由仓库 commit 和固定配置复算；
+- 基线与工具流程使用完全相同的评估样本、标签、时间窗口、风险阈值、
+  额度假设和群体定义；
 - 审查员确认所有数字可由 artifact 或本页公式得到；
 - 风险指标没有恶化，公平性结果不是通过隐藏拒绝、改变分母或删除群体得到；
 - 文案显著包含“模拟”“情景”“估算”，不出现“客户实现”“生产提升”或
   “已创造 280 万美元”等事实性措辞；
 - 外部行业数字有独立来源，不与 FairLendKit 模拟结果混写。
 
-在门禁关闭前，批准状态为 `simulation_only / not_customer_validated`。
+所有输出的证据类别必须是
+`simulation_not_production_evidence`。在门禁关闭前，批准状态为
+`simulation_only / not_customer_validated`。
 
 ## 6. 批准文案
 
