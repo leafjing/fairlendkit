@@ -543,7 +543,7 @@ def authorization_payload(quarantine, audit, now):
         "run_id": "authorized-run-1",
         "issued_at": now.isoformat(),
         "expires_at": (now + harness.timedelta(hours=1)).isoformat(),
-        "candidate_id": "uci-south-german-credit-2019",
+        "candidate_id": "uci-south-german-credit-2020",
         "max_attempts": 1,
         "package_url": harness.PACKAGE_URL,
         "allowed_redirect_host": harness.ALLOWED_HOST,

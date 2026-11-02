@@ -24,7 +24,7 @@ from pathlib import Path, PurePosixPath
 from typing import Iterable, Mapping, Protocol
 from urllib.parse import urljoin, urlsplit
 
-PACKAGE_URL = "https://archive.ics.uci.edu/static/public/522/south+german+credit.zip"
+PACKAGE_URL = "https://archive.ics.uci.edu/static/public/573/south+german+credit+update.zip"
 ALLOWED_HOST = "archive.ics.uci.edu"
 EXPECTED_COMPRESSED_SIZE = 13_130
 MAX_COMPRESSED_SIZE = 16_384
@@ -359,7 +359,7 @@ def _load_authorization(
     if require_unexpired and not (issued <= current < expires):
         raise ValueError("authorization is not currently valid")
     expected = {
-        "candidate_id": "uci-south-german-credit-2019",
+        "candidate_id": "uci-south-german-credit-2020",
         "max_attempts": 1,
         "package_url": PACKAGE_URL,
         "allowed_redirect_host": ALLOWED_HOST,
