@@ -402,6 +402,16 @@ def run_benchmark(
             "candidate_copy_status": (
                 "publishable" if publication_passed else "locked_not_publishable"
             ),
+            "external_summary_candidate": (
+                "在包含10,000名申请人的固定样本量化评估中，FairLendKit按显式流程"
+                "工时假设将后处理工作量由80人时测算为32人时，预计减少60%；评估"
+                "覆盖情景由2,000人扩展至10,000人。固定逐行策略派生出247个新增批准，"
+                "对应2,731,500美元授信机会。"
+            ),
+            "external_summary_footnote": (
+                "结果基于固定样本、流程工时和逐行授信额度，尚未经过客户生产环境"
+                "试点验证；当前候选文案因预设期望未复现而锁定，不得发布。"
+            ),
         },
         data_provenance={
             "identity": "deterministic synthetic applicants generated in repository",

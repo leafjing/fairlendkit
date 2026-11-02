@@ -67,6 +67,14 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     assert payload["publication_gate"]["candidate_copy_status"] == (
         "locked_not_publishable"
     )
+    external_copy = payload["publication_gate"]["external_summary_candidate"]
+    assert "量化评估" in external_copy
+    assert "预计" in external_copy
+    assert "模拟" not in external_copy
+    assert "已实现" not in external_copy
+    assert "尚未经过客户生产环境试点验证" in (
+        payload["publication_gate"]["external_summary_footnote"]
+    )
     assert payload["risk_constraint"]["allowed_absolute_tolerance"] == 0.0
     assert payload["config_summary"]["population_size"] == 10000
     assert "same deterministic" in payload["config_summary"]["evaluation_sample"]

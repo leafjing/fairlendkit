@@ -65,5 +65,11 @@ approved-ID set digests, the synthetic outcome definition and observation
 window, zero risk tolerance, and expected-versus-actual approval and group-gap
 values. Targets are assertions, never inputs to the decision functions.
 
+The internal evidence class remains unchanged. The machine-readable external
+copy candidate uses the reader-facing terms “固定样本量化评估”, “预计”, and
+“测算”, carries a production-pilot disclaimer, and avoids claims of realized
+customer impact. It reports the derived 247 approvals—not the unreproduced
+350-person expectation—and remains locked while the publication gate fails.
+
 The benchmark does not recommend a policy or threshold and does not establish
 fairness, legality, business value, or real-world impact.

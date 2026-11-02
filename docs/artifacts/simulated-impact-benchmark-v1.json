@@ -23,7 +23,7 @@
     "selection_rate_difference": -0.10322645344643361,
     "true_positive_rate": 0.5290599887871426
   },
-  "baseline_median_seconds": 0.000406169,
+  "baseline_median_seconds": 0.000554954,
   "benchmark_id": "fairlendkit-simulated-impact-v1",
   "code_commit_basis": "81891a8",
   "config_summary": {
@@ -62,7 +62,7 @@
     "selection_rate_difference": "comparison selection rate - reference selection rate",
     "true_positive_rate": "approved favorable outcomes / favorable outcomes"
   },
-  "generated_at_utc": "2026-11-02T06:30:48.854709+00:00",
+  "generated_at_utc": "2026-11-02T06:32:30.487498+00:00",
   "group_evidence": {
     "baseline": {
       "comparison": {
@@ -120,6 +120,8 @@
   "population_size": 10000,
   "publication_gate": {
     "candidate_copy_status": "locked_not_publishable",
+    "external_summary_candidate": "在包含10,000名申请人的固定样本量化评估中，FairLendKit按显式流程工时假设将后处理工作量由80人时测算为32人时，预计减少60%；评估覆盖情景由2,000人扩展至10,000人。固定逐行策略派生出247个新增批准，对应2,731,500美元授信机会。",
+    "external_summary_footnote": "结果基于固定样本、流程工时和逐行授信额度，尚未经过客户生产环境试点验证；当前候选文案因预设期望未复现而锁定，不得发布。",
     "passed": false,
     "reason_code": "scenario_expectations_not_reproduced",
     "status": "failed"
@@ -154,16 +156,16 @@
   },
   "runtime_statistics": {
     "baseline": {
-      "mean_seconds": 0.00042170773333333335,
-      "median_seconds": 0.000406169,
+      "mean_seconds": 0.0005513456,
+      "median_seconds": 0.000554954,
       "repetitions": 15,
-      "stdev_seconds": 0.00006442879126542581
+      "stdev_seconds": 0.00004016219856460622
     },
     "tool": {
-      "mean_seconds": 0.0009753916666666667,
-      "median_seconds": 0.000809355,
+      "mean_seconds": 0.0012112332,
+      "median_seconds": 0.001253702,
       "repetitions": 15,
-      "stdev_seconds": 0.00048258656262931826
+      "stdev_seconds": 0.000126351587641221
     }
   },
   "scenario_expectations": {
@@ -188,5 +190,5 @@
     "selection_rate_difference": -0.0999877849323706,
     "true_positive_rate": 0.5658755372827509
   },
-  "tool_median_seconds": 0.000809355
+  "tool_median_seconds": 0.001253702
 }
