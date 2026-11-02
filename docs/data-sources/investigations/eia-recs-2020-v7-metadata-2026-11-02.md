@@ -28,6 +28,52 @@ human-readable candidate version `2020 RECS public microdata v7`, but not an
 immutable publisher release ID or publisher checksum. No DOI or other
 persistent identifier is presented for this file release.
 
+## Population, sample design, weights, and geography
+
+The official page describes RECS as a national sample survey of housing units
+occupied as primary residences and their households. It reports nearly 18,500
+sampled households, statistically selected to represent 123.5 million occupied
+primary-residence housing units. This is a household/housing-unit survey, not a
+census, transaction ledger, utility-account population, or sample of credit
+applicants.
+
+The previously inspected official v7 codebook metadata identifies `DOEID` as a
+respondent identifier, `NWEIGHT` as the final analysis weight, and `NWEIGHT1`
+through `NWEIGHT60` as final analysis replicate weights. Unweighted row counts
+must never be presented as population estimates, and uncertainty must follow
+the official replicate-weight method rather than ordinary unweighted formulas.
+
+This metadata-only pass does not establish an exact allowable public-file
+geography vocabulary. The landing page links separate published state tables,
+but that does not prove the row-level microdata contains state or finer
+geography. Until the codebook and CSV schema are jointly verified after an
+authorized retrieval, no state, county, ZIP-code, address, or tract field may be
+claimed or derived. Any available region/division/climate/urbanicity field must
+be treated as contextual or proxy-sensitive, not precise residence location.
+
+## Sensitive fields and proxy-discrimination boundary
+
+The official description and existing codebook evidence cover household and
+housing characteristics, energy sources and equipment, consumption and
+expenditures, billing coverage, hardship, imputation, demographics, and survey
+weights. These categories can expose or proxy income and socioeconomic status,
+household composition, tenure/housing conditions, age or life stage,
+race/ethnicity where present, disability or health-related energy needs where
+present, geography/climate, and utility access.
+
+`DOEID` is a respondent identifier and must be removed from reports, logs,
+exceptions, fixtures, joins, and exported derived records. Rare combinations of
+demographics, housing, geography, equipment, fuel, hardship, and expenditure
+fields can create singling-out or linkage risk even without names or addresses.
+
+No RECS field may be used to score an individual, infer creditworthiness, train
+or validate an underwriting outcome, or treat energy burden, disconnection
+notices, inability to afford service, fuel choice, missingness, or imputation as
+delinquency/default. Group differences may be reported only as descriptive,
+weighted, uncertainty-qualified `quality_only` evidence with support,
+missingness, imputation, geography, and proxy limitations disclosed. They are
+not findings of unlawful discrimination or causal effects.
+
 ## Fixed endpoint HEAD evidence
 
 Each exact HTTPS endpoint returned `200`, no redirect, and successful TLS
@@ -66,6 +112,14 @@ redistribution path, but manifest and member scope remain `unverified` until a
 controlled retrieval confirms exact files, notices, and absence or handling of
 third-party material. A future attribution should identify EIA, the January
 2024 v7 update, the canonical page, retrieval date, and exact byte hashes.
+
+EIA does not present a formal DOI citation for this release. The proposed
+project attribution, subject to post-retrieval review, is: `Source: U.S. Energy
+Information Administration, Residential Energy Consumption Survey (RECS), 2020
+public microdata v7 (January 2024),
+https://www.eia.gov/consumption/residential/data/2020/index.php?view=microdata,
+accessed 2026-11-02.` This is a project-formatted acknowledgment implementing
+EIA's source/date guidance, not a publisher-issued bibliographic record.
 
 ## Fitness and next gate
 

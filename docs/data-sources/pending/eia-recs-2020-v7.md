@@ -27,6 +27,14 @@ proxy-pathway research. It is not a monthly payment ledger and does not establis
 timeliness, arrears, reversals, interruption, or credit default unless an exact
 official field says so.
 
+The official page describes nearly 18,500 sampled households statistically
+selected to represent 123.5 million U.S. housing units occupied as primary
+residences. Population estimates therefore require `NWEIGHT`, and uncertainty
+requires the 60 replicate weights; unweighted rows are not nationally
+representative estimates. Exact row-level geographic granularity remains
+unverified. Separate EIA state tables do not establish that state or finer
+geography exists in the public microdata.
+
 Required evidence: terms, attribution, redistribution and automated-access
 review, file size/hash, field/imputation/replicate-weight matrix, reference and
 release times, and a `quality_only` approved-use record.
@@ -113,6 +121,14 @@ weights, or publish uncertainty estimates.
 Any future admission is `quality_only` by default. Permitted research claims
 are limited to utility-data coverage, energy expenditure/consumption quality,
 imputation prevalence, weighted representation, and coverage differences.
+
+Demographics, income/socioeconomic context, household composition, housing and
+tenure, geography/climate, energy equipment/fuels, hardship, consumption, and
+expenditures can form protected-class or socioeconomic proxies and rare linkage
+combinations. `DOEID` must never appear in outputs or joins. RECS must not be
+used for individual scoring, underwriting, creditworthiness inference, or a
+claim of causal or unlawful discrimination; group analysis must remain
+descriptive, weighted, support-qualified, and explicit about proxy pathways.
 
 `SCALEE`, `NOHEATEL`, `NOHEATNG`, and related hardship fields may support
 clearly labeled survey-based coverage or hardship analysis. They are not loan
