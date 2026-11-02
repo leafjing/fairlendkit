@@ -64,6 +64,14 @@ task. The same snapshot measured 1,079,680 live rows versus the page's
 `2026-11-02T04:48:28Z`, confirming the need for access-time snapshot hashes.
 These measurements are pending independent review of that commit.
 
+The final superseding implementation `25ccbd0` applies the strict cutoff
+`trans.date < loan.date`: 17,621 eligible pre-loan transactions across all 234
+finished loans, 55 same-day transactions across 40 finished loans, and 73,013
+post-loan transactions across all 234 finished loans. Same-day and post-loan
+transactions are excluded. Its adjacent manifest fixes the schema SHA-256,
+total shape, and every table's shape and canonical SHA-256; any drift fails
+closed. No raw or transformed row was committed.
+
 The live CTU page is an authoritative current access route, but it offers a
 live MariaDB export rather than an immutable package and states no explicit
 dataset license or redistribution grant. Public access does not establish

@@ -69,15 +69,53 @@ CTU explicitly warns that ignoring time causes target leakage: future
 transaction balances can perfectly separate good and bad loans, and loan date
 plus duration can distinguish finished from unfinished loans relative to
 1999-01-01. Any FairLendKit use must enforce an as-of boundary at `loan.date`,
-exclude post-start transactions and outcome-derived fields, and document label
-maturity. This is potentially relevant to historical cash-flow/risk research,
-but only after table-level temporal and linkage review.
+exclude same-day and post-start transactions plus outcome-derived fields, and
+document label maturity. Because the source records dates without decision-time
+timestamps, the fail-closed rule is strictly `trans.date < loan.date`, never
+`<=`. This is potentially relevant to historical cash-flow/risk research, but
+only after table-level temporal and linkage review.
+
+The final implementation evidence in
+`feat/ctu-berka-financial-evaluation@25ccbd0` records 17,621 strictly pre-loan
+transactions across all 234 finished loans, 55 same-day transactions across 40
+finished loans, and 73,013 post-loan transactions across all 234 finished
+loans. The same-day 55 and post-loan 73,013 are excluded from every feature
+snapshot.
 
 The commonly documented relational entities are accounts, clients,
 dispositions, districts, cards, orders, transactions, and loans. Exact current
 columns, types, keys, nulls, code domains, dates, currency units, and row counts
 must be verified from the selected CTU variant; historical descriptions or
 third-party mirrors must not be treated as the live schema.
+
+## Final snapshot-integrity evidence
+
+The `25ccbd0` manifest fixes schema SHA-256
+`cd494eba2b2b80aaaf74ca0c32bb3d43ea76bff87d7a12976ed89c451c8ae129`, total
+shape `1,079,680 x 55`, and these per-table shapes and canonical SHA-256 values:
+
+- `account`: `4,500 x 4`,
+  `75968bd956668686bee3c0862737978dbaa5e80e3bcbe4a384236fa4ff9ea75a`;
+- `card`: `892 x 4`,
+  `51cc2d890df840d50b66525281fc1a9492445934e902ab672f899b2e780e7b09`;
+- `client`: `5,369 x 4`,
+  `0dc07b5120bcd726cdc6b2d9c229d14dd7ea02e97a1c454c5fb19e26e2510178`;
+- `disp`: `5,369 x 4`,
+  `ccb76a4d1b5255b8eb8c2d98ff45487f74eec4169e0a671a109c20eac7bfaaeb`;
+- `district`: `77 x 16`,
+  `9d85a1bd8f7a0fcd85c238f3fc805ed4d65cd6420eb7fe0c259627dc7380c705`;
+- `loan`: `682 x 7`,
+  `a2c331ee1a4f1bd97e4e6c56e431a805b97a18d3b4d443af15244510bae64d2f`;
+- `order`: `6,471 x 6`,
+  `9b88d5bbdc6534cd630fea9fa311aa3fd931a43fd73916f9f5c429d202b8af0a`;
+  and
+- `trans`: `1,056,320 x 10`,
+  `7d7498d12f57d39b3c7d7e1e02c95321e3324fa97f008093b35e1f46f29eb3a0`.
+
+Canonical hashes use UTF-8 JSON Lines, a canonical schema line, primary-key row
+order, ISO-8601 dates, exact decimal strings, and JSON nulls. The implementation
+fails closed on any schema hash, total shape, table shape, or table hash drift.
+These are project snapshot hashes, not publisher-issued release identifiers.
 
 ## License, privacy, and permitted-use determination
 
