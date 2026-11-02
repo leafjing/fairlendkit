@@ -77,13 +77,16 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
     external_copy = payload["publication_gate"]["external_summary_candidate"]
     assert "量化影响评估（固定样本情景测算）" in external_copy
     assert "预设流程工时假设" in external_copy
-    assert "分别估算为80和32人时" in external_copy
+    assert "分别估算为{{baseline_person_hours}}和{{tool_person_hours}}人时" in external_copy
     assert "预计" in external_copy
     assert "模拟" not in external_copy
     assert "已实现" not in external_copy
-    assert "247个新增批准" in external_copy
-    assert "测算可支持" in external_copy
-    assert "1,976,000美元" in external_copy
+    assert "{{population_size}}" in external_copy
+    assert "{{baseline_person_hours}}" in external_copy
+    assert "247" not in external_copy
+    assert "1,976,000" not in external_copy
+    assert "12个" not in external_copy
+    assert "5个" not in external_copy
     assert "尚未经过客户生产环境试点验证" in (
         payload["publication_gate"]["external_summary_footnote"]
     )

@@ -67,11 +67,9 @@ window, zero risk tolerance, and expected-versus-actual approval and group-gap
 values. Targets are assertions, never inputs to the decision functions.
 
 The internal evidence class remains unchanged. The machine-readable external
-copy candidate uses the reader-facing terms “固定样本量化评估”, “预计”, and
-“测算”, carries a production-pilot disclaimer, and avoids claims of realized
-customer impact. It reports the derived 247 approvals—not the unreproduced
-350-person expectation—and remains locked while the publication gate fails.
-The exact machine-readable state is `locked_pending_evidence`.
+copy candidate is a placeholder-only template carrying a production-pilot
+disclaimer. It contains no derived or expected result numbers while any gate
+fails. The exact machine-readable state is `locked_pending_evidence`.
 
 The candidate describes 80 and 32 person-hours as separate estimates under a
 predeclared workflow-effort assumption; it does not say observed work “fell”
