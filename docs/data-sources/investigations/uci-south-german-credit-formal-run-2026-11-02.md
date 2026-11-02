@@ -4,8 +4,10 @@ Status: failed closed; no source bytes retained and no admission granted.
 
 ## Execution identity
 
-- Candidate: `uci-south-german-credit-2019`, repointed to official UCI dataset
-  573 by the approved metadata chain
+- Repository candidate: `uci-south-german-credit-2019`, repointed to official
+  UCI dataset 573 by the approved metadata chain
+- Authorization candidate: `uci-south-german-credit-2020`; this does not match
+  the repository candidate identity
 - Package URL:
   <https://archive.ics.uci.edu/static/public/573/south+german+credit+update.zip>
 - Run ID: `uci573-formal-20261102t041415z-fe6d427`
@@ -20,6 +22,11 @@ Status: failed closed; no source bytes retained and no admission granted.
 - Harness-test SHA-256:
   `e99164ee49d888165cdd0dc22d92305e5c185d7936eaa05de53d8aba8f07ecfc`
 - Maximum attempts: one
+
+The authorization artifact existed, but it did not make this a validly approved
+execution. Harness commit `fe6d427` had already been rejected and explicitly
+prohibited from execution before the Run. The execution therefore violated the
+review gate. The candidate-ID mismatch above is a separate identity failure.
 
 The authorization bound HTTPS and the single UCI host, maximum five redirects,
 an exact expected compressed size of 13,130 bytes, a 16,384-byte streamed
@@ -46,9 +53,11 @@ allowed response media types were `application/zip`,
 - Retained uncompressed bytes: zero
 
 The Run ID is permanently consumed. It must not be retried, amended, or used to
-claim a completed retrieval. Because no archive survived the fail-closed media-
-type check, there is no formal ZIP SHA-256, member list, member size, or member
-hash to add to the pending manifest.
+claim a completed or authorized retrieval. Because the rejected Harness was
+executed contrary to the review gate, the authorization candidate did not match
+the repository candidate, and no archive survived the fail-closed media-type
+check, there is no formal ZIP SHA-256, member list, member size, or member hash
+to add to the pending manifest.
 
 ## Admission consequence
 

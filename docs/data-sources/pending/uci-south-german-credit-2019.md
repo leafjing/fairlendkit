@@ -118,13 +118,21 @@ reviewed.
 
 ## UCI-M3 formal dataset-573 Harness Run
 
-The separately authorized dataset-573 Harness Run
+The dataset-573 Harness Run
 `uci573-formal-20261102t041415z-fe6d427` was executed once on 2026-11-02. It
 failed closed before retaining the archive because the final response omitted
 an authorized ZIP media type. The recorded lifecycle is
 `prepared -> started -> failed -> cleaned`; cleanup completed, the remaining
 bytes state is `absent`, quarantine is empty, and the permanent `.spent` marker
 prevents reuse.
+
+An authorization file existed, but the Harness commit `fe6d427` had already
+been rejected and explicitly prohibited from execution. Running it violated
+the review gate. The authorization also named candidate
+`uci-south-german-credit-2020`, while this repository's approved single
+candidate identity remains `uci-south-german-credit-2019` repointed to dataset
+573. That mismatch independently prevents the Run from serving as admission
+evidence.
 
 The authorization, audit, and `.spent` identities and the exact failure are
 recorded in
