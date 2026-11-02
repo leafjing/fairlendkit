@@ -53,8 +53,10 @@ Checked 2026-11-01 without retrieving any dataset or mirror content:
 The 2026-11-02 current-source investigation is recorded in
 [`../investigations/ctu-berka-pkdd-1999-metadata-2026-11-02.md`](../investigations/ctu-berka-pkdd-1999-metadata-2026-11-02.md).
 It identifies the live CTU FEL repository page, its three transformed variants,
-8-table/1,090,086-row/55-column metadata, 682 finished-loan instances, the
-606/76 A/B label split, and CTU's explicit temporal-leakage warning.
+8-table/1,090,086-row/55-column metadata, 682 total loan instances, CTU's
+overall 606 successful / 76 unsuccessful summary, and its explicit temporal-
+leakage warning. Actual A/B/C/D counts remain unverified; the overall summary
+must not be represented as the A/B-only distribution.
 
 The live CTU page is an authoritative current access route, but it offers a
 live MariaDB export rather than an immutable package and states no explicit

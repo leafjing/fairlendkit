@@ -45,13 +45,16 @@ authoritative substitutes.
 
 CTU describes `Financial` as a real relational dataset with 8 tables,
 1,090,086 rows, 55 columns, missing values, numeric/string/temporal types, 682
-loan instances, target table `loan`, target column `status`, target identifier
+total loan instances, target table `loan`, target column `status`, target identifier
 `account_id`, and target timestamp `date`.
 
 The standard task is restricted to finished loans: predict `A` versus `B` at
-loan start. CTU reports 606 successful and 76 unsuccessful finished loans. `C`
-and `D` are unfinished-loan states and must not be silently combined with the
-finished-loan task.
+loan start. Separately, CTU summarizes the full 682-loan dataset as 606
+successful and 76 unsuccessful loans. The page does not establish that this
+overall summary is the A/B-only distribution. Actual A/B/C/D row counts and
+their relationship to the 606/76 summary remain `unverified` pending content
+evaluation. `C` and `D` are unfinished-loan states and must not be silently
+combined with the finished-loan task.
 
 CTU explicitly warns that ignoring time causes target leakage: future
 transaction balances can perfectly separate good and bad loans, and loan date
