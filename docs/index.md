@@ -41,6 +41,7 @@ page for each topic; it does not replace the normative contracts.
 - [Alternative-data release-candidate evidence](alternative-data-release-candidate.md)
 - [FairLendKit 0.1.0rc1 release notes](releases/v0.1.0rc1.md)
 - [Citation and research relationship](citation-and-research.md)
+- [Fairlearn and Aequitas interoperability comparison](research/fairlearn-aequitas-comparison.md)
 - [Repository discoverability decisions](discoverability-audit.md)
 - [Technical discovery configuration and site templates](repository-discoverability-config.md)
 
