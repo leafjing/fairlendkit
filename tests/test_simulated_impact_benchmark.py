@@ -51,6 +51,16 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
         "tool.approved_credit - baseline.approved_credit"
     )
     assert payload["runtime_environment"]["timer"] == "time.perf_counter_ns"
+    assert payload["scenario_id"] == "fairlendkit-sim-impact-v1"
+    assert payload["analyst_effort_scenario"]["baseline_person_hours"] == 80
+    assert payload["analyst_effort_scenario"]["tool_assisted_person_hours"] == 32
+    assert payload["review_coverage_scenario"]["baseline_people"] == 2000
+    assert payload["review_coverage_scenario"]["tool_people"] == 10000
+    assert payload["risk_constraint"]["passed"] is True
+    assert payload["constraint_status"] == "passed"
+    assert payload["reason_code"] == "constraints_passed"
+    assert payload["group_evidence"]["tool"]["reference"]["sample_size"] > 0
+    assert payload["group_evidence"]["tool"]["comparison"]["sample_size"] > 0
 
 
 def test_checked_in_artifact_matches_deterministic_result():
@@ -64,6 +74,8 @@ def test_checked_in_artifact_matches_deterministic_result():
         "baseline_median_seconds",
         "tool_median_seconds",
         "runtime_environment",
+        "runtime_statistics",
+        "generated_at_utc",
     ):
         result.pop(runtime_field)
         artifact.pop(runtime_field)
