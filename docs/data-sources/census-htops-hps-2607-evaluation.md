@@ -14,6 +14,16 @@ Both CSVs contain 12,755 rows with no duplicates. Exact sizes, SHA-256 values,
 ordered schemas, and the dictionary-derived special-code mapping are pinned in
 the adjacent manifest and evidence JSON. No respondent rows are committed.
 
+The October 30 user note postdates the September 10 ZIP. It reports errors in
+the published Health1 and Housing3 tables, while its incorporated October 7
+notice reports an error in Transportation3. All three affected products are
+summary tables, and the note explicitly states that the underlying PUF is not
+affected. The note therefore does not authorize or require substituting new PUF
+bytes; this evaluation remains pinned to the September 10 ZIP hash. It also
+warns that July race/ethnicity fields changed with the questionnaire and that
+some variables were recoded for disclosure avoidance, reinforcing the ban on
+silent cross-wave pooling or comparisons without wave-specific dictionaries.
+
 `SCRAMID` is non-null and unique, and its row order agrees between the main and
 replicate files. It is used only for local integrity joining and is prohibited
 from features, outputs, logs, fixtures, and cross-wave/source linkage.

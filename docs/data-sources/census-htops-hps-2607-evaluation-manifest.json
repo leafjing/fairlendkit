@@ -18,6 +18,15 @@
     "bytes": 20037422,
     "sha256": "43980716428de1b6e2a215973f31b0f0a0af4317107a97ef889dbf569d207a31"
   },
+  "user_note": {
+    "url": "https://www2.census.gov/programs-surveys/demo/technical-documentation/hhp/2607_HTOPS_Household_Pulse_User_Notes_10302026.pdf",
+    "filename": "2607_HTOPS_Household_Pulse_User_Notes_10302026.pdf",
+    "bytes": 283812,
+    "sha256": "186816441c17c109e35b8916c7bea31a0d22336bec98256af6f8b4408ce2d0c8",
+    "last_modified_utc": "2026-10-30T16:00:27Z",
+    "puf_effect": "none; the note explicitly states that the underlying PUF is not affected",
+    "affected_published_tables": ["Health1", "Housing3", "Transportation3"]
+  },
   "members": {
     "HTOPS_HPS_2607_PUF Data Dictionary_CSV.xlsx": {"bytes": 32197, "sha256": "f91b0509a92e00218c8c59aa61237b5b494641860af5e72fc9e30143d9590585"},
     "HTOPS_HPS_2607_PUF.csv": {"bytes": 16050806, "sha256": "cfc4fc46d15be4b61c0ee924e9b881b3fb742cd668270b3bd532efe5b5a6c380", "rows": 12755, "columns": 255, "schema_sha256": "a0c1a98b9695c414fe2d5f415e0b7fc8c92e2cc0af739d09eef9f452cdb62c3d"},

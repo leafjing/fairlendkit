@@ -22,6 +22,7 @@ EXPECTED = {
     "main_sha256": "cfc4fc46d15be4b61c0ee924e9b881b3fb742cd668270b3bd532efe5b5a6c380",
     "replicate_sha256": "10b15223c98ee185a3025290e64819841885571ad46099c399fde6e3f48eebf6",
     "dictionary_sha256": "f91b0509a92e00218c8c59aa61237b5b494641860af5e72fc9e30143d9590585",
+    "user_note_sha256": "186816441c17c109e35b8916c7bea31a0d22336bec98256af6f8b4408ce2d0c8",
     "main_schema_sha256": "a0c1a98b9695c414fe2d5f415e0b7fc8c92e2cc0af739d09eef9f452cdb62c3d",
     "replicate_schema_sha256": "4e7594ebcd61d5b505ba01fabccca8d121593df0c5d37b9d01383e7a2dc49e0d",
     "special_rules_sha256": "0a9c58ae2434eef53ce3e7828b554d7b65f632afbfd299166681560b08c09c03",
@@ -78,7 +79,7 @@ def validate_summary(**evidence: object) -> None:
     """Fail closed unless every aggregate equals the reviewed official package."""
     for key in (
         "rows", "main_columns", "replicate_columns", "archive_sha256", "main_sha256",
-        "replicate_sha256", "dictionary_sha256", "main_schema_sha256",
+        "replicate_sha256", "dictionary_sha256", "user_note_sha256", "main_schema_sha256",
         "replicate_schema_sha256", "special_rules_sha256", "base_weights",
         "replicate_weights", "imputation", "special_counts",
     ):
