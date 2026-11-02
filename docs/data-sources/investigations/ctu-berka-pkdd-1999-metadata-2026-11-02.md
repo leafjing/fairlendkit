@@ -1,0 +1,130 @@
+# CTU-M1 — Berka PKDD'99 Financial metadata evidence
+
+Status: official-page and metadata-only investigation. No database connection,
+SQL export, mirror download, row read, admission, promotion, or redistribution
+approval was performed.
+
+- Candidate: `ctu-berka-pkdd-1999`
+- Observation date: `2026-11-02`
+- Current institutional page:
+  <https://relational.fel.cvut.cz/dataset/Financial>
+- Repository owner context: CTU Prague Faculty of Electrical Engineering
+- Historical source linked by CTU:
+  <https://web.archive.org/web/20180506061559/http://lisp.vse.cz/pkdd99/Challenge/chall.htm>
+- CTU repository citation page: <https://relational.fel.cvut.cz/about>
+
+## Source authority and version identity
+
+The CTU Relational Learning Repository page is live over HTTPS and returned
+`200`, no redirect, and successful TLS verification. The repository identifies
+itself as a CTU-hosted collection offered to the relational machine-learning
+community and lists a current institutional contact and authors on its contact
+page.
+
+The dataset page identifies three repository transformations:
+
+- `Financial`, by Jan Motl, with foreign keys added and Czech birth-number data
+  split into date of birth and gender;
+- `Financial_ijs`, by Janez Kranjc; and
+- `Financial_std`, by Oliver Schulte.
+
+The page does not expose an immutable release number, publication timestamp,
+file URL, byte size for an export, checksum, or snapshot identifier. It serves a
+live MariaDB database and instructs users to export a chosen database. Therefore
+the exact candidate version must remain unresolved until an export records the
+database variant, UTC time, schema, row counts, and byte/table hashes. The
+repository's displayed `78.8 MB` is database metadata, not a promised export
+size.
+
+The historical VŠE challenge and the former `relational.fit.cvut.cz` address do
+not currently resolve. The live institutional endpoint is
+`relational.fel.cvut.cz`; mirrors on GitHub, Kaggle, or elsewhere are not
+authoritative substitutes.
+
+## Structure, task, and temporal semantics
+
+CTU describes `Financial` as a real relational dataset with 8 tables,
+1,090,086 rows, 55 columns, missing values, numeric/string/temporal types, 682
+loan instances, target table `loan`, target column `status`, target identifier
+`account_id`, and target timestamp `date`.
+
+The standard task is restricted to finished loans: predict `A` versus `B` at
+loan start. CTU reports 606 successful and 76 unsuccessful finished loans. `C`
+and `D` are unfinished-loan states and must not be silently combined with the
+finished-loan task.
+
+CTU explicitly warns that ignoring time causes target leakage: future
+transaction balances can perfectly separate good and bad loans, and loan date
+plus duration can distinguish finished from unfinished loans relative to
+1999-01-01. Any FairLendKit use must enforce an as-of boundary at `loan.date`,
+exclude post-start transactions and outcome-derived fields, and document label
+maturity. This is potentially relevant to historical cash-flow/risk research,
+but only after table-level temporal and linkage review.
+
+The commonly documented relational entities are accounts, clients,
+dispositions, districts, cards, orders, transactions, and loans. Exact current
+columns, types, keys, nulls, code domains, dates, currency units, and row counts
+must be verified from the selected CTU variant; historical descriptions or
+third-party mirrors must not be treated as the live schema.
+
+## License, privacy, and permitted-use determination
+
+The live dataset, repository About page, and Contact page provide public access
+and a repository citation, but no explicit dataset license, copyright grant,
+commercial-use permission, redistribution permission, or terms covering the
+underlying anonymous bank data. Public MariaDB access is evidence of
+availability, not a license. No Creative Commons or public-domain status may be
+inferred.
+
+Consequently:
+
+- research evaluation against the institutional live source may proceed under
+  the architect's instruction;
+- raw or transformed source rows must not be committed or redistributed;
+- the disposition cannot be `repository` without an explicit rights basis;
+- any retained artifact must remain outside the repository and be minimized;
+  and
+- if suitable technically, the maximum defensible disposition is
+  `external_only` pending license/rightsholder confirmation.
+
+The dataset contains longitudinal individual banking relationships and
+transactions. Even if direct identifiers were transformed, account/client
+keys, dates, locations/district attributes, birth-derived age/gender, balances,
+amounts, transaction patterns, cards, loans, and rare relationship combinations
+create substantial linkage and singling-out risk. Identifiers must be used only
+for isolated relational integrity, never logged, exported, cross-source linked,
+or treated as model features without a reviewed derivation. Gender, age,
+geography, account history, product use, and transaction patterns are sensitive
+or proxy-sensitive and must not support production scoring or causal/legal
+discrimination conclusions.
+
+## Citation
+
+CTU's About page supplies this repository citation:
+
+```bibtex
+@misc{motl2024ctupraguerelationallearning,
+  title={The CTU Prague Relational Learning Repository},
+  author={Jan Motl and Oliver Schulte},
+  year={2024},
+  eprint={1511.03086},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG},
+  url={https://arxiv.org/abs/1511.03086}
+}
+```
+
+A future analysis must cite both the CTU repository record and the original
+PKDD'99 challenge provenance linked by CTU, plus the selected variant, access
+date, and project-computed snapshot hashes. This is not evidence that the CTU
+article grants rights in the underlying bank data.
+
+## Handoff
+
+The candidate is technically promising but rights-limited. Content evaluation
+should verify the exact CTU `Financial` variant, schema, hashes, time boundary,
+loan-status domain, currency/date semantics, identifiers, and privacy risk. A
+suitable result should be recorded as `external_only` and `quality_only` or a
+narrow historical-risk benchmark unless explicit license evidence is obtained.
+An unsuitable result should record the concrete provenance, privacy, leakage,
+or schema reason and move to CFPB Making Ends Meet.

@@ -3,18 +3,23 @@
 - Candidate ID: `ctu-berka-pkdd-1999`
 - Priority: 1
 - Review status: `evidence_incomplete`
-- Publisher/legal entity: attributed to Petr Berka / Czech academic sources;
-  current authoritative publisher must be confirmed
-- Publisher class: university, pending confirmation
+- Publisher/legal entity: CTU Prague Relational Learning Repository for the
+  current transformed database; original PKDD'99 rights remain unverified
+- Publisher class: university repository
+- Current institutional page:
+  <https://relational.fel.cvut.cz/dataset/Financial>
 - Historical landing page:
   <https://sorry.vse.cz/~berka/challenge/pkdd1999/berka.htm> was unreachable on
   2026-11-01
-- Exact release/version: PKDD'99 discovery challenge dataset, unverified package
+- Exact release/version: CTU variants `Financial`, `Financial_ijs`, and
+  `Financial_std`; no immutable release or export snapshot is published
 - License/redistribution: no official license text verified
-- Decision: none; download and redistribution prohibited pending verification
-- Trust tier: `untrusted` pending an authoritative current source
+- Decision: none; content evaluation authorized, but repository inclusion and
+  redistribution prohibited pending an explicit rights basis
+- Trust tier: B for current CTU source authority; underlying-data rights and
+  immutable snapshot identity remain unverified
 
-Published descriptions characterize relational banking records such as accounts,
+The current CTU page characterizes relational banking records such as accounts,
 transactions, loans, orders, cards, clients, and districts. This makes it a
 potential cash-flow and credit-outcome source, but third-party mirrors are not
 authoritative and no mirror may be downloaded under this record.
@@ -45,13 +50,18 @@ Checked 2026-11-01 without retrieving any dataset or mirror content:
 - the historical `sorry.vse.cz` and `lisp.vse.cz` hosts did not resolve in the
   current check.
 
-These records establish an institutional connection and two official inquiry
-routes, not an authoritative package. No current VŠE/CTU archive, package
-identity, dictionary, license, redistribution permission, checksum, or privacy
-terms were located. A web archive, GitHub repository, Kaggle entry, or other
-mirror may help locate former filenames, but none may supply authoritative
-metadata or bytes for admission. The candidate therefore remains
-`evidence_incomplete`, with no manifested release and no download authorization.
+The 2026-11-02 current-source investigation is recorded in
+[`../investigations/ctu-berka-pkdd-1999-metadata-2026-11-02.md`](../investigations/ctu-berka-pkdd-1999-metadata-2026-11-02.md).
+It identifies the live CTU FEL repository page, its three transformed variants,
+8-table/1,090,086-row/55-column metadata, 682 finished-loan instances, the
+606/76 A/B label split, and CTU's explicit temporal-leakage warning.
+
+The live CTU page is an authoritative current access route, but it offers a
+live MariaDB export rather than an immutable package and states no explicit
+dataset license or redistribution grant. Public access does not establish
+rights. The candidate therefore remains `evidence_incomplete`; repository
+redistribution is prohibited and the maximum provisional disposition is
+`external_only` pending rights confirmation.
 
 ## Enablement plan
 

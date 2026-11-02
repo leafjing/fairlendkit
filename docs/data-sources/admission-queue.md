@@ -200,20 +200,23 @@ dictionary, and relevant utility semantics are the strongest after UCI.
 ### 7. CTU/Berka PKDD'99 financial dataset
 
 - Candidate: [`ctu-berka-pkdd-1999`](pending/ctu-berka-pkdd-1999.md)
-- Current gate: Q0, no manifestable authoritative release.
-- Evidence ready: current VŠE institutional/author connection and official
-  research-data inquiry routes only.
+- Current gate: live CTU source and schema metadata verified. The institutional
+  endpoint exposes a live MariaDB database with no immutable export identity,
+  checksum, or explicit underlying-data license; content evaluation may proceed
+  but repository redistribution remains prohibited.
+- Evidence ready: live CTU institutional source, three named repository
+  variants, database/table/row/column metadata, task and label definition,
+  temporal-leakage warning, repository citation, and official contact route.
 - Potential use: historical relational cash-flow/credit research if and only if
   authoritative provenance, dictionary, rights, privacy, and outcome semantics
   are recovered.
-- Blocking before Q1: current author/rightsholder-controlled archive, package
-  identity, official codebook/member list, license, redistribution/automation
-  permission, checksums, label horizon, currency/time semantics, and privacy
-  review. Historical dead hosts and third-party mirrors are not source evidence.
-- Next action: separately authorize one institutional inquiry to the verified
-  author/VŠE library routes. No mirror download or reconstructed manifest.
-- Required bespoke retrieval: cannot be designed until an authoritative package
-  and rights holder are established.
+- Blocking before repository admission: immutable export identity, exact live
+  schema and hashes, explicit license/redistribution permission, label horizon,
+  currency/time semantics, and privacy review. Historical dead hosts and
+  third-party mirrors are not source evidence.
+- Next action: evaluate the official CTU `Financial` database directly; retain
+  no unnecessary source rows and do not redistribute. If technically suitable,
+  record `external_only` unless explicit rights evidence is obtained.
 
 CTU/Berka ranks last by evidence maturity, not research value. If provenance or
 rights cannot be made authoritative, it remains `evidence_incomplete` or is
