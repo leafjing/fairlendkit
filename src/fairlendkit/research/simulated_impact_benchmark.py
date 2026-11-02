@@ -540,7 +540,7 @@ def run_benchmark(
             "status": "passed" if publication_passed else "failed",
             "reason_code": publication_reason,
             "candidate_copy_status": (
-                "publishable" if publication_passed else "locked_pending_evidence"
+                "publishable" if publication_passed else "locked_not_publishable"
             ),
             "external_summary_candidate": (
                 "在包含{{population_size}}名申请人的量化影响评估（固定样本情景测算）"

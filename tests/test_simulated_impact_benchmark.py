@@ -77,7 +77,7 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
         "impact_expectations_not_met"
     )
     assert payload["publication_gate"]["candidate_copy_status"] == (
-        "locked_pending_evidence"
+        "locked_not_publishable"
     )
     external_copy = payload["publication_gate"]["external_summary_candidate"]
     assert "量化影响评估（固定样本情景测算）" in external_copy
