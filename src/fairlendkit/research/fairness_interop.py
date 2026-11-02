@@ -21,6 +21,31 @@ ExecutionStatus = Literal[
     "execution_succeeded",
 ]
 
+_EXECUTION_EVIDENCE: dict[ExecutionStatus, dict[str, str]] = {
+    "not_executed": {
+        "reason_code": "external_not_executed",
+        "evidence_status": "synthetic_semantic_spike_external_not_executed",
+        "command_status": "planned_not_executed",
+    },
+    "dependency_identity_mismatch": {
+        "reason_code": "dependency_identity_mismatch",
+        "evidence_status": "synthetic_semantic_spike_dependency_identity_mismatch",
+        "command_status": "blocked_identity_mismatch",
+    },
+    "execution_failed": {
+        "reason_code": "external_execution_failed",
+        "evidence_status": "synthetic_semantic_spike_external_execution_failed",
+        "command_status": "execution_failed",
+    },
+    # This dependency-free spike cannot supply raw external output. A caller
+    # claiming success therefore remains fail closed until output validation.
+    "execution_succeeded": {
+        "reason_code": "external_output_invalid",
+        "evidence_status": "synthetic_semantic_spike_external_output_invalid",
+        "command_status": "invalid_or_missing_output",
+    },
+}
+
 PACKAGE_IDENTITIES = {
     "fairlearn": {
         "package": "fairlearn",
@@ -125,24 +150,13 @@ def _auc_contract_cases() -> list[dict[str, object]]:
 
 
 def _execution_record(tool: str, status: ExecutionStatus) -> dict[str, object]:
-    if status not in {
-        "not_executed",
-        "dependency_identity_mismatch",
-        "execution_failed",
-        "execution_succeeded",
-    }:
+    if status not in _EXECUTION_EVIDENCE:
         raise ValueError("unsupported execution status")
-    reason_by_status = {
-        "not_executed": "external_not_executed",
-        "dependency_identity_mismatch": "dependency_identity_mismatch",
-        "execution_failed": "external_execution_failed",
-        # No raw output is supplied by this dependency-free spike, so even a
-        # forged success status remains fail closed.
-        "execution_succeeded": "external_output_invalid",
-    }
+    evidence = _EXECUTION_EVIDENCE[status]
     return {
         "execution_status": status,
-        "reason_code": reason_by_status[status],
+        "evidence_status": evidence["evidence_status"],
+        "reason_code": evidence["reason_code"],
         "expected_package_identity": PACKAGE_IDENTITIES[tool],
         "identity_verified": False,
         "command": [
@@ -154,7 +168,7 @@ def _execution_record(tool: str, status: ExecutionStatus) -> dict[str, object]:
             "--input",
             "fixed-synthetic-v1",
         ],
-        "command_status": "planned_not_executed",
+        "command_status": evidence["command_status"],
         "exit_status": None,
         "stdout_sha256": None,
         "stderr_sha256": None,
@@ -193,15 +207,20 @@ def build_interop_artifact(
         for reason in (
             "dependency_identity_mismatch",
             "external_execution_failed",
-            "external_not_executed",
             "external_output_invalid",
+            "external_not_executed",
         )
         if reason in reasons
+    )
+    top_evidence_status = next(
+        record["evidence_status"]
+        for record in external.values()
+        if record["reason_code"] == top_reason
     )
     artifact: dict[str, Any] = {
         "artifact_schema": "fairlendkit.fairness_interop_spike.v2",
         "evidence_class": "external_interoperability_spike_not_production_validation",
-        "evidence_status": "synthetic_semantic_spike_external_not_executed",
+        "evidence_status": top_evidence_status,
         "constraint_status": "failed",
         "reason_code": top_reason,
         "candidate_copy_status": "locked_research_only",
@@ -238,15 +257,17 @@ def build_interop_artifact(
                     "execution_status": fairlearn_status,
                     "normalized_value": None,
                     "value_match": None,
-                    "reason_code": "external_not_executed",
+                    "reason_code": external["fairlearn"]["reason_code"],
                 },
                 "aequitas": {
                     "api": None,
-                    "support_status": "metric_not_supported",
+                    # API support cannot be concluded until the pinned
+                    # identity/API manifest has actually been verified.
+                    "support_status": "not_evaluated",
                     "execution_status": aequitas_status,
                     "normalized_value": None,
                     "value_match": None,
-                    "reason_code": "metric_not_supported",
+                    "reason_code": external["aequitas"]["reason_code"],
                 },
             }
         },
