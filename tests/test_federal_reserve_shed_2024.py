@@ -17,6 +17,7 @@ from fairlendkit.research.federal_reserve_shed_2024 import (
     special_response_rules_sha256,
     summarize_special_responses,
     summarize_numeric,
+    summarize_identifier_years,
     validate_summary,
 )
 
@@ -32,6 +33,7 @@ def _valid() -> dict[str, object]:
         "identifier_index": 0,
         "identifier_nulls": 0,
         "identifier_unique": EXPECTED["rows"],
+        "identifier_year_counts": EXPECTED["identifier_year_counts"],
         "weights": EXPECTED["weights"],
         "missingness": EXPECTED["missingness"],
         "imputation_flags": EXPECTED["imputation_flags"],
@@ -61,6 +63,7 @@ def test_reviewed_summary_validates_with_provisional_boundary() -> None:
         ("identifier_index", 1, "identifier"),
         ("identifier_nulls", 1, "identifier"),
         ("identifier_unique", 1, "identifier"),
+        ("identifier_year_counts", {}, "historical case identifiers"),
         ("weights", {}, "weight"),
         ("missingness", (1, 1, 1), "missingness"),
         ("imputation_flags", (1, 1, 1, 1, 1), "imputation"),
@@ -87,6 +90,18 @@ def test_shedid_is_excluded_from_analysis() -> None:
         analysis_columns(("weight", "B2"))
     with pytest.raises(Shed2024IntegrityError, match="required"):
         analysis_columns(("shedid", "SHEDID", "weight"))
+
+
+def test_all_current_and_historical_case_ids_are_validated() -> None:
+    synthetic = tuple(
+        f"{year}{index:05d}"
+        for year, count in EXPECTED["identifier_year_counts"].items()
+        for index in range(count)
+    )
+    assert summarize_identifier_years(synthetic) == EXPECTED["identifier_year_counts"]
+    for malformed in ("", "2024", "2024abcde", " 202400001"):
+        with pytest.raises(Shed2024IntegrityError, match="blank or malformed"):
+            summarize_identifier_years((malformed,))
 
 
 def test_ordered_schema_digest_detects_name_order_and_case_drift() -> None:
@@ -130,8 +145,16 @@ def test_manifest_pins_schema_identifier_and_special_response_rules() -> None:
         "zero_based_index": 0,
         "missing": 0,
         "unique": 12295,
+        "case_id_year_counts": EXPECTED["identifier_year_counts"],
         "analysis_use": "prohibited",
     }
+    schema = json.loads(
+        Path("docs/data-sources/federal-reserve-shed-2024-schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert len(schema["ordered_columns"]) == EXPECTED["columns"]
+    assert schema_sha256(schema["ordered_columns"]) == EXPECTED["schema_sha256"]
     evidence = manifest["special_response_evidence"]
     assert evidence["rules_sha256"] == special_response_rules_sha256(evidence["rules"])
     assert evidence["rules_sha256"] == EXPECTED["special_response_rules_sha256"]

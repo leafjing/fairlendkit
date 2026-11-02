@@ -38,6 +38,20 @@
     "zero_based_index": 0,
     "missing": 0,
     "unique": 12295,
+    "case_id_year_counts": {
+      "2013": 58,
+      "2014": 47,
+      "2015": 42,
+      "2016": 124,
+      "2017": 524,
+      "2018": 579,
+      "2019": 570,
+      "2020": 694,
+      "2021": 680,
+      "2022": 1188,
+      "2023": 1262,
+      "2024": 6527
+    },
     "analysis_use": "prohibited"
   },
   "weight_stat_fields": ["missing", "non_finite", "zero", "negative", "minimum", "maximum"],

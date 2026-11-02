@@ -14,7 +14,8 @@ the adjacent manifest. The page identifies the codebook as last updated May 28,
 columns, with no duplicate rows. No raw or transformed respondent rows are
 committed. The ordered, case-sensitive schema is pinned by SHA-256, so a renamed,
 reordered, added, or removed field fails closed rather than passing on shape
-alone.
+alone. The complete 751-column ordered header is retained in the adjacent
+`federal-reserve-shed-2024-schema.json` evidence file.
 
 The longitudinal `shedid` is non-null and unique in this snapshot. It is used
 only for local integrity checks and is prohibited from features, outputs, logs,
@@ -24,6 +25,10 @@ are pinned; analysis-column construction removes exactly one case-sensitive
 race/ethnicity, education,
 income, disability, employment, housing, family, credit, debt, and hardship
 fields are sensitive or proxy-bearing and require disclosure controls.
+The actual schema contains no second case-ID column. The longitudinal `shedid`
+values include current and historical case cohorts from 2013 through 2024;
+their cohort counts are pinned, and blank, malformed, missing-cohort, or
+unexpected-cohort evidence fails closed.
 
 ## Weights, missingness, and imputation
 

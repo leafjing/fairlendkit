@@ -13,6 +13,7 @@ DISPOSITION = "external_only"
 USAGE = "quality_only"
 REDISTRIBUTION = "prohibited"
 IDENTIFIER_COLUMN = "shedid"
+IDENTIFIER_COLUMNS = (IDENTIFIER_COLUMN,)
 SPECIAL_RESPONSE_RULES = {
     "not_asked": {
         "UNION100": ("Not asked",),
@@ -45,6 +46,20 @@ EXPECTED = {
     "columns": 751,
     "schema_sha256": "63fd0317d14b9634f9dafd3f3a63932c2c40d41d764c220d01cad34a4cbde6e9",
     "identifier_index": 0,
+    "identifier_year_counts": {
+        "2013": 58,
+        "2014": 47,
+        "2015": 42,
+        "2016": 124,
+        "2017": 524,
+        "2018": 579,
+        "2019": 570,
+        "2020": 694,
+        "2021": 680,
+        "2022": 1188,
+        "2023": 1262,
+        "2024": 6527,
+    },
     "archive_sha256": "b455d02356a0c01a02d7f478c02d772515491564e905ce13db55f272f83567c1",
     "csv_sha256": "82897c55a7c3dc1c056270506714d174732215927419f7d571400612cdd30819",
     "weights": {
@@ -101,6 +116,17 @@ def summarize_special_responses(
     return counts
 
 
+def summarize_identifier_years(values: Iterable[str]) -> dict[str, int]:
+    """Count current and historical case IDs by their four-digit cohort prefix."""
+    counts: dict[str, int] = {}
+    for value in values:
+        if len(value) != 9 or not value.isascii() or not value.isdigit():
+            raise Shed2024IntegrityError("shedid is blank or malformed")
+        year = value[:4]
+        counts[year] = counts.get(year, 0) + 1
+    return counts
+
+
 def summarize_numeric(values: Sequence[str]) -> tuple[int, int, int, int, float, float]:
     """Return missing/non-finite/zero/negative/min/max without retaining rows."""
     missing = non_finite = zero = negative = 0
@@ -136,6 +162,7 @@ def validate_summary(
     identifier_index: int,
     identifier_nulls: int,
     identifier_unique: int,
+    identifier_year_counts: Mapping[str, int],
     weights: Mapping[str, Sequence[int | float]],
     missingness: Sequence[int],
     imputation_flags: Sequence[int],
@@ -156,6 +183,8 @@ def validate_summary(
         or identifier_unique != rows
     ):
         raise Shed2024IntegrityError("SHED identifier is missing or non-unique")
+    if dict(identifier_year_counts) != EXPECTED["identifier_year_counts"]:
+        raise Shed2024IntegrityError("SHED current or historical case identifiers changed")
     if {name: tuple(values) for name, values in weights.items()} != EXPECTED["weights"]:
         raise Shed2024IntegrityError("SHED weight statistics changed")
     if tuple(missingness) != EXPECTED["missingness"]:
@@ -170,7 +199,8 @@ def validate_summary(
 
 def analysis_columns(columns: Sequence[str]) -> tuple[str, ...]:
     """Remove the longitudinal identifier from bounded aggregate analysis."""
-    identifier_matches = [column for column in columns if column.casefold() == IDENTIFIER_COLUMN]
-    if identifier_matches != [IDENTIFIER_COLUMN]:
-        raise Shed2024IntegrityError("shedid is required for isolation checks")
-    return tuple(column for column in columns if column != IDENTIFIER_COLUMN)
+    for identifier in IDENTIFIER_COLUMNS:
+        identifier_matches = [column for column in columns if column.casefold() == identifier]
+        if identifier_matches != [identifier]:
+            raise Shed2024IntegrityError(f"{identifier} is required for isolation checks")
+    return tuple(column for column in columns if column not in IDENTIFIER_COLUMNS)
