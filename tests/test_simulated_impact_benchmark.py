@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from fairlendkit.research.simulated_impact_benchmark import (
+    ScenarioExpectations,
     baseline_decisions,
     generate_simulated_applicants,
     policy_metrics,
@@ -118,3 +119,22 @@ def test_invalid_population_repetitions_and_shape_fail_closed():
         run_benchmark(repetitions=0)
     with pytest.raises(ValueError, match="equal lengths"):
         policy_metrics(generate_simulated_applicants(population_size=10), (True,))
+
+
+def test_expectations_do_not_change_decisions_or_derived_results():
+    canonical = run_benchmark(repetitions=1)
+    changed = run_benchmark(
+        repetitions=1,
+        expectations=ScenarioExpectations(
+            incremental_approvals=-999,
+            baseline_absolute_gap=0.99,
+            tool_absolute_gap=0.98,
+        ),
+    )
+    assert changed.input_sha256 == canonical.input_sha256
+    assert changed.decision_set_digests == canonical.decision_set_digests
+    assert changed.baseline == canonical.baseline
+    assert changed.tool == canonical.tool
+    assert changed.approval_increment == canonical.approval_increment
+    assert changed.credit_increment == canonical.credit_increment
+    assert changed.scenario_expectations != canonical.scenario_expectations

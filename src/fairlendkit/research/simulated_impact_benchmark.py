@@ -54,6 +54,13 @@ class PolicyMetrics:
 
 
 @dataclass(frozen=True)
+class ScenarioExpectations:
+    incremental_approvals: int = 350
+    baseline_absolute_gap: float = 0.12
+    tool_absolute_gap: float = 0.05
+
+
+@dataclass(frozen=True)
 class BenchmarkResult:
     benchmark_id: str
     scenario_id: str
@@ -302,6 +309,7 @@ def _group_evidence(
 def run_benchmark(
     *, seed: int = SEED, population_size: int = POPULATION_SIZE,
     repetitions: int = REPETITIONS,
+    expectations: ScenarioExpectations = ScenarioExpectations(),
 ) -> BenchmarkResult:
     rows = generate_simulated_applicants(seed=seed, population_size=population_size)
     baseline = baseline_decisions(rows)
@@ -327,9 +335,12 @@ def run_benchmark(
     baseline_gap = abs(baseline_metrics.selection_rate_difference)
     tool_gap = abs(tool_metrics.selection_rate_difference)
     expectations_passed = (
-        tool_metrics.approvals - baseline_metrics.approvals == 350
-        and math.isclose(baseline_gap, 0.12, abs_tol=1e-12)
-        and math.isclose(tool_gap, 0.05, abs_tol=1e-12)
+        tool_metrics.approvals - baseline_metrics.approvals
+        == expectations.incremental_approvals
+        and math.isclose(
+            baseline_gap, expectations.baseline_absolute_gap, abs_tol=1e-12
+        )
+        and math.isclose(tool_gap, expectations.tool_absolute_gap, abs_tol=1e-12)
     )
     publication_passed = risk_passed and expectations_passed
     publication_reason = (
@@ -461,11 +472,11 @@ def run_benchmark(
             "canceled_approved_ids_sha256": _id_set_sha256(canceled_ids),
         },
         scenario_expectations={
-            "expected_incremental_approvals": 350,
+            "expected_incremental_approvals": expectations.incremental_approvals,
             "actual_incremental_approvals": approval_increment,
-            "expected_baseline_absolute_gap": 0.12,
+            "expected_baseline_absolute_gap": expectations.baseline_absolute_gap,
             "actual_baseline_absolute_gap": baseline_gap,
-            "expected_tool_absolute_gap": 0.05,
+            "expected_tool_absolute_gap": expectations.tool_absolute_gap,
             "actual_tool_absolute_gap": tool_gap,
             "passed": expectations_passed,
         },
