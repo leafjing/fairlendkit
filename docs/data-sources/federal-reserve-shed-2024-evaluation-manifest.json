@@ -1,0 +1,115 @@
+{
+  "candidate_id": "federal-reserve-shed-2024",
+  "accessed_utc": "2026-11-02T05:25:25Z",
+  "admission_status": "evidence_incomplete",
+  "adopted": false,
+  "disposition": "external_only",
+  "usage": "provisional_quality_only_boundary",
+  "redistribution": "prohibited",
+  "publisher_page": {
+    "url": "https://www.federalreserve.gov/consumerscommunities/shed_data.htm",
+    "bytes": 92487,
+    "sha256": "5b50338e478e40e89735317e2facd27c248a67289d46aa2fbd636f12549c523a",
+    "release_note": "2024 codebook last updated May 28, 2025"
+  },
+  "archive": {
+    "url": "https://www.federalreserve.gov/consumerscommunities/files/SHED_public_use_data_2024_(CSV).zip",
+    "filename": "SHED_public_use_data_2024_(CSV).zip",
+    "bytes": 3787684,
+    "sha256": "b455d02356a0c01a02d7f478c02d772515491564e905ce13db55f272f83567c1",
+    "member": "public2024.csv",
+    "member_bytes": 40570692,
+    "member_sha256": "82897c55a7c3dc1c056270506714d174732215927419f7d571400612cdd30819"
+  },
+  "codebook": {
+    "url": "https://www.federalreserve.gov/consumerscommunities/files/SHED_2024codebook.pdf",
+    "filename": "SHED_2024codebook.pdf",
+    "bytes": 848401,
+    "sha256": "caa1b19f87539e3746654fd71d7d003b4db7f9d74e7a0c302ff4a8517c05339d"
+  },
+  "shape": {
+    "rows": 12295,
+    "columns": 751,
+    "duplicate_rows": 0,
+    "ordered_schema_sha256": "63fd0317d14b9634f9dafd3f3a63932c2c40d41d764c220d01cad34a4cbde6e9"
+  },
+  "identifier": {
+    "column": "shedid",
+    "zero_based_index": 0,
+    "missing": 0,
+    "unique": 12295,
+    "case_id_year_counts": {
+      "2013": 58,
+      "2014": 47,
+      "2015": 42,
+      "2016": 124,
+      "2017": 524,
+      "2018": 579,
+      "2019": 570,
+      "2020": 694,
+      "2021": 680,
+      "2022": 1188,
+      "2023": 1262,
+      "2024": 6527
+    },
+    "analysis_use": "prohibited"
+  },
+  "weight_stat_fields": ["missing", "non_finite", "zero", "negative", "minimum", "maximum"],
+  "weights": {
+    "weight": [0, 0, 0, 0, 0.1788, 3.5159],
+    "weight_pop": [0, 0, 0, 0, 3771.794, 74172.6995],
+    "panel_weight": [8280, 0, 0, 0, 0.0943, 3.2902],
+    "panel_weight_pop": [8280, 0, 0, 0, 6094.602, 212555.405]
+  },
+  "missingness": {"blank_cells": 2159319, "columns_with_blanks": 254, "complete_columns": 497},
+  "imputation_flags": {
+    "columns": 342,
+    "cells": 4204890,
+    "blank": 0,
+    "not_imputed_0": 4191995,
+    "imputed_1": 12895
+  },
+  "special_response_evidence": {
+    "rules_sha256": "a19cf85d3459959ae0481eed2e7278703c0a2e6819993511c6ee1493a222efc9",
+    "rules": {
+      "not_asked": {
+        "UNION100": ["Not asked"],
+        "ind1": ["-2"],
+        "ppcm0160": ["Not asked"],
+        "ppcm1301": ["Not asked"]
+      },
+      "dont_know": {
+        "A6": ["Don’t know"],
+        "CH2A": ["Don’t know"],
+        "D47": ["Don’t know"],
+        "E2A": ["Don’t know"],
+        "K0": ["Don’t know"],
+        "SL13": ["Don’t know"],
+        "SL3": ["Don’t know"],
+        "SL4": ["Don’t know"],
+        "ppfs1482": ["Don’t know"]
+      },
+      "refused": {
+        "CH2A": ["Refused"],
+        "ND1_e": ["Refused"],
+        "UNION100": ["Refused"],
+        "ind1": ["-1"],
+        "ppcm0160": ["Refused"],
+        "ppcm1301": ["Refused"]
+      }
+    },
+    "counts": {"not_asked": 20300, "dont_know": 4313, "refused": 537}
+  },
+  "terms": {
+    "status": "redistribution_unverified",
+    "website_policy_url": "https://www.federalreserve.gov/website-linking-policies.htm",
+    "website_policy_bytes": 89832,
+    "website_policy_sha256": "eeea04f0a813d1eaa7101e09f60d2519bfd90ecca9c313220e884b34acf2e3a9",
+    "finding": "No dataset-specific redistribution grant was located on the SHED page, in the package, codebook, or general website policy."
+  },
+  "citation": {
+    "text": "Board of Governors of the Federal Reserve System. (2025). Survey of Household Economics and Decisionmaking [Dataset].",
+    "doi": "https://doi.org/10.17016/datasets.002"
+  },
+  "raw_or_transformed_data_committed": false
+}
