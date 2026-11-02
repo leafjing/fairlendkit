@@ -12,11 +12,11 @@ Suggested subject: South German Credit package response headers, version, and pr
 Hello UCI Machine Learning Repository team,
 
 We are documenting a reproducible, bounded benchmark use of the South German
-Credit dataset, DOI `10.24432/C5X89F`, and would appreciate clarification of a
+Credit dataset, DOI `10.24432/C5QG88`, and would appreciate clarification of a
 few metadata points. We have not redistributed or incorporated the package into
 our repository.
 
-During one authorized, controlled request to the official package URL, our
+During one authorized, controlled request to the former dataset-522 package URL, our
 client stopped before retaining or processing any response body because the
 normalized response media type did not match its reviewed ZIP allowlist. The
 failed run was not retried and retained no package bytes. Separate metadata-only
@@ -31,9 +31,9 @@ which headers a `GET` response would return.
 2. Is the omission of `Content-Type` and `Content-Length` from `HEAD` responses
    intentional, and is there a recommended metadata-only method for verifying
    the package before a bounded download?
-3. The rendered dataset page reports a donation date of 2019-11-28, while the
-   page's repository metadata reports `2019-11-29T00:00:00Z`. Which date should
-   be treated as the authoritative release/donation date?
+3. The dataset-573 page metadata reports donation date `2020-06-20`. Should
+   that be treated only as the catalog donation date, or also as an immutable
+   package release identifier?
 4. What is the current authoritative package revision or version, release date,
    and publisher-issued checksum (including algorithm and value)? Is the object
    at the official package URL immutable, and, if it can change in place, is
@@ -52,13 +52,12 @@ which headers a `GET` response would return.
    attribution, automated-analysis, or redistribution restrictions that apply
    to the archive or any member?
 
-For reference, the package metadata currently visible to us lists
-`SouthGermanCredit.asc`, `read_SouthGermanCredit.R`, and `codetable.txt`, with a
-total compressed size of 13,130 bytes. We will keep the candidate unavailable
-until the response behavior, version, provenance, label, and privacy review is
-complete. A reply would be treated as evidence for a new independent review; it
-would not itself authorize another download, data admission, repository
-promotion, or redistribution.
+The prior dataset-522 member names and sizes are not being carried forward as
+dataset-573 facts. We will keep the candidate unavailable until the new Run's
+members, response behavior, version, provenance, label, and privacy evidence
+are independently reviewed. A reply would be treated as evidence for review;
+it would not itself authorize data admission, repository promotion, or
+redistribution.
 
 Thank you.
 

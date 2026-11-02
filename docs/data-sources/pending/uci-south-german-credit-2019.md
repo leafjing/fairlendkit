@@ -8,11 +8,11 @@
   collection context needs further review
 - Publisher class: university repository
 - Canonical page:
-  <https://archive.ics.uci.edu/dataset/522/south+german+credit>
-- DOI: <https://doi.org/10.24432/C5X89F>
-- Repository release: the rendered page says donated 2019-11-28, while embedded
-  official metadata reports `2019-11-29T00:00:00Z`; the one-day discrepancy is
-  unresolved and `release_date` remains null in the manifest
+  <https://archive.ics.uci.edu/dataset/573/south+german+credit+update>
+- DOI: <https://doi.org/10.24432/C5QG88>
+- Repository release: official embedded metadata reports donation date
+  `2020-06-20`; no publisher-issued immutable package revision is known, so
+  `release_id` and `release_date` remain null pending retrieval review
 - License: CC BY 4.0, linked by UCI:
   <https://creativecommons.org/licenses/by/4.0/legalcode>
 - Redistribution: appears permitted with attribution, subject to package,
@@ -37,16 +37,14 @@ population or alternative-signal claims.
 
 ## Verified official metadata snapshot
 
-Checked against the canonical UCI page on 2026-11-01 without downloading the
-package:
+The prior dataset-522 member snapshot is superseded and must not be used for
+retrieval or admission. Checked against the canonical dataset-573 UCI page on
+2026-11-02 before package retrieval:
 
 - package URL:
-  <https://archive.ics.uci.edu/static/public/522/south+german+credit.zip>;
-- `SouthGermanCredit.asc`: 47,940 bytes;
-- `read_SouthGermanCredit.R`: 7,550 bytes;
-- `codetable.txt`: 3,154 bytes;
-- total uncompressed size: 58,644 bytes;
-- total compressed size: 13,130 bytes;
+  <https://archive.ics.uci.edu/static/public/573/south+german+credit+update.zip>;
+- package members, member sizes, compressed size, uncompressed size, and hashes:
+  pending independent review of the new isolated Run;
 - official abstract: 1,000 cases, 700 good and 300 bad, 20 predictors, collected
   1973–1975, with bad credits heavily oversampled;
 - target description: whether the credit contract was complied with (`good`) or
@@ -57,7 +55,7 @@ package:
 The metadata-only
 [`uci-south-german-credit-2019-manifest.json`](uci-south-german-credit-2019-manifest.json)
 pins these claims. Publisher checksums and repository SHA-256 values remain null
-because data retrieval is not authorized by this documentation change.
+until the isolated dataset-573 Run is independently reviewed.
 The CC BY 4.0 presentation is affirmative license evidence, but manifest-level
 and member-level redistribution remain `unverified` until admission closes the
 package, provenance, and privacy checks.
@@ -112,11 +110,11 @@ recorded in
 The DOI resolves to UCI's dataset 573 update record, so this is a materially new
 endpoint rather than permission to retry the spent dataset-522 Run.
 
-No GET or body read was performed. The dataset-573 package HEAD is reachable but
-again omits media type, length, validators, and checksum. The existing manifest
-therefore remains pinned to dataset 522 and `evidence_incomplete` until an
-independent review decides whether 573 is a successor release and approves a
-new single-use retrieval contract and Run ID.
+The dataset-573 package HEAD is reachable but omits media type, length,
+validators, and checksum. The pending manifest now pins dataset 573 as the
+authoritative candidate identity while retaining `evidence_incomplete`, null
+hashes, and an empty member list until the new isolated Run is independently
+reviewed.
 
 ## Enablement plan
 

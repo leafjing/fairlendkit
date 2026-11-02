@@ -9,9 +9,9 @@ or change the candidate manifest from `evidence_incomplete`.
 - Proposed analytical use: generic credit-risk metric and adapter benchmark
 - Prohibited claim: evidence about cash flow, rent, utilities, alternative-data
   coverage, present-day German or U.S. borrowers, or production lending
-- Official identity: UCI dataset 522; DOI `10.24432/C5X89F`
+- Official identity: UCI dataset 573; DOI `10.24432/C5QG88`
 - Official package URL:
-  <https://archive.ics.uci.edu/static/public/522/south+german+credit.zip>
+  <https://archive.ics.uci.edu/static/public/573/south+german+credit+update.zip>
 - Current manifest:
   [`../pending/uci-south-german-credit-2019-manifest.json`](../pending/uci-south-german-credit-2019-manifest.json)
 
@@ -88,7 +88,7 @@ UCI presents the dataset under Creative Commons Attribution 4.0 International.
 Repository inclusion must preserve the following obligations:
 
 - give appropriate credit, including dataset title, UCI Machine Learning
-  Repository, DOI `10.24432/C5X89F`, and any creator/citation UCI identifies;
+  Repository, DOI `10.24432/C5QG88`, and any creator/citation UCI identifies;
 - link to <https://creativecommons.org/licenses/by/4.0/>;
 - state whether files, schema names, encodings, or derived artifacts were
   modified, without implying UCI endorsement;
