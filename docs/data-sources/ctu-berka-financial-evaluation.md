@@ -29,11 +29,13 @@ task requires prediction at `loan.date` and only A/B records are completed, so
 the eligible benchmark has 234 loans (203 A, 31 B), with material class
 imbalance and limited sample size.
 
-All 234 completed loans have transactions after the decision date. The live
-join contained 17,676 transactions on or before `loan.date` and 73,013 after
-it. Any feature query must enforce `trans.date <= loan.date`; post-loan
-balances, transaction behavior, loan duration/completion logic, and any other
-future-derived values are prohibited. The district table has one missing value
+All 234 completed loans have transactions on the loan date or later. The live
+join contained 17,621 transactions strictly before `loan.date`, 55 on the same
+date, and 73,013 after it. Because the source has dates but no decision-time
+timestamps, same-day ordering is unknowable. Any feature query must therefore
+enforce `trans.date < loan.date`; same-day and post-loan balances, transaction
+behavior, loan duration/completion logic, and any other future-derived values
+are prohibited. The district table has one missing value
 in each of A12 and A15. Transaction missingness is concentrated in `operation`,
 `k_symbol`, `bank`, and `account` (183,114; 481,881; 782,812; and 760,931
 rows respectively) and must retain field-specific semantics.

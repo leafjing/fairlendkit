@@ -21,9 +21,10 @@
   "loan_status_counts": {"A": 203, "B": 31, "C": 403, "D": 45},
   "finished_ab_loans": 234,
   "finished_loan_transaction_counts": {
-    "on_or_before_loan_date": 17676,
+    "strictly_before_loan_date": 17621,
+    "same_day_as_loan_date": 55,
     "after_loan_date": 73013,
-    "finished_loans_with_post_loan_transactions": 234
+    "finished_loans_with_same_day_or_later_transactions": 234
   },
   "raw_or_transformed_data_committed": false,
   "redistribution": "prohibited_without_explicit_rights_basis"
