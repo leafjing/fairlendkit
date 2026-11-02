@@ -25,7 +25,7 @@
   },
   "baseline_median_seconds": 0.000535034,
   "benchmark_id": "fairlendkit-simulated-impact-v1",
-  "code_commit_basis": "0f8cbd6",
+  "code_commit_basis": "6dff96a",
   "config_sha256": "fb0ff04c92060607f0662956b60a01b8015e27adcaf06f15da04252fdd999226",
   "config_summary": {
     "credit_amounts": "same pre-decision requested_credit for baseline and tool",
