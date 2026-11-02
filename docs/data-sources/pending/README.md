@@ -41,10 +41,11 @@ documented credit outcome may satisfy the risk-outcome contract.
 4. [Census HTOPS/HPS](census-htops-hps.md)
 5. [EIA RECS 2020 v7](eia-recs-2020-v7.md)
 6. [Census/HUD AHS 2023 PUF](census-ahs-2023-puf.md)
-7. [UCI South German Credit](uci-south-german-credit-2019.md)
+7. [UCI South German Credit (dataset 573, adopted quality-only benchmark)](../uci-south-german-credit-2020.md)
 
-Every record remains `evidence_incomplete`. Priority controls investigation
-order, not trust, admission, or preferred analytical conclusion.
+Pending records 1–6 remain `evidence_incomplete`. Item 7 is listed only to route
+stale discovery to the adopted dataset 573 record. Priority controls
+investigation order, not trust, admission, or preferred analytical conclusion.
 
 Each record must include an enablement plan: target `repository` or
 `external_only` disposition, fixable conditions, official contact route, next
