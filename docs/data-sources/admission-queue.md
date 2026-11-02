@@ -163,20 +163,21 @@ dictionary, and relevant utility semantics are the strongest after UCI.
 ### 5. Federal Reserve SHED 2024 public-use data
 
 - Candidate: [`federal-reserve-shed-2024`](pending/federal-reserve-shed-2024.md)
-- Current gate: Q0.
+- Current gate: metadata verified; direct content evaluation may proceed under
+  an `external_only` and `quality_only` ceiling.
 - Evidence ready: authoritative survey page, current CSV ZIP and codebook URLs,
   observed sizes and 2026 update metadata, plus a `quality_only` boundary.
 - Intended use: household financial coverage, bill/housing/credit-access
   survey quality and representation. Self-reported hardship is not default.
-- Blocking before Q1: publisher-issued package/revision identity, ZIP members,
-  package-specific public-use and redistribution terms, checksum/revision
-  policy, field/reference-period matrix, weight semantics, and longitudinal-ID
-  privacy restrictions.
+- Blocking before approval: ZIP/member hashes and shape, retrieved field and
+  reference-period matrix, weight/imputation/special-code aggregates, and
+  longitudinal-ID containment. The publisher supplies no immutable release ID,
+  checksum, or affirmative dataset redistribution grant.
 - Required bespoke retrieval: SHED-specific ZIP/member limits, update identity,
   survey-weight validation, longitudinal identifier containment, and no
   assumption that a general website linking policy grants redistribution.
-- Likely disposition: `repository` only with affirmative terms and privacy
-  approval; otherwise `external_only`.
+- Disposition: `external_only`, `quality_only`, redistribution prohibited; no
+  raw or transformed respondent rows in the repository.
 
 ### 6. CFPB Making Ends Meet
 
