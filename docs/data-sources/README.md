@@ -12,3 +12,9 @@ Every candidate must be rechecked against the original publisher, exact version,
 current license and terms, redistribution rights, field dictionary, and temporal
 semantics. Mirrors, papers, catalog pages, and prior third-party use are leads,
 not authoritative evidence.
+
+Completed content evaluations:
+
+- [UCI South German Credit](uci-south-german-credit-2020.md)
+- [EIA RECS 2020 v7](eia-recs-2020-v7-evaluation.md)
+- [CTU/Berka PKDD'99 `financial`](ctu-berka-financial-evaluation.md)
