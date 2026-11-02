@@ -1,0 +1,15 @@
+{
+  "candidate_id": "uci-south-german-credit-2020",
+  "disposition": "external_only",
+  "usage": "quality_only",
+  "official_url": "https://archive.ics.uci.edu/static/public/573/south+german+credit+update.zip",
+  "archive_sha256": "0b40d40eb7321693d559e247a556f88a6cc8df8489c3cb2ae084db7592584551",
+  "license": "CC-BY-4.0",
+  "doi": "10.24432/C5QG88",
+  "source_bytes_committed": false,
+  "members": {
+    "codetable.txt": {"bytes": 3154, "sha256": "0040e7a173a06d1167447b2bbc4315ee1380fa3c25db321b9fd7d97ada0721bf"},
+    "read_SouthGermanCredit.R": {"bytes": 7550, "sha256": "92340012c6387dcc0fea9dcf47e2cc9659cda93c21bd688f3f694f0f0229ed68"},
+    "SouthGermanCredit.asc": {"bytes": 47940, "sha256": "5f363343f356ca38a0236baab849e472846399b2176ccc5bd686483dd8a7562f"}
+  }
+}
