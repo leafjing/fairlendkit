@@ -8,9 +8,11 @@
 - HTOPS overview: <https://www.census.gov/programs-surveys/htops.html>
 - Official data page linked there:
   <https://www.census.gov/programs-surveys/household-pulse-survey/data.html>
-- Exact release/version: not selected; each cycle/wave requires its own manifest
+- Exact release/version: July 2026 cross-sectional release `HTOPS_HPS_2607`,
+  evaluated in the [wave-specific data card](../census-htops-hps-2607-evaluation.md)
 - License/redistribution: Census and file-specific terms require verification
-- Decision: none
+- Decision: technical evaluation complete; formal adoption remains
+  `evidence_incomplete`
 - Trust tier: A for publisher authority; admission remains incomplete
 
 HTOPS succeeds/extends the experimental Household Pulse Survey. Topics may

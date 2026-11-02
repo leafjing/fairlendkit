@@ -1,0 +1,1732 @@
+{
+  "schemas": {
+    "HTOPS_HPS_2607_PUF.csv": [
+      "SCRAMID",
+      "PWEIGHT",
+      "HWEIGHT",
+      "REGION",
+      "METRO",
+      "METRO_STATUS",
+      "THHLD_NUMPER",
+      "THHLD_NUMKID",
+      "THHLD_NUMADULT",
+      "TBIRTH_YEAR",
+      "TAGE",
+      "ESEX",
+      "SEX_ORNT",
+      "EHISPANIC",
+      "RRACE",
+      "MS",
+      "REDUC",
+      "AF_NO",
+      "AF_ACTDUTY_SELF",
+      "AF_RESNG_SELF",
+      "AF_ACTDUTY_SP",
+      "AF_RESNG_SP",
+      "AFEVER_NO",
+      "AFEVER_ACTDUTY_SELF",
+      "AFEVER_RESNG_SELF",
+      "AFEVER_ACTDUTY_SP",
+      "AFEVER_RESNG_SP",
+      "LANG_OTHER_HOME",
+      "RLANG_HOME",
+      "ENGLISH_PROF",
+      "SATISFACTION",
+      "KIDS_LT1Y",
+      "KIDS_1_4Y",
+      "KIDS_5_11Y",
+      "KIDS_12_17Y",
+      "ENRPUBCHK",
+      "ENRPRVCHK",
+      "ENRHMSCHK",
+      "ENROLLNONE",
+      "TENROLLPUB",
+      "TENROLLPRV",
+      "TENROLLHMSCH",
+      "CHILDCARE",
+      "RCHILDCARE_RSLT1",
+      "RCHILDCARE_RSLT2",
+      "RCHILDCARE_RSLT3",
+      "RCHILDCARE_RSLT4",
+      "RCHILDCARE_RSLT5",
+      "RCHILDCARE_RSLT6",
+      "RCHILDCARE_RSLT7",
+      "RCHILDCARE_RSLT8",
+      "RCHILDCARE_RSLT9",
+      "FORMULA_AGE",
+      "BABY_FED",
+      "RFORMULA_DIFFICULT",
+      "WORKLOSS",
+      "ANYWORK",
+      "CLASS_WORKER",
+      "REASON_NOWORK",
+      "TWDAYS",
+      "SEEING",
+      "HEARING",
+      "MOBILITY",
+      "REMEMBERING",
+      "SELFCARE",
+      "UNDERSTAND",
+      "ANXIOUS",
+      "WORRY",
+      "INTEREST",
+      "DOWN",
+      "MHLTH_NEED",
+      "MHLTH_GET",
+      "MHLTH_SATISFIED",
+      "RMHLTH_DIFFICULT",
+      "HLTHINS_EMP",
+      "HLTHINS_MEDICARE",
+      "HLTHINS_MEDICAID",
+      "HLTHINS_PURCH",
+      "HLTHINS_VA",
+      "HLTHINS_TRICARE",
+      "HLTHINS_IHS",
+      "HLTHINS_OTH",
+      "HLTHINS_NO",
+      "SOC_LONELY",
+      "SOC_SUPPORT",
+      "SOC_TOGETHER",
+      "SOC_TALK",
+      "SOC_RELSERVICES",
+      "SOC_CLUBS",
+      "NARCAN_CARRY",
+      "NARCAN_EVERUSE",
+      "NARCAN_USEPAST30",
+      "MEDSHORT_PRESC",
+      "MEDSHORT_OTC",
+      "MEDSHORT_SUPPLIES",
+      "MEDSHORT_OTH",
+      "MEDSHORT_NONE",
+      "MEDRES_ALT",
+      "MEDRES_SPEND",
+      "MEDRES_REDUCE",
+      "MEDRES_PROC",
+      "MEDRES_HELP",
+      "MEDRES_NEG",
+      "MEDRES_NEGHLTH",
+      "MEDRES_DK",
+      "MEDRES_OTH",
+      "FD_SUFF",
+      "FD_CHILD",
+      "FDRSN_AFFORD",
+      "FDRSN_GETSTORE",
+      "FDRSN_SAFETY",
+      "FDRSN_NONE",
+      "FD_FREE",
+      "FDBEN_SNAP",
+      "FDBEN_WIC",
+      "FDBEN_NSLPRED",
+      "FDBEN_SUMMEREBT",
+      "FDBEN_NONE",
+      "FDSCHL_EXPNSDIF",
+      "EXPENSE_DIFFICULT",
+      "PRICECHANGE",
+      "PRICESTRESS",
+      "PRICECONCERN",
+      "TENURE",
+      "RENTCUR",
+      "MORTCUR",
+      "TMONTHSBEHIND",
+      "EVICT",
+      "RFORECLOSE",
+      "RLIVEARRANGEPLAN",
+      "EH",
+      "REH_SHELTER",
+      "REH_STREET",
+      "REH_COUCH",
+      "REH_OTHER",
+      "REH_DK",
+      "REHWHO_SELF",
+      "REHWHO_SPOUSE",
+      "REHWHO_ADULTCHILD",
+      "REHWHO_CHILDU18",
+      "REHWHO_SIBLING",
+      "REHWHO_OTHERFAM",
+      "REHWHO_NONRELATIVE",
+      "ENERGY",
+      "HSE_TEMP",
+      "ENERGY_BILL",
+      "COOL_CENTRAL",
+      "COOL_WINDOW",
+      "COOL_FANS",
+      "COOL_SWAMP",
+      "COOL_OTHER",
+      "COOL_NONE",
+      "TEMP_SAFE",
+      "AC_WEAK",
+      "AC_BROKEN",
+      "AC_AFFORDALL",
+      "AC_AFFORDPART",
+      "AC_POWER",
+      "AC_OTHER",
+      "CD_WEAK",
+      "CD_BROKEN",
+      "CD_AFFORDALL",
+      "CD_AFFORDPART",
+      "CD_POWER",
+      "CD_NONE",
+      "CD_OTHER",
+      "COOLSHELTER",
+      "CSISSUE_CROWDED",
+      "CSISSUE_NOTOPEN",
+      "CSISSUE_FAR",
+      "CSISSUE_MED",
+      "CSISSUE_NOTSAFE",
+      "CSISSUE_NOPETS",
+      "CSISSUE_OTHER",
+      "CSISSUE_NONE",
+      "CSGO_CROWDED",
+      "CSGO_NOTOPEN",
+      "CSGO_FAR",
+      "CSGO_MED",
+      "CSGO_NOTSAFE",
+      "CSGO_NOPETS",
+      "CSGO_FIND",
+      "CSGO_NONEED",
+      "CSGO_OTHER",
+      "HLTH_HEAT",
+      "HLTH_HEART",
+      "HLTH_ASTHMA",
+      "HLTH_DIABETES",
+      "HLTH_KIDNEYS",
+      "HLTH_MEDICATION",
+      "HLTH_MOBILITY",
+      "HLTH_OTHER",
+      "HOT_COOLSHELTER",
+      "HOT_PUBFACILITY",
+      "HOT_COMFACILITY",
+      "HOT_ACHOME",
+      "HOT_POOL",
+      "HOT_ACHOTEL",
+      "HOT_NOAPPLIANCE",
+      "HOT_NOACTION",
+      "HOT_OTHER",
+      "TP_WALK",
+      "TP_BIKE",
+      "TP_MOTORCYCLE",
+      "TP_VEHOWN",
+      "TP_VEHBOR",
+      "TP_VEHRENT",
+      "TP_TAXI",
+      "TP_BUS",
+      "TP_RAIL",
+      "TP_FERRY",
+      "TP_PARA",
+      "TP_OTH",
+      "TPACCESS",
+      "TPNEED_NOTAVAIL",
+      "TPNEED_MORETIME",
+      "TPNEED_UNPRED",
+      "TPNEED_AFFORD",
+      "TPNEED_UNSAFE",
+      "TPNEED_DISAB",
+      "TPNEED_NONE",
+      "DRIVE_AUTOVEH",
+      "LIVE_ENTERTAINMENT",
+      "ARTEXHIBIT",
+      "MOVIES",
+      "CREATEART",
+      "PARTINARTS",
+      "DIET_DAIRY",
+      "DIET_PROTEIN",
+      "DIET_PROCESSED",
+      "DIET_GUIDELINES",
+      "TRUST_FEDSTAT",
+      "TRUST_MILITARY",
+      "TRUST_POLICE",
+      "TRUST_SUPREME",
+      "TRUST_PRESIDENCY",
+      "TRUST_SCHOOLS",
+      "TRUST_CRIMJUST",
+      "TRUST_CONGRESS",
+      "TRUST_CENSUS",
+      "TRUST_STATISTICAL",
+      "FEDSTAT_NEED",
+      "HLTHTRUST_DR",
+      "HLTHTRUST_GOV",
+      "HLTHTRUST_SCI",
+      "HLTHTRUST_AI",
+      "RHHINCOME",
+      "A_THHLD_NUMPER",
+      "A_THHLD_NUMKID",
+      "A_TAGE",
+      "A_TBIRTH_YEAR",
+      "A_ESEX",
+      "A_RRACE",
+      "A_EHISPANIC",
+      "A_REDUC"
+    ],
+    "HTOPS_HPS_2607_REPWGT_PUF.csv": [
+      "SCRAMID",
+      "PWEIGHT0",
+      "PWEIGHT1",
+      "PWEIGHT2",
+      "PWEIGHT3",
+      "PWEIGHT4",
+      "PWEIGHT5",
+      "PWEIGHT6",
+      "PWEIGHT7",
+      "PWEIGHT8",
+      "PWEIGHT9",
+      "PWEIGHT10",
+      "PWEIGHT11",
+      "PWEIGHT12",
+      "PWEIGHT13",
+      "PWEIGHT14",
+      "PWEIGHT15",
+      "PWEIGHT16",
+      "PWEIGHT17",
+      "PWEIGHT18",
+      "PWEIGHT19",
+      "PWEIGHT20",
+      "PWEIGHT21",
+      "PWEIGHT22",
+      "PWEIGHT23",
+      "PWEIGHT24",
+      "PWEIGHT25",
+      "PWEIGHT26",
+      "PWEIGHT27",
+      "PWEIGHT28",
+      "PWEIGHT29",
+      "PWEIGHT30",
+      "PWEIGHT31",
+      "PWEIGHT32",
+      "PWEIGHT33",
+      "PWEIGHT34",
+      "PWEIGHT35",
+      "PWEIGHT36",
+      "PWEIGHT37",
+      "PWEIGHT38",
+      "PWEIGHT39",
+      "PWEIGHT40",
+      "PWEIGHT41",
+      "PWEIGHT42",
+      "PWEIGHT43",
+      "PWEIGHT44",
+      "PWEIGHT45",
+      "PWEIGHT46",
+      "PWEIGHT47",
+      "PWEIGHT48",
+      "PWEIGHT49",
+      "PWEIGHT50",
+      "PWEIGHT51",
+      "PWEIGHT52",
+      "PWEIGHT53",
+      "PWEIGHT54",
+      "PWEIGHT55",
+      "PWEIGHT56",
+      "PWEIGHT57",
+      "PWEIGHT58",
+      "PWEIGHT59",
+      "PWEIGHT60",
+      "PWEIGHT61",
+      "PWEIGHT62",
+      "PWEIGHT63",
+      "PWEIGHT64",
+      "PWEIGHT65",
+      "PWEIGHT66",
+      "PWEIGHT67",
+      "PWEIGHT68",
+      "PWEIGHT69",
+      "PWEIGHT70",
+      "PWEIGHT71",
+      "PWEIGHT72",
+      "PWEIGHT73",
+      "PWEIGHT74",
+      "PWEIGHT75",
+      "PWEIGHT76",
+      "PWEIGHT77",
+      "PWEIGHT78",
+      "PWEIGHT79",
+      "PWEIGHT80",
+      "HWEIGHT0",
+      "HWEIGHT1",
+      "HWEIGHT2",
+      "HWEIGHT3",
+      "HWEIGHT4",
+      "HWEIGHT5",
+      "HWEIGHT6",
+      "HWEIGHT7",
+      "HWEIGHT8",
+      "HWEIGHT9",
+      "HWEIGHT10",
+      "HWEIGHT11",
+      "HWEIGHT12",
+      "HWEIGHT13",
+      "HWEIGHT14",
+      "HWEIGHT15",
+      "HWEIGHT16",
+      "HWEIGHT17",
+      "HWEIGHT18",
+      "HWEIGHT19",
+      "HWEIGHT20",
+      "HWEIGHT21",
+      "HWEIGHT22",
+      "HWEIGHT23",
+      "HWEIGHT24",
+      "HWEIGHT25",
+      "HWEIGHT26",
+      "HWEIGHT27",
+      "HWEIGHT28",
+      "HWEIGHT29",
+      "HWEIGHT30",
+      "HWEIGHT31",
+      "HWEIGHT32",
+      "HWEIGHT33",
+      "HWEIGHT34",
+      "HWEIGHT35",
+      "HWEIGHT36",
+      "HWEIGHT37",
+      "HWEIGHT38",
+      "HWEIGHT39",
+      "HWEIGHT40",
+      "HWEIGHT41",
+      "HWEIGHT42",
+      "HWEIGHT43",
+      "HWEIGHT44",
+      "HWEIGHT45",
+      "HWEIGHT46",
+      "HWEIGHT47",
+      "HWEIGHT48",
+      "HWEIGHT49",
+      "HWEIGHT50",
+      "HWEIGHT51",
+      "HWEIGHT52",
+      "HWEIGHT53",
+      "HWEIGHT54",
+      "HWEIGHT55",
+      "HWEIGHT56",
+      "HWEIGHT57",
+      "HWEIGHT58",
+      "HWEIGHT59",
+      "HWEIGHT60",
+      "HWEIGHT61",
+      "HWEIGHT62",
+      "HWEIGHT63",
+      "HWEIGHT64",
+      "HWEIGHT65",
+      "HWEIGHT66",
+      "HWEIGHT67",
+      "HWEIGHT68",
+      "HWEIGHT69",
+      "HWEIGHT70",
+      "HWEIGHT71",
+      "HWEIGHT72",
+      "HWEIGHT73",
+      "HWEIGHT74",
+      "HWEIGHT75",
+      "HWEIGHT76",
+      "HWEIGHT77",
+      "HWEIGHT78",
+      "HWEIGHT79",
+      "HWEIGHT80"
+    ]
+  },
+  "special_response_rules": {
+    "not_in_universe": {
+      "AFEVER_NO": [
+        "-88",
+        "-88.0"
+      ],
+      "AFEVER_ACTDUTY_SELF": [
+        "-88",
+        "-88.0"
+      ],
+      "AFEVER_RESNG_SELF": [
+        "-88",
+        "-88.0"
+      ],
+      "AFEVER_ACTDUTY_SP": [
+        "-88",
+        "-88.0"
+      ],
+      "AFEVER_RESNG_SP": [
+        "-88",
+        "-88.0"
+      ],
+      "RLANG_HOME": [
+        "-88",
+        "-88.0"
+      ],
+      "ENGLISH_PROF": [
+        "-88",
+        "-88.0"
+      ],
+      "KIDS_LT1Y": [
+        "-88",
+        "-88.0"
+      ],
+      "KIDS_1_4Y": [
+        "-88",
+        "-88.0"
+      ],
+      "KIDS_5_11Y": [
+        "-88",
+        "-88.0"
+      ],
+      "KIDS_12_17Y": [
+        "-88",
+        "-88.0"
+      ],
+      "ENRPUBCHK": [
+        "-88",
+        "-88.0"
+      ],
+      "ENRPRVCHK": [
+        "-88",
+        "-88.0"
+      ],
+      "ENRHMSCHK": [
+        "-88",
+        "-88.0"
+      ],
+      "ENROLLNONE": [
+        "-88",
+        "-88.0"
+      ],
+      "TENROLLPUB": [
+        "-88",
+        "-88.0"
+      ],
+      "TENROLLPRV": [
+        "-88",
+        "-88.0"
+      ],
+      "TENROLLHMSCH": [
+        "-88",
+        "-88.0"
+      ],
+      "CHILDCARE": [
+        "-88",
+        "-88.0"
+      ],
+      "RCHILDCARE_RSLT1": [
+        "-88",
+        "-88.0"
+      ],
+      "RCHILDCARE_RSLT2": [
+        "-88",
+        "-88.0"
+      ],
+      "RCHILDCARE_RSLT3": [
+        "-88",
+        "-88.0"
+      ],
+      "RCHILDCARE_RSLT4": [
+        "-88",
+        "-88.0"
+      ],
+      "RCHILDCARE_RSLT5": [
+        "-88",
+        "-88.0"
+      ],
+      "RCHILDCARE_RSLT6": [
+        "-88",
+        "-88.0"
+      ],
+      "RCHILDCARE_RSLT7": [
+        "-88",
+        "-88.0"
+      ],
+      "RCHILDCARE_RSLT8": [
+        "-88",
+        "-88.0"
+      ],
+      "RCHILDCARE_RSLT9": [
+        "-88",
+        "-88.0"
+      ],
+      "FORMULA_AGE": [
+        "-88",
+        "-88.0"
+      ],
+      "BABY_FED": [
+        "-88",
+        "-88.0"
+      ],
+      "RFORMULA_DIFFICULT": [
+        "-88",
+        "-88.0"
+      ],
+      "CLASS_WORKER": [
+        "-88",
+        "-88.0"
+      ],
+      "REASON_NOWORK": [
+        "-88",
+        "-88.0"
+      ],
+      "TWDAYS": [
+        "-88",
+        "-88.0"
+      ],
+      "MHLTH_NEED": [
+        "-88",
+        "-88.0"
+      ],
+      "MHLTH_GET": [
+        "-88",
+        "-88.0"
+      ],
+      "MHLTH_SATISFIED": [
+        "-88",
+        "-88.0"
+      ],
+      "RMHLTH_DIFFICULT": [
+        "-88",
+        "-88.0"
+      ],
+      "NARCAN_EVERUSE": [
+        "-88",
+        "-88.0"
+      ],
+      "NARCAN_USEPAST30": [
+        "-88",
+        "-88.0"
+      ],
+      "MEDRES_ALT": [
+        "-88",
+        "-88.0"
+      ],
+      "MEDRES_SPEND": [
+        "-88",
+        "-88.0"
+      ],
+      "MEDRES_REDUCE": [
+        "-88",
+        "-88.0"
+      ],
+      "MEDRES_PROC": [
+        "-88",
+        "-88.0"
+      ],
+      "MEDRES_HELP": [
+        "-88",
+        "-88.0"
+      ],
+      "MEDRES_NEG": [
+        "-88",
+        "-88.0"
+      ],
+      "MEDRES_NEGHLTH": [
+        "-88",
+        "-88.0"
+      ],
+      "MEDRES_DK": [
+        "-88",
+        "-88.0"
+      ],
+      "MEDRES_OTH": [
+        "-88",
+        "-88.0"
+      ],
+      "FD_CHILD": [
+        "-88",
+        "-88.0"
+      ],
+      "FDRSN_AFFORD": [
+        "-88",
+        "-88.0"
+      ],
+      "FDRSN_GETSTORE": [
+        "-88",
+        "-88.0"
+      ],
+      "FDRSN_SAFETY": [
+        "-88",
+        "-88.0"
+      ],
+      "FDRSN_NONE": [
+        "-88",
+        "-88.0"
+      ],
+      "FDSCHL_EXPNSDIF": [
+        "-88",
+        "-88.0"
+      ],
+      "PRICESTRESS": [
+        "-88",
+        "-88.0"
+      ],
+      "RENTCUR": [
+        "-88",
+        "-88.0"
+      ],
+      "MORTCUR": [
+        "-88",
+        "-88.0"
+      ],
+      "TMONTHSBEHIND": [
+        "-88",
+        "-88.0"
+      ],
+      "EVICT": [
+        "-88",
+        "-88.0"
+      ],
+      "RFORECLOSE": [
+        "-88",
+        "-88.0"
+      ],
+      "RLIVEARRANGEPLAN": [
+        "-88",
+        "-88.0"
+      ],
+      "REH_SHELTER": [
+        "-88",
+        "-88.0"
+      ],
+      "REH_STREET": [
+        "-88",
+        "-88.0"
+      ],
+      "REH_COUCH": [
+        "-88",
+        "-88.0"
+      ],
+      "REH_OTHER": [
+        "-88",
+        "-88.0"
+      ],
+      "REH_DK": [
+        "-88",
+        "-88.0"
+      ],
+      "REHWHO_SELF": [
+        "-88",
+        "-88.0"
+      ],
+      "REHWHO_SPOUSE": [
+        "-88",
+        "-88.0"
+      ],
+      "REHWHO_ADULTCHILD": [
+        "-88",
+        "-88.0"
+      ],
+      "REHWHO_CHILDU18": [
+        "-88",
+        "-88.0"
+      ],
+      "REHWHO_SIBLING": [
+        "-88",
+        "-88.0"
+      ],
+      "REHWHO_OTHERFAM": [
+        "-88",
+        "-88.0"
+      ],
+      "REHWHO_NONRELATIVE": [
+        "-88",
+        "-88.0"
+      ],
+      "AC_WEAK": [
+        "-88",
+        "-88.0"
+      ],
+      "AC_BROKEN": [
+        "-88",
+        "-88.0"
+      ],
+      "AC_AFFORDALL": [
+        "-88",
+        "-88.0"
+      ],
+      "AC_AFFORDPART": [
+        "-88",
+        "-88.0"
+      ],
+      "AC_POWER": [
+        "-88",
+        "-88.0"
+      ],
+      "AC_OTHER": [
+        "-88",
+        "-88.0"
+      ],
+      "CD_WEAK": [
+        "-88",
+        "-88.0"
+      ],
+      "CD_BROKEN": [
+        "-88",
+        "-88.0"
+      ],
+      "CD_AFFORDALL": [
+        "-88",
+        "-88.0"
+      ],
+      "CD_AFFORDPART": [
+        "-88",
+        "-88.0"
+      ],
+      "CD_POWER": [
+        "-88",
+        "-88.0"
+      ],
+      "CD_NONE": [
+        "-88",
+        "-88.0"
+      ],
+      "CD_OTHER": [
+        "-88",
+        "-88.0"
+      ],
+      "CSISSUE_CROWDED": [
+        "-88",
+        "-88.0"
+      ],
+      "CSISSUE_NOTOPEN": [
+        "-88",
+        "-88.0"
+      ],
+      "CSISSUE_FAR": [
+        "-88",
+        "-88.0"
+      ],
+      "CSISSUE_MED": [
+        "-88",
+        "-88.0"
+      ],
+      "CSISSUE_NOTSAFE": [
+        "-88",
+        "-88.0"
+      ],
+      "CSISSUE_NOPETS": [
+        "-88",
+        "-88.0"
+      ],
+      "CSISSUE_OTHER": [
+        "-88",
+        "-88.0"
+      ],
+      "CSISSUE_NONE": [
+        "-88",
+        "-88.0"
+      ],
+      "CSGO_CROWDED": [
+        "-88",
+        "-88.0"
+      ],
+      "CSGO_NOTOPEN": [
+        "-88",
+        "-88.0"
+      ],
+      "CSGO_FAR": [
+        "-88",
+        "-88.0"
+      ],
+      "CSGO_MED": [
+        "-88",
+        "-88.0"
+      ],
+      "CSGO_NOTSAFE": [
+        "-88",
+        "-88.0"
+      ],
+      "CSGO_NOPETS": [
+        "-88",
+        "-88.0"
+      ],
+      "CSGO_FIND": [
+        "-88",
+        "-88.0"
+      ],
+      "CSGO_NONEED": [
+        "-88",
+        "-88.0"
+      ],
+      "CSGO_OTHER": [
+        "-88",
+        "-88.0"
+      ],
+      "HLTH_HEART": [
+        "-88",
+        "-88.0"
+      ],
+      "HLTH_ASTHMA": [
+        "-88",
+        "-88.0"
+      ],
+      "HLTH_DIABETES": [
+        "-88",
+        "-88.0"
+      ],
+      "HLTH_KIDNEYS": [
+        "-88",
+        "-88.0"
+      ],
+      "HLTH_MEDICATION": [
+        "-88",
+        "-88.0"
+      ],
+      "HLTH_MOBILITY": [
+        "-88",
+        "-88.0"
+      ],
+      "HLTH_OTHER": [
+        "-88",
+        "-88.0"
+      ],
+      "TPNEED_NOTAVAIL": [
+        "-88",
+        "-88.0"
+      ],
+      "TPNEED_MORETIME": [
+        "-88",
+        "-88.0"
+      ],
+      "TPNEED_UNPRED": [
+        "-88",
+        "-88.0"
+      ],
+      "TPNEED_AFFORD": [
+        "-88",
+        "-88.0"
+      ],
+      "TPNEED_UNSAFE": [
+        "-88",
+        "-88.0"
+      ],
+      "TPNEED_DISAB": [
+        "-88",
+        "-88.0"
+      ],
+      "TPNEED_NONE": [
+        "-88",
+        "-88.0"
+      ]
+    },
+    "did_not_answer": {
+      "SEX_ORNT": [
+        "-99",
+        "-99.0"
+      ],
+      "MS": [
+        "-99",
+        "-99.0"
+      ],
+      "AF_NO": [
+        "-99",
+        "-99.0"
+      ],
+      "AF_ACTDUTY_SELF": [
+        "-99",
+        "-99.0"
+      ],
+      "AF_RESNG_SELF": [
+        "-99",
+        "-99.0"
+      ],
+      "AF_ACTDUTY_SP": [
+        "-99",
+        "-99.0"
+      ],
+      "AF_RESNG_SP": [
+        "-99",
+        "-99.0"
+      ],
+      "AFEVER_NO": [
+        "-99",
+        "-99.0"
+      ],
+      "AFEVER_ACTDUTY_SELF": [
+        "-99",
+        "-99.0"
+      ],
+      "AFEVER_RESNG_SELF": [
+        "-99",
+        "-99.0"
+      ],
+      "AFEVER_ACTDUTY_SP": [
+        "-99",
+        "-99.0"
+      ],
+      "AFEVER_RESNG_SP": [
+        "-99",
+        "-99.0"
+      ],
+      "LANG_OTHER_HOME": [
+        "-99",
+        "-99.0"
+      ],
+      "RLANG_HOME": [
+        "-99",
+        "-99.0"
+      ],
+      "ENGLISH_PROF": [
+        "-99",
+        "-99.0"
+      ],
+      "SATISFACTION": [
+        "-99",
+        "-99.0"
+      ],
+      "KIDS_LT1Y": [
+        "-99",
+        "-99.0"
+      ],
+      "KIDS_1_4Y": [
+        "-99",
+        "-99.0"
+      ],
+      "KIDS_5_11Y": [
+        "-99",
+        "-99.0"
+      ],
+      "KIDS_12_17Y": [
+        "-99",
+        "-99.0"
+      ],
+      "ENRPUBCHK": [
+        "-99",
+        "-99.0"
+      ],
+      "ENRPRVCHK": [
+        "-99",
+        "-99.0"
+      ],
+      "ENRHMSCHK": [
+        "-99",
+        "-99.0"
+      ],
+      "ENROLLNONE": [
+        "-99",
+        "-99.0"
+      ],
+      "TENROLLPUB": [
+        "-99",
+        "-99.0"
+      ],
+      "TENROLLPRV": [
+        "-99",
+        "-99.0"
+      ],
+      "TENROLLHMSCH": [
+        "-99",
+        "-99.0"
+      ],
+      "CHILDCARE": [
+        "-99",
+        "-99.0"
+      ],
+      "FORMULA_AGE": [
+        "-99",
+        "-99.0"
+      ],
+      "BABY_FED": [
+        "-99",
+        "-99.0"
+      ],
+      "WORKLOSS": [
+        "-99",
+        "-99.0"
+      ],
+      "ANYWORK": [
+        "-99",
+        "-99.0"
+      ],
+      "CLASS_WORKER": [
+        "-99",
+        "-99.0"
+      ],
+      "REASON_NOWORK": [
+        "-99",
+        "-99.0"
+      ],
+      "TWDAYS": [
+        "-99",
+        "-99.0"
+      ],
+      "SEEING": [
+        "-99",
+        "-99.0"
+      ],
+      "HEARING": [
+        "-99",
+        "-99.0"
+      ],
+      "MOBILITY": [
+        "-99",
+        "-99.0"
+      ],
+      "REMEMBERING": [
+        "-99",
+        "-99.0"
+      ],
+      "SELFCARE": [
+        "-99",
+        "-99.0"
+      ],
+      "UNDERSTAND": [
+        "-99",
+        "-99.0"
+      ],
+      "ANXIOUS": [
+        "-99",
+        "-99.0"
+      ],
+      "WORRY": [
+        "-99",
+        "-99.0"
+      ],
+      "INTEREST": [
+        "-99",
+        "-99.0"
+      ],
+      "DOWN": [
+        "-99",
+        "-99.0"
+      ],
+      "MHLTH_NEED": [
+        "-99",
+        "-99.0"
+      ],
+      "MHLTH_GET": [
+        "-99",
+        "-99.0"
+      ],
+      "MHLTH_SATISFIED": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHINS_EMP": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHINS_MEDICARE": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHINS_MEDICAID": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHINS_PURCH": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHINS_VA": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHINS_TRICARE": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHINS_IHS": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHINS_OTH": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHINS_NO": [
+        "-99",
+        "-99.0"
+      ],
+      "SOC_LONELY": [
+        "-99",
+        "-99.0"
+      ],
+      "SOC_SUPPORT": [
+        "-99",
+        "-99.0"
+      ],
+      "SOC_TOGETHER": [
+        "-99",
+        "-99.0"
+      ],
+      "SOC_TALK": [
+        "-99",
+        "-99.0"
+      ],
+      "SOC_RELSERVICES": [
+        "-99",
+        "-99.0"
+      ],
+      "SOC_CLUBS": [
+        "-99",
+        "-99.0"
+      ],
+      "NARCAN_CARRY": [
+        "-99",
+        "-99.0"
+      ],
+      "NARCAN_EVERUSE": [
+        "-99",
+        "-99.0"
+      ],
+      "NARCAN_USEPAST30": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDSHORT_PRESC": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDSHORT_OTC": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDSHORT_SUPPLIES": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDSHORT_OTH": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDSHORT_NONE": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDRES_ALT": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDRES_SPEND": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDRES_REDUCE": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDRES_PROC": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDRES_HELP": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDRES_NEG": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDRES_NEGHLTH": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDRES_DK": [
+        "-99",
+        "-99.0"
+      ],
+      "MEDRES_OTH": [
+        "-99",
+        "-99.0"
+      ],
+      "FD_SUFF": [
+        "-99",
+        "-99.0"
+      ],
+      "FD_CHILD": [
+        "-99",
+        "-99.0"
+      ],
+      "FDRSN_AFFORD": [
+        "-99",
+        "-99.0"
+      ],
+      "FDRSN_GETSTORE": [
+        "-99",
+        "-99.0"
+      ],
+      "FDRSN_SAFETY": [
+        "-99",
+        "-99.0"
+      ],
+      "FDRSN_NONE": [
+        "-99",
+        "-99.0"
+      ],
+      "FD_FREE": [
+        "-99",
+        "-99.0"
+      ],
+      "FDBEN_SNAP": [
+        "-99",
+        "-99.0"
+      ],
+      "FDBEN_WIC": [
+        "-99",
+        "-99.0"
+      ],
+      "FDBEN_NSLPRED": [
+        "-99",
+        "-99.0"
+      ],
+      "FDBEN_SUMMEREBT": [
+        "-99",
+        "-99.0"
+      ],
+      "FDBEN_NONE": [
+        "-99",
+        "-99.0"
+      ],
+      "FDSCHL_EXPNSDIF": [
+        "-99",
+        "-99.0"
+      ],
+      "EXPENSE_DIFFICULT": [
+        "-99",
+        "-99.0"
+      ],
+      "PRICECHANGE": [
+        "-99",
+        "-99.0"
+      ],
+      "PRICESTRESS": [
+        "-99",
+        "-99.0"
+      ],
+      "PRICECONCERN": [
+        "-99",
+        "-99.0"
+      ],
+      "TENURE": [
+        "-99",
+        "-99.0"
+      ],
+      "RENTCUR": [
+        "-99",
+        "-99.0"
+      ],
+      "MORTCUR": [
+        "-99",
+        "-99.0"
+      ],
+      "TMONTHSBEHIND": [
+        "-99",
+        "-99.0"
+      ],
+      "EVICT": [
+        "-99",
+        "-99.0"
+      ],
+      "EH": [
+        "-99",
+        "-99.0"
+      ],
+      "ENERGY": [
+        "-99",
+        "-99.0"
+      ],
+      "HSE_TEMP": [
+        "-99",
+        "-99.0"
+      ],
+      "ENERGY_BILL": [
+        "-99",
+        "-99.0"
+      ],
+      "COOL_CENTRAL": [
+        "-99",
+        "-99.0"
+      ],
+      "COOL_WINDOW": [
+        "-99",
+        "-99.0"
+      ],
+      "COOL_FANS": [
+        "-99",
+        "-99.0"
+      ],
+      "COOL_SWAMP": [
+        "-99",
+        "-99.0"
+      ],
+      "COOL_OTHER": [
+        "-99",
+        "-99.0"
+      ],
+      "COOL_NONE": [
+        "-99",
+        "-99.0"
+      ],
+      "TEMP_SAFE": [
+        "-99",
+        "-99.0"
+      ],
+      "AC_WEAK": [
+        "-99",
+        "-99.0"
+      ],
+      "AC_BROKEN": [
+        "-99",
+        "-99.0"
+      ],
+      "AC_AFFORDALL": [
+        "-99",
+        "-99.0"
+      ],
+      "AC_AFFORDPART": [
+        "-99",
+        "-99.0"
+      ],
+      "AC_POWER": [
+        "-99",
+        "-99.0"
+      ],
+      "AC_OTHER": [
+        "-99",
+        "-99.0"
+      ],
+      "CD_WEAK": [
+        "-99",
+        "-99.0"
+      ],
+      "CD_BROKEN": [
+        "-99",
+        "-99.0"
+      ],
+      "CD_AFFORDALL": [
+        "-99",
+        "-99.0"
+      ],
+      "CD_AFFORDPART": [
+        "-99",
+        "-99.0"
+      ],
+      "CD_POWER": [
+        "-99",
+        "-99.0"
+      ],
+      "CD_NONE": [
+        "-99",
+        "-99.0"
+      ],
+      "CD_OTHER": [
+        "-99",
+        "-99.0"
+      ],
+      "COOLSHELTER": [
+        "-99",
+        "-99.0"
+      ],
+      "CSISSUE_CROWDED": [
+        "-99",
+        "-99.0"
+      ],
+      "CSISSUE_NOTOPEN": [
+        "-99",
+        "-99.0"
+      ],
+      "CSISSUE_FAR": [
+        "-99",
+        "-99.0"
+      ],
+      "CSISSUE_MED": [
+        "-99",
+        "-99.0"
+      ],
+      "CSISSUE_NOTSAFE": [
+        "-99",
+        "-99.0"
+      ],
+      "CSISSUE_NOPETS": [
+        "-99",
+        "-99.0"
+      ],
+      "CSISSUE_OTHER": [
+        "-99",
+        "-99.0"
+      ],
+      "CSISSUE_NONE": [
+        "-99",
+        "-99.0"
+      ],
+      "CSGO_CROWDED": [
+        "-99",
+        "-99.0"
+      ],
+      "CSGO_NOTOPEN": [
+        "-99",
+        "-99.0"
+      ],
+      "CSGO_FAR": [
+        "-99",
+        "-99.0"
+      ],
+      "CSGO_MED": [
+        "-99",
+        "-99.0"
+      ],
+      "CSGO_NOTSAFE": [
+        "-99",
+        "-99.0"
+      ],
+      "CSGO_NOPETS": [
+        "-99",
+        "-99.0"
+      ],
+      "CSGO_FIND": [
+        "-99",
+        "-99.0"
+      ],
+      "CSGO_NONEED": [
+        "-99",
+        "-99.0"
+      ],
+      "CSGO_OTHER": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTH_HEAT": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTH_HEART": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTH_ASTHMA": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTH_DIABETES": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTH_KIDNEYS": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTH_MEDICATION": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTH_MOBILITY": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTH_OTHER": [
+        "-99",
+        "-99.0"
+      ],
+      "HOT_COOLSHELTER": [
+        "-99",
+        "-99.0"
+      ],
+      "HOT_PUBFACILITY": [
+        "-99",
+        "-99.0"
+      ],
+      "HOT_COMFACILITY": [
+        "-99",
+        "-99.0"
+      ],
+      "HOT_ACHOME": [
+        "-99",
+        "-99.0"
+      ],
+      "HOT_POOL": [
+        "-99",
+        "-99.0"
+      ],
+      "HOT_ACHOTEL": [
+        "-99",
+        "-99.0"
+      ],
+      "HOT_NOAPPLIANCE": [
+        "-99",
+        "-99.0"
+      ],
+      "HOT_NOACTION": [
+        "-99",
+        "-99.0"
+      ],
+      "HOT_OTHER": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_WALK": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_BIKE": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_MOTORCYCLE": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_VEHOWN": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_VEHBOR": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_VEHRENT": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_TAXI": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_BUS": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_RAIL": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_FERRY": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_PARA": [
+        "-99",
+        "-99.0"
+      ],
+      "TP_OTH": [
+        "-99",
+        "-99.0"
+      ],
+      "TPACCESS": [
+        "-99",
+        "-99.0"
+      ],
+      "TPNEED_NOTAVAIL": [
+        "-99",
+        "-99.0"
+      ],
+      "TPNEED_MORETIME": [
+        "-99",
+        "-99.0"
+      ],
+      "TPNEED_UNPRED": [
+        "-99",
+        "-99.0"
+      ],
+      "TPNEED_AFFORD": [
+        "-99",
+        "-99.0"
+      ],
+      "TPNEED_UNSAFE": [
+        "-99",
+        "-99.0"
+      ],
+      "TPNEED_DISAB": [
+        "-99",
+        "-99.0"
+      ],
+      "TPNEED_NONE": [
+        "-99",
+        "-99.0"
+      ],
+      "DRIVE_AUTOVEH": [
+        "-99",
+        "-99.0"
+      ],
+      "LIVE_ENTERTAINMENT": [
+        "-99",
+        "-99.0"
+      ],
+      "ARTEXHIBIT": [
+        "-99",
+        "-99.0"
+      ],
+      "MOVIES": [
+        "-99",
+        "-99.0"
+      ],
+      "CREATEART": [
+        "-99",
+        "-99.0"
+      ],
+      "PARTINARTS": [
+        "-99",
+        "-99.0"
+      ],
+      "DIET_DAIRY": [
+        "-99",
+        "-99.0"
+      ],
+      "DIET_PROTEIN": [
+        "-99",
+        "-99.0"
+      ],
+      "DIET_PROCESSED": [
+        "-99",
+        "-99.0"
+      ],
+      "DIET_GUIDELINES": [
+        "-99",
+        "-99.0"
+      ],
+      "TRUST_FEDSTAT": [
+        "-99",
+        "-99.0"
+      ],
+      "TRUST_MILITARY": [
+        "-99",
+        "-99.0"
+      ],
+      "TRUST_POLICE": [
+        "-99",
+        "-99.0"
+      ],
+      "TRUST_SUPREME": [
+        "-99",
+        "-99.0"
+      ],
+      "TRUST_PRESIDENCY": [
+        "-99",
+        "-99.0"
+      ],
+      "TRUST_SCHOOLS": [
+        "-99",
+        "-99.0"
+      ],
+      "TRUST_CRIMJUST": [
+        "-99",
+        "-99.0"
+      ],
+      "TRUST_CONGRESS": [
+        "-99",
+        "-99.0"
+      ],
+      "TRUST_CENSUS": [
+        "-99",
+        "-99.0"
+      ],
+      "TRUST_STATISTICAL": [
+        "-99",
+        "-99.0"
+      ],
+      "FEDSTAT_NEED": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHTRUST_DR": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHTRUST_GOV": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHTRUST_SCI": [
+        "-99",
+        "-99.0"
+      ],
+      "HLTHTRUST_AI": [
+        "-99",
+        "-99.0"
+      ],
+      "RHHINCOME": [
+        "-99",
+        "-99.0"
+      ]
+    }
+  }
+}

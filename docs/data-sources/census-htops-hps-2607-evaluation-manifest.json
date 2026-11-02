@@ -1,0 +1,82 @@
+{
+  "candidate_id": "census-htops-hps-2607",
+  "accessed_utc": "2026-11-02T05:52:43Z",
+  "admission_status": "evidence_incomplete",
+  "adopted": false,
+  "disposition": "external_only",
+  "usage": "provisional_quality_only_boundary",
+  "redistribution": "prohibited",
+  "publisher_page": {
+    "url": "https://www.census.gov/programs-surveys/household-pulse-survey/data/datasets.html",
+    "bytes": 339359,
+    "sha256": "4e2f1bd03924e30dd03562248a35262404917b8bfc43c8b5f6afca82b1666e35",
+    "reviewed": "2026-09-04T11:02:46.092-04:00"
+  },
+  "archive": {
+    "url": "https://www2.census.gov/programs-surveys/demo/datasets/hhp/2026/topical/HTOPS_HPS_2607_CSV.zip",
+    "filename": "HTOPS_HPS_2607_CSV.zip",
+    "bytes": 20037422,
+    "sha256": "43980716428de1b6e2a215973f31b0f0a0af4317107a97ef889dbf569d207a31"
+  },
+  "user_note": {
+    "url": "https://www2.census.gov/programs-surveys/demo/technical-documentation/hhp/2607_HTOPS_Household_Pulse_User_Notes_10302026.pdf",
+    "filename": "2607_HTOPS_Household_Pulse_User_Notes_10302026.pdf",
+    "bytes": 283812,
+    "sha256": "186816441c17c109e35b8916c7bea31a0d22336bec98256af6f8b4408ce2d0c8",
+    "accessed_utc": "2026-11-02T05:52:43Z",
+    "last_modified_utc": "2026-10-30T16:00:27Z",
+    "puf_effect": "none; the note explicitly states that the underlying PUF is not affected",
+    "affected_published_tables": ["Health1", "Housing3", "Transportation3"]
+  },
+  "supporting_documents": {
+    "questionnaire": {
+      "url": "https://www2.census.gov/programs-surveys/demo/technical-documentation/hhp/HTOPS_2607_Questionnaire_ENGLISH.pdf",
+      "filename": "HTOPS_2607_Questionnaire_ENGLISH.pdf",
+      "bytes": 397247,
+      "sha256": "ab59743a68470c64aba42dfa8b72ab1ffce9eba8b34a69b0d5bbe53232b6896c",
+      "accessed_utc": "2026-11-02T05:52:43Z",
+      "last_modified_utc": "2026-09-24T13:02:14Z"
+    },
+    "source_and_accuracy": {
+      "url": "https://www2.census.gov/programs-surveys/demo/technical-documentation/hhp/HTOPS_2607_Source_and_Accuracy.pdf",
+      "filename": "HTOPS_2607_Source_and_Accuracy.pdf",
+      "bytes": 1279166,
+      "sha256": "5b17eb1e2b01fe59eb434366a257da979be01c651be14b23f55d83747c644360",
+      "accessed_utc": "2026-11-02T05:52:43Z",
+      "last_modified_utc": "2026-09-24T12:47:12Z"
+    },
+    "quality_measures": {
+      "url": "https://www2.census.gov/programs-surveys/demo/tables/hhp/2026/2607/HTOPS_2607_Quality_Measures.xlsx",
+      "filename": "HTOPS_2607_Quality_Measures.xlsx",
+      "bytes": 12763,
+      "sha256": "da5533fef6ca2e9b73457dc8faaf589ef96217d0f9e9d94f08ff2821a77a50bb",
+      "accessed_utc": "2026-11-02T05:52:43Z",
+      "last_modified_utc": "2026-09-24T12:47:11Z"
+    }
+  },
+  "members": {
+    "HTOPS_HPS_2607_PUF Data Dictionary_CSV.xlsx": {"bytes": 32197, "sha256": "f91b0509a92e00218c8c59aa61237b5b494641860af5e72fc9e30143d9590585"},
+    "HTOPS_HPS_2607_PUF.csv": {"bytes": 16050806, "sha256": "cfc4fc46d15be4b61c0ee924e9b881b3fb742cd668270b3bd532efe5b5a6c380", "rows": 12755, "columns": 255, "schema_sha256": "a0c1a98b9695c414fe2d5f415e0b7fc8c92e2cc0af739d09eef9f452cdb62c3d"},
+    "HTOPS_HPS_2607_REPWGT_PUF.csv": {"bytes": 38137778, "sha256": "10b15223c98ee185a3025290e64819841885571ad46099c399fde6e3f48eebf6", "rows": 12755, "columns": 163, "schema_sha256": "4e7594ebcd61d5b505ba01fabccca8d121593df0c5d37b9d01383e7a2dc49e0d"}
+  },
+  "identifier": {"column": "SCRAMID", "missing": 0, "unique": 12755, "replicate_order_matches": true, "analysis_use": "prohibited"},
+  "base_weights": {
+    "PWEIGHT": [0, 0, 0, 0, 633.0710898644122, 3941958.426037522],
+    "HWEIGHT": [0, 0, 0, 0, 638.1644723523074, 1058697.3650488455]
+  },
+  "replicate_weights": {
+    "full_sample": {"PWEIGHT0_equals_PWEIGHT": true, "HWEIGHT0_equals_HWEIGHT": true},
+    "sequence": "PWEIGHT1..PWEIGHT80 and HWEIGHT1..HWEIGHT80",
+    "variance_factor": "4/80",
+    "PWEIGHT": [80, 0, 0, 0, 0, 167.2803393650417, 6225349.31742791, "1a2bcb4f1689dc858bb0fe4d23f0a43773b23a8dd6cb92a039ed3d226b2b0ff8"],
+    "HWEIGHT": [80, 0, 0, 0, 0, 169.82246136495218, 1711612.8305694133, "0eec8ab8d9a9870a0f9042411dc7b404642f9dbe00a88a2a3ed6b35365607a06"]
+  },
+  "imputation_flags": {
+    "A_THHLD_NUMPER": [42, 12713], "A_THHLD_NUMKID": [91, 12664],
+    "A_TAGE": [962, 11793], "A_TBIRTH_YEAR": [379, 12376],
+    "A_ESEX": [125, 12630], "A_RRACE": [338, 12417],
+    "A_EHISPANIC": [228, 12527], "A_REDUC": [83, 12672]
+  },
+  "special_responses": {"rules_sha256": "0a9c58ae2434eef53ce3e7828b554d7b65f632afbfd299166681560b08c09c03", "not_in_universe": 1264241, "did_not_answer": 97065},
+  "raw_or_transformed_data_committed": false
+}
