@@ -70,7 +70,9 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
         "locked_pending_evidence"
     )
     external_copy = payload["publication_gate"]["external_summary_candidate"]
-    assert "量化评估" in external_copy
+    assert "固定样本情景测算" in external_copy
+    assert "预设流程工时假设" in external_copy
+    assert "分别估算为80和32人时" in external_copy
     assert "预计" in external_copy
     assert "模拟" not in external_copy
     assert "已实现" not in external_copy

@@ -477,8 +477,8 @@ def run_benchmark(
                 "publishable" if publication_passed else "locked_pending_evidence"
             ),
             "external_summary_candidate": (
-                "在包含10,000名申请人的固定样本量化评估中，FairLendKit按显式流程"
-                "工时假设将后处理工作量由80人时测算为32人时，预计减少60%；评估"
+                "在包含10,000名申请人的固定样本情景测算中，按预设流程工时假设，"
+                "基线与工具辅助流程分别估算为80和32人时，对应预计减少60%；评估"
                 f"覆盖情景由2,000人扩展至10,000人。固定逐行策略派生出{approval_increment}"
                 f"个新增批准，按每笔8,000美元假设对应{credit_increment:,}美元授信机会。"
             ),

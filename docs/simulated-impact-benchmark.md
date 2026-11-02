@@ -73,5 +73,9 @@ customer impact. It reports the derived 87 approvals—not the unreproduced
 350-person expectation—and remains locked while the publication gate fails.
 The exact machine-readable state is `locked_pending_evidence`.
 
+The candidate describes 80 and 32 person-hours as separate estimates under a
+predeclared workflow-effort assumption; it does not say observed work “fell”
+from one value to the other and never derives either value from wall-clock time.
+
 The benchmark does not recommend a policy or threshold and does not establish
 fairness, legality, business value, or real-world impact.
