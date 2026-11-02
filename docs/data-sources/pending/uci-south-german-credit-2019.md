@@ -78,6 +78,31 @@ The independently reviewable AD-D1-UCI proposal is recorded at
 It proposes a bounded one-time retrieval gate; it does not authorize retrieval,
 populate hashes, or change this candidate's pending state.
 
+## UCI-M1 response-metadata investigation
+
+The first independently authorized retrieval attempt was consumed on
+2026-11-02 and failed closed before body streaming because the normalized GET
+response media type was not in the exact approved ZIP allowlist. Independent
+review confirmed lifecycle `prepared -> started -> failed -> cleaned`, completed
+cleanup, no quarantined bytes, a permanent single-use `.spent` marker, and no
+admission or repository action. The candidate therefore remains
+`evidence_incomplete` and cannot advance to byte-level Q3 review.
+
+The metadata-only follow-up is recorded in
+[`../investigations/uci-south-german-credit-response-metadata-2026-11-02.md`](../investigations/uci-south-german-credit-response-metadata-2026-11-02.md).
+It shows that the package endpoint's HEAD response omits `Content-Type` and
+`Content-Length`, including when sent the approved Harness `Accept` and
+`User-Agent` headers. The failed GET audit did not persist raw response headers,
+so the exact GET `Content-Type` cannot be reconstructed after the fact. HEAD and
+GET semantics must not be assumed identical.
+
+No second retrieval is proposed from this evidence. A future attempt requires a
+new reviewed Harness version that safely records response metadata before media-
+type rejection, or affirmative publisher evidence about the package delivery
+headers; then a new contract, authorization, run ID, and independent approval.
+The existing media-type allowlist is not widened and the consumed Run ID is
+never reused.
+
 ## Enablement plan
 
 - Target: `repository` as the first directly included risk-metric benchmark,

@@ -59,16 +59,24 @@ Every candidate advances through these gates in order:
 ### 1. UCI South German Credit
 
 - Candidate: [`uci-south-german-credit-2019`](pending/uci-south-german-credit-2019.md)
-- Current gate: Q1, authorization preparation; live retrieval has not run.
+- Current gate: Q0/UCI-M1 response-metadata evidence. The first Q2 authorization
+  was consumed and failed closed before body streaming; cleanup and zero
+  residual bytes were independently verified. It cannot enter Q3 or Q4.
 - Evidence ready: official UCI page and DOI, official package URL, three expected
   members and sizes, CC BY 4.0 presentation, field-level privacy proposal,
   benchmark-only boundary, approved offline controlled-retrieval harness.
 - Intended use: generic historical credit-risk metric/adapter benchmark only;
   never cash-flow, rent, utility, modern-population, underwriting, or production
   fairness evidence.
-- Blocking before Q2: independently reviewed read-only authorization JSON bound
-  to the approved UCI harness/test hashes, official URL, single-use run ID,
-  expiry, byte/member limits, and repository-external paths.
+- Blocking before any new Q1/Q2: the official package HEAD response supplies no
+  `Content-Type` or `Content-Length`, while the failed GET audit proves only that
+  its normalized media type was outside the approved allowlist and did not
+  preserve the exact raw header. The delivery behavior must be resolved without
+  inferring GET headers from HEAD or widening the allowlist.
+- Next evidence: obtain affirmative publisher header/package guidance, or
+  independently review a new offline-only Harness revision that records safe
+  status/redirect/header-presence evidence before rejecting a response. Only
+  then may a new contract, authorization, and Run ID be proposed.
 - Q3 must resolve: actual hashes and member/schema identity, unexpected fields,
   direct/quasi-identifier risk, package notices, release-date discrepancy,
   original provenance, label horizon, sampling, and time semantics.

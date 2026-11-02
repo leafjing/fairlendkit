@@ -6,6 +6,8 @@ raw, sampled, transformed, or row-level third-party data.
 - `pending/` holds unverified candidate records.
 - `admission-proposals/` holds independently reviewable proposals; a proposal
   is not an admission decision or download authorization.
+- `investigations/` holds metadata-only, non-row evidence from failed gates or
+  publisher behavior checks; it never contains downloaded source bytes.
 - [`admission-queue.md`](admission-queue.md) is the reviewed, strictly serial
   work queue for moving candidates through retrieval, admission, promotion, and
   redistribution as separate gates.
