@@ -55,8 +55,13 @@ The 2026-11-02 current-source investigation is recorded in
 It identifies the live CTU FEL repository page, its three transformed variants,
 8-table/1,090,086-row/55-column metadata, 682 total loan instances, CTU's
 overall 606 successful / 76 unsuccessful summary, and its explicit temporal-
-leakage warning. Actual A/B/C/D counts remain unverified; the overall summary
-must not be represented as the A/B-only distribution.
+leakage warning. The later live content evaluation at
+`feat/ctu-berka-financial-evaluation@7fefb5e` measured `A=203`, `B=31`, `C=403`,
+and `D=45`: finished-only A/B is 234 (`203/31`), while the overall summary is
+`A+C=606` and `B+D=76`. C/D remain unfinished and are excluded from the A/B
+task. The same snapshot measured 1,079,680 live rows versus the page's
+1,090,086 catalog value, confirming the need for access-time snapshot hashes.
+These measurements are pending independent review of that commit.
 
 The live CTU page is an authoritative current access route, but it offers a
 live MariaDB export rather than an immutable package and states no explicit

@@ -36,6 +36,12 @@ database variant, UTC time, schema, row counts, and byte/table hashes. The
 repository's displayed `78.8 MB` is database metadata, not a promised export
 size.
 
+The later `7fefb5e` live snapshot recorded 8 tables, 55 columns, and 1,079,680
+rows, differing from the page's 1,090,086-row catalog value. This reinforces
+that the database is mutable/live and that every evaluation must pin its access
+time, exact schema, per-table counts, and normalized hashes rather than treating
+the landing-page count as an immutable release identity.
+
 The historical VŠE challenge and the former `relational.fit.cvut.cz` address do
 not currently resolve. The live institutional endpoint is
 `relational.fel.cvut.cz`; mirrors on GitHub, Kaggle, or elsewhere are not
@@ -50,11 +56,13 @@ total loan instances, target table `loan`, target column `status`, target identi
 
 The standard task is restricted to finished loans: predict `A` versus `B` at
 loan start. Separately, CTU summarizes the full 682-loan dataset as 606
-successful and 76 unsuccessful loans. The page does not establish that this
-overall summary is the A/B-only distribution. Actual A/B/C/D row counts and
-their relationship to the 606/76 summary remain `unverified` pending content
-evaluation. `C` and `D` are unfinished-loan states and must not be silently
-combined with the finished-loan task.
+successful and 76 unsuccessful loans. The subsequent official-live-database
+evaluation in `feat/ctu-berka-financial-evaluation@7fefb5e` independently
+recorded `A=203`, `B=31`, `C=403`, and `D=45`. Thus the finished-only A/B task
+contains 234 loans (`203/31`), while CTU's overall summary is exactly
+`A+C=606` and `B+D=76`. `C` and `D` are unfinished-loan states and must not be
+silently combined with the finished-loan task. These content measurements
+remain subject to independent review of `7fefb5e`.
 
 CTU explicitly warns that ignoring time causes target leakage: future
 transaction balances can perfectly separate good and bad loans, and loan date
