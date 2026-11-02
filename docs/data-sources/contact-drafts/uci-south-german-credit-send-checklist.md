@@ -64,12 +64,15 @@ new single-send authorization.
 
 ## Reply archive and privacy boundary
 
-- Raw replies and attachments must remain outside Git under the fixed local
-  root `/home/kouji175/dev-court/uci-south-german-credit-live/correspondence/`.
-- A send authorization must assign a unique case ID below that root before
-  submission. The case directory must be `0700`; raw message and attachment
-  files must be `0600`. The root and case directory are not created by this
-  checklist.
+- Raw replies and attachments must remain outside Git under a dedicated
+  repository-external root identified in authorization records as
+  `UCI_CORRESPONDENCE_ROOT`. The repository must not contain its host-specific
+  expansion, username, or directory layout.
+- A send authorization must bind `UCI_CORRESPONDENCE_ROOT` to a reviewed
+  absolute path outside every Git worktree and assign a unique case ID below
+  that root before submission. The root and case directory must be `0700`; raw
+  message and attachment files must be `0600`. Neither directory is created by
+  this checklist.
 - Do not commit respondent names, email addresses, signatures, message headers,
   unpublished attachments, or verbatim private correspondence.
 - The repository may later contain only a separately reviewed, minimized
