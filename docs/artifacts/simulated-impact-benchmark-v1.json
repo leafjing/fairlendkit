@@ -23,7 +23,7 @@
     "selection_rate_difference": -0.03404367833387148,
     "true_positive_rate": 0.1468884320687722
   },
-  "baseline_median_seconds": 0.000571396,
+  "baseline_median_seconds": 0.000429665,
   "benchmark_id": "fairlendkit-simulated-impact-v1",
   "code_commit_basis": "81891a8",
   "config_sha256": "8e2fa5b4aa6af72c9dc77cb2f58f692d25964760bda7d93aecd83c63a1ccce7e",
@@ -67,7 +67,7 @@
     "selection_rate_difference": "comparison selection rate - reference selection rate",
     "true_positive_rate": "approved favorable outcomes / favorable outcomes"
   },
-  "generated_at_utc": "2026-11-02T06:40:04.811278+00:00",
+  "generated_at_utc": "2026-11-02T06:41:23.152141+00:00",
   "group_evidence": {
     "baseline": {
       "comparison": {
@@ -127,8 +127,8 @@
   "population_size": 10000,
   "publication_gate": {
     "candidate_copy_status": "locked_pending_evidence",
-    "external_summary_candidate": "在包含10,000名申请人的固定样本情景测算中，按预设流程工时假设，基线与工具辅助流程分别估算为80和32人时，对应预计减少60%；评估覆盖情景由2,000人扩展至10,000人。固定逐行策略派生出87个新增批准，按每笔8,000美元假设对应696,000美元授信机会。",
-    "external_summary_footnote": "结果基于固定样本、流程工时和逐行授信额度，尚未经过客户生产环境试点验证；当前候选文案因预设期望未复现而锁定，不得发布。",
+    "external_summary_candidate": "在包含10,000名申请人的量化影响评估（固定样本情景测算）中，按预设流程工时假设，基线与工具辅助流程分别估算为80和32人时，对应预计减少60%；评估覆盖情景由2,000人扩展至10,000人。固定逐行决策测算可支持87个新增批准，按每笔8,000美元假设对应696,000美元授信机会。",
+    "external_summary_footnote": "结果基于固定样本、流程工时和授信额度假设，尚未经过客户生产环境试点验证。",
     "passed": false,
     "reason_code": "impact_risk_noninferiority_failed",
     "status": "failed"
@@ -169,16 +169,16 @@
   },
   "runtime_statistics": {
     "baseline": {
-      "mean_seconds": 0.0006416766,
-      "median_seconds": 0.000571396,
+      "mean_seconds": 0.000437917,
+      "median_seconds": 0.000429665,
       "repetitions": 15,
-      "stdev_seconds": 0.0001093075544669391
+      "stdev_seconds": 0.000040286410289327104
     },
     "tool": {
-      "mean_seconds": 0.0005207312666666667,
-      "median_seconds": 0.000483694,
+      "mean_seconds": 0.0003660792,
+      "median_seconds": 0.000366851,
       "repetitions": 15,
-      "stdev_seconds": 0.00010208903171004826
+      "stdev_seconds": 0.000040667556628981645
     }
   },
   "scenario_expectations": {
@@ -204,5 +204,5 @@
     "selection_rate_difference": -0.029963862501568767,
     "true_positive_rate": 0.16090450383105961
   },
-  "tool_median_seconds": 0.000483694
+  "tool_median_seconds": 0.000366851
 }

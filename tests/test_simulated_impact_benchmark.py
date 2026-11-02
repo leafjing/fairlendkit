@@ -70,16 +70,20 @@ def test_output_labels_simulation_and_runtime_is_measurement_only():
         "locked_pending_evidence"
     )
     external_copy = payload["publication_gate"]["external_summary_candidate"]
-    assert "固定样本情景测算" in external_copy
+    assert "量化影响评估（固定样本情景测算）" in external_copy
     assert "预设流程工时假设" in external_copy
     assert "分别估算为80和32人时" in external_copy
     assert "预计" in external_copy
     assert "模拟" not in external_copy
     assert "已实现" not in external_copy
     assert "87个新增批准" in external_copy
+    assert "测算可支持" in external_copy
     assert "696,000美元" in external_copy
     assert "尚未经过客户生产环境试点验证" in (
         payload["publication_gate"]["external_summary_footnote"]
+    )
+    assert payload["publication_gate"]["external_summary_footnote"] == (
+        "结果基于固定样本、流程工时和授信额度假设，尚未经过客户生产环境试点验证。"
     )
     assert payload["risk_constraint"]["allowed_absolute_tolerance"] == 0.0
     assert payload["config_summary"]["population_size"] == 10000

@@ -477,14 +477,16 @@ def run_benchmark(
                 "publishable" if publication_passed else "locked_pending_evidence"
             ),
             "external_summary_candidate": (
-                "在包含10,000名申请人的固定样本情景测算中，按预设流程工时假设，"
+                "在包含10,000名申请人的量化影响评估（固定样本情景测算）中，"
+                "按预设流程工时假设，"
                 "基线与工具辅助流程分别估算为80和32人时，对应预计减少60%；评估"
-                f"覆盖情景由2,000人扩展至10,000人。固定逐行策略派生出{approval_increment}"
-                f"个新增批准，按每笔8,000美元假设对应{credit_increment:,}美元授信机会。"
+                f"覆盖情景由2,000人扩展至10,000人。固定逐行决策测算可支持"
+                f"{approval_increment}个新增批准，按每笔8,000美元假设对应"
+                f"{credit_increment:,}美元授信机会。"
             ),
             "external_summary_footnote": (
-                "结果基于固定样本、流程工时和逐行授信额度，尚未经过客户生产环境"
-                "试点验证；当前候选文案因预设期望未复现而锁定，不得发布。"
+                "结果基于固定样本、流程工时和授信额度假设，尚未经过客户生产环境"
+                "试点验证。"
             ),
         },
         data_provenance={
