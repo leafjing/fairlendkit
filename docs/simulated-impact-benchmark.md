@@ -51,12 +51,12 @@ approval, credit, risk, and fairness metrics.
 
 It additionally records the one-page assessment's analyst-effort and review-
 coverage assumptions as scenario inputs, never as wall-clock-derived savings.
-The executable policy produces 87 incremental approvals rather than the page's
+The executable policy produces 247 incremental approvals rather than the page's
 350-person scenario target; the artifact preserves the measured simulation
 result and does not rewrite it to match that target. Consequently the candidate
 publication copy remains locked with reason code
-`impact_risk_noninferiority_failed`: the observed approved bad rate increases
-under the zero-tolerance contract. Group sample sizes and 95%
+`scenario_expectations_not_reproduced`; the risk non-inferiority gate passes,
+but the approval and group-gap expectations do not. Group sample sizes and 95%
 Wilson intervals accompany selection rates. The risk constraint, stable reason
 code, source identity, allowed use, generation timestamp, code basis, runtime
 mean, and runtime standard deviation are machine readable.
@@ -69,7 +69,7 @@ values. Targets are assertions, never inputs to the decision functions.
 The internal evidence class remains unchanged. The machine-readable external
 copy candidate uses the reader-facing terms “固定样本量化评估”, “预计”, and
 “测算”, carries a production-pilot disclaimer, and avoids claims of realized
-customer impact. It reports the derived 87 approvals—not the unreproduced
+customer impact. It reports the derived 247 approvals—not the unreproduced
 350-person expectation—and remains locked while the publication gate fails.
 The exact machine-readable state is `locked_pending_evidence`.
 

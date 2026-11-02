@@ -131,7 +131,9 @@ def generate_simulated_applicants(
                 alternative_score=round(alternative_score, 12),
                 alternative_data_available=available,
                 favorable_outcome=favorable,
-                predicted_bad_probability=round(1 - favorable_probability, 12),
+                predicted_bad_probability=round(
+                    max(0.0, min(1.0, (800 - credit_score) / 800)), 12
+                ),
                 outcome_matured_12m=True,
                 bad_12m=not favorable,
                 requested_credit=requested_credit,
@@ -306,6 +308,50 @@ def _group_evidence(
     return evidence
 
 
+def evaluate_risk_gate(
+    *,
+    baseline_bad_count: int,
+    baseline_matured_count: int,
+    tool_bad_count: int,
+    tool_matured_count: int,
+    tolerance: float = 0.0,
+) -> dict[str, bool | float | int | str]:
+    """Evaluate the fixed non-inferiority contract with stable failure codes."""
+
+    counts = (
+        baseline_bad_count,
+        baseline_matured_count,
+        tool_bad_count,
+        tool_matured_count,
+    )
+    if tolerance < 0 or any(value < 0 for value in counts):
+        return {"passed": False, "reason_code": "impact_outcome_contract_invalid"}
+    if baseline_bad_count > baseline_matured_count or tool_bad_count > tool_matured_count:
+        return {"passed": False, "reason_code": "impact_outcome_contract_invalid"}
+    if baseline_matured_count == 0 or tool_matured_count == 0:
+        return {"passed": False, "reason_code": "impact_risk_denominator_empty"}
+    baseline_rate = baseline_bad_count / baseline_matured_count
+    tool_rate = tool_bad_count / tool_matured_count
+    delta = tool_rate - baseline_rate
+    passed = delta <= tolerance
+    return {
+        "passed": passed,
+        "reason_code": (
+            "impact_risk_noninferiority_passed"
+            if passed
+            else "impact_risk_noninferiority_failed"
+        ),
+        "baseline_bad_count": baseline_bad_count,
+        "baseline_matured_approved_count": baseline_matured_count,
+        "tool_bad_count": tool_bad_count,
+        "tool_matured_approved_count": tool_matured_count,
+        "baseline_approved_bad_rate": baseline_rate,
+        "tool_approved_bad_rate": tool_rate,
+        "risk_delta": delta,
+        "allowed_absolute_tolerance": tolerance,
+    }
+
+
 def run_benchmark(
     *, seed: int = SEED, population_size: int = POPULATION_SIZE,
     repetitions: int = REPETITIONS,
@@ -318,7 +364,23 @@ def run_benchmark(
     tool_metrics = policy_metrics(rows, tool)
     baseline_runtime = _runtime_statistics(baseline_decisions, rows, repetitions)
     tool_runtime = _runtime_statistics(tool_decisions, rows, repetitions)
-    risk_passed = tool_metrics.approved_bad_rate <= baseline_metrics.approved_bad_rate
+    baseline_bad_count = sum(
+        row.bad_12m
+        for row, decision in zip(rows, baseline, strict=True)
+        if decision and row.outcome_matured_12m
+    )
+    tool_bad_count = sum(
+        row.bad_12m
+        for row, decision in zip(rows, tool, strict=True)
+        if decision and row.outcome_matured_12m
+    )
+    risk_result = evaluate_risk_gate(
+        baseline_bad_count=baseline_bad_count,
+        baseline_matured_count=baseline_metrics.approvals,
+        tool_bad_count=tool_bad_count,
+        tool_matured_count=tool_metrics.approvals,
+    )
+    risk_passed = bool(risk_result["passed"])
     input_sha256 = _input_sha256(rows)
     baseline_ids = {
         row.applicant_id
@@ -446,20 +508,7 @@ def run_benchmark(
             "outcome_definition": "bad_12m = 90+ DPD or charge-off within 12 months",
             "observation_window": "12 months after decision; only matured rows enter denominator",
             "formula": "sum(bad_12m for matured approved) / matured approved count",
-            "allowed_absolute_tolerance": 0.0,
-            "baseline_matured_approved_count": baseline_metrics.approvals,
-            "tool_matured_approved_count": tool_metrics.approvals,
-            "baseline_approved_bad_rate": baseline_metrics.approved_bad_rate,
-            "tool_approved_bad_rate": tool_metrics.approved_bad_rate,
-            "risk_delta": (
-                tool_metrics.approved_bad_rate - baseline_metrics.approved_bad_rate
-            ),
-            "reason_code": (
-                "impact_risk_noninferiority_passed"
-                if risk_passed
-                else "impact_risk_noninferiority_failed"
-            ),
-            "passed": risk_passed,
+            **risk_result,
         },
         decision_set_digests={
             "baseline_approved_count": baseline_metrics.approvals,
