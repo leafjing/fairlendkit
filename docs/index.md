@@ -39,6 +39,7 @@ page for each topic; it does not replace the normative contracts.
 - [Alternative-data credit-risk metrics](alternative-data-risk-metrics.md)
 - [Alternative-data potential proxy-risk screening](alternative-data-proxy-screening.md)
 - [Alternative-data release-candidate evidence](alternative-data-release-candidate.md)
+- [Simulated impact benchmark](simulated-impact-benchmark.md)
 - [FairLendKit 0.1.0rc1 release notes](releases/v0.1.0rc1.md)
 - [Citation and research relationship](citation-and-research.md)
 - [Repository discoverability decisions](discoverability-audit.md)

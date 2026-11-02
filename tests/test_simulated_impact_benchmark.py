@@ -1,0 +1,54 @@
+import json
+
+import pytest
+
+from fairlendkit.research.simulated_impact_benchmark import (
+    baseline_decisions,
+    generate_simulated_applicants,
+    policy_metrics,
+    run_benchmark,
+    tool_decisions,
+)
+
+
+def test_fixed_population_and_decision_outputs_are_reproducible():
+    first = generate_simulated_applicants()
+    second = generate_simulated_applicants()
+    assert first == second
+    result = run_benchmark(repetitions=1)
+    assert result.input_sha256 == "6eae1134ac5986dd53ba6baba01e339d66bba4bbdfeac378e757167e82ba77a9"
+    assert result.covered_applicants == 6329
+    assert result.baseline.approvals == 4351
+    assert result.tool.approvals == 4598
+    assert result.approval_increment == 247
+    assert result.credit_increment == 2731500
+
+
+def test_metrics_are_directly_recomputed_from_rows_and_decisions():
+    rows = generate_simulated_applicants()
+    baseline = policy_metrics(rows, baseline_decisions(rows))
+    tool = policy_metrics(rows, tool_decisions(rows))
+    assert tool.approvals - baseline.approvals == 247
+    assert tool.approved_credit - baseline.approved_credit == 2_731_500
+    assert baseline.approved_bad_rate == pytest.approx(0.34934497816593885)
+    assert tool.approved_bad_rate == pytest.approx(0.34145280556763813)
+    assert baseline.adverse_impact_ratio == pytest.approx(0.7830240080470594)
+    assert tool.adverse_impact_ratio == pytest.approx(0.7996940012359449)
+
+
+def test_output_labels_simulation_and_runtime_is_measurement_only():
+    result = run_benchmark(repetitions=2)
+    payload = json.loads(result.canonical_json())
+    assert payload["benchmark_id"] == "fairlendkit-simulated-impact-v1"
+    assert "Synthetic simulation only" in payload["disclaimer"]
+    assert payload["baseline_median_seconds"] >= 0
+    assert payload["tool_median_seconds"] >= 0
+
+
+def test_invalid_population_repetitions_and_shape_fail_closed():
+    with pytest.raises(ValueError, match="population_size"):
+        generate_simulated_applicants(population_size=0)
+    with pytest.raises(ValueError, match="repetitions"):
+        run_benchmark(repetitions=0)
+    with pytest.raises(ValueError, match="equal lengths"):
+        policy_metrics(generate_simulated_applicants(population_size=10), (True,))
