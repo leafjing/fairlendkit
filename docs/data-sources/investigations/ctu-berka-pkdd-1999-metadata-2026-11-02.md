@@ -36,11 +36,12 @@ database variant, UTC time, schema, row counts, and byte/table hashes. The
 repository's displayed `78.8 MB` is database metadata, not a promised export
 size.
 
-The later `7fefb5e` live snapshot recorded 8 tables, 55 columns, and 1,079,680
-rows, differing from the page's 1,090,086-row catalog value. This reinforces
-that the database is mutable/live and that every evaluation must pin its access
-time, exact schema, per-table counts, and normalized hashes rather than treating
-the landing-page count as an immutable release identity.
+The later `7fefb5e` live snapshot, accessed from `2026-11-02T04:48:08Z` through
+`2026-11-02T04:48:28Z`, recorded 8 tables, 55 columns, and 1,079,680 rows,
+differing from the page's 1,090,086-row catalog value. This reinforces that the
+database is mutable/live and that every evaluation must pin its access time,
+exact schema, per-table counts, and normalized hashes rather than treating the
+landing-page count as an immutable release identity.
 
 The historical VŠE challenge and the former `relational.fit.cvut.cz` address do
 not currently resolve. The live institutional endpoint is

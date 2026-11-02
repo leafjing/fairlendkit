@@ -60,7 +60,8 @@ leakage warning. The later live content evaluation at
 and `D=45`: finished-only A/B is 234 (`203/31`), while the overall summary is
 `A+C=606` and `B+D=76`. C/D remain unfinished and are excluded from the A/B
 task. The same snapshot measured 1,079,680 live rows versus the page's
-1,090,086 catalog value, confirming the need for access-time snapshot hashes.
+1,090,086 catalog value during access from `2026-11-02T04:48:08Z` through
+`2026-11-02T04:48:28Z`, confirming the need for access-time snapshot hashes.
 These measurements are pending independent review of that commit.
 
 The live CTU page is an authoritative current access route, but it offers a
