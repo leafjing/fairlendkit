@@ -1,0 +1,33 @@
+{
+  "candidate_id": "ctu-berka-pkdd-1999",
+  "database": "financial",
+  "disposition": "external_only",
+  "access_started_utc": "2026-11-02T04:48:08Z",
+  "access_ended_utc": "2026-11-02T04:48:28Z",
+  "schema_sha256": "cd494eba2b2b80aaaf74ca0c32bb3d43ea76bff87d7a12976ed89c451c8ae129",
+  "canonicalization": "SHA-256 over UTF-8 JSON Lines: one canonical schema line followed by rows ordered by the table primary key; dates use ISO-8601, decimals exact strings, and missing values JSON null",
+  "total_rows": 1079680,
+  "total_columns": 55,
+  "tables": {
+    "account": {"rows": 4500, "columns": 4, "sha256": "75968bd956668686bee3c0862737978dbaa5e80e3bcbe4a384236fa4ff9ea75a"},
+    "card": {"rows": 892, "columns": 4, "sha256": "51cc2d890df840d50b66525281fc1a9492445934e902ab672f899b2e780e7b09"},
+    "client": {"rows": 5369, "columns": 4, "sha256": "0dc07b5120bcd726cdc6b2d9c229d14dd7ea02e97a1c454c5fb19e26e2510178"},
+    "disp": {"rows": 5369, "columns": 4, "sha256": "ccb76a4d1b5255b8eb8c2d98ff45487f74eec4169e0a671a109c20eac7bfaaeb"},
+    "district": {"rows": 77, "columns": 16, "sha256": "9d85a1bd8f7a0fcd85c238f3fc805ed4d65cd6420eb7fe0c259627dc7380c705", "null_counts": {"A12": 1, "A15": 1}},
+    "loan": {"rows": 682, "columns": 7, "sha256": "a2c331ee1a4f1bd97e4e6c56e431a805b97a18d3b4d443af15244510bae64d2f"},
+    "order": {"rows": 6471, "columns": 6, "sha256": "9b88d5bbdc6534cd630fea9fa311aa3fd931a43fd73916f9f5c429d202b8af0a"},
+    "trans": {"rows": 1056320, "columns": 10, "sha256": "7d7498d12f57d39b3c7d7e1e02c95321e3324fa97f008093b35e1f46f29eb3a0", "null_counts": {"operation": 183114, "k_symbol": 481881, "bank": 782812, "account": 760931}}
+  },
+  "loan_status_counts": {"A": 203, "B": 31, "C": 403, "D": 45},
+  "finished_ab_loans": 234,
+  "finished_loan_transaction_counts": {
+    "strictly_before_loan_date": 17621,
+    "same_day_as_loan_date": 55,
+    "after_loan_date": 73013,
+    "finished_loans_with_strictly_before_transactions": 234,
+    "finished_loans_with_same_day_transactions": 40,
+    "finished_loans_with_after_transactions": 234
+  },
+  "raw_or_transformed_data_committed": false,
+  "redistribution": "prohibited_without_explicit_rights_basis"
+}
