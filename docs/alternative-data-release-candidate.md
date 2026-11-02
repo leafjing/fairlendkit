@@ -82,3 +82,17 @@ Observed RC-1 results:
 - `git diff --check`: passed.
 
 The final RC handoff identifies the single RC commit containing this evidence.
+
+## Release-control handoff
+
+The release is prepared as version `0.1.0rc1`, tag `v0.1.0rc1`, and a GitHub
+prerelease only. The reviewed merge strategy is a merge commit so the approved
+lineage remains directly auditable. The tag must be an annotated signed tag;
+the signer type and public-key fingerprint are recorded in the final evidence,
+and both local signature verification and GitHub `--verify-tag` are mandatory.
+
+Rollback uses a new revert PR against the merge commit. A public tag is not
+moved, reused, or deleted during ordinary rollback. Withdrawal is represented
+by a withdrawn prerelease notice followed by a correcting version. Any tag or
+release deletion requires separate emergency authorization. The complete
+fail-closed command sequence is frozen in `docs/releases/v0.1.0rc1.md`.
