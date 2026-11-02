@@ -24,20 +24,20 @@
 - 每个工作日：`8` 小时
 - 原人工公平性复核：`2` 名分析师 × `5` 个工作日
 - FairLendKit 辅助流程：`2` 名分析师 × `2` 个工作日
-- 原人工抽查覆盖：`2,000` 人
-- 工具流程覆盖：`10,000` 人
-- 平均每笔授信额假设：`8,000` 美元
+- 基线与工具覆盖人数：由同一输入上的实际决策记录派生
+- 每行拟授信额：固定在输入文件中；不得用一个均额替代实际逐行额度，除非
+  benchmark 配置明确选择并哈希固定的统一额度情景
 - 决策风险阈值：预测 12 个月坏账概率 `<= 0.20`
 - 坏账 outcome：决策后 12 个月内出现 `90+ DPD` 或 charge-off 时为 `1`，
   否则为 `0`；未完成 12 个月观察窗口的行不得进入风险分母
 - 风险容差：工具批准集坏账率不得高于基线批准集坏账率，绝对容差 `0.0000`
 - 公平性指标：固定 protected/reference 两组的批准率绝对差
-- 决策输入：固定逐行特征、预测风险、成熟 outcome、群体和稳定行 ID；基线与
-  工具流程使用同一份输入、同一阈值和同一分母
+- 决策输入：固定逐行特征、预测风险、成熟 outcome、群体、拟授信额和稳定行
+  ID；基线与工具流程使用同一份输入、同一阈值和同一分母
 
-`350` 个新增批准、基线差距 `12pp` 和工具差距 `5pp` 仅是验收期望。它们不得
-进入决策函数或作为结果字段的输入；必须从固定逐行决策重新计算。任一期望未
-满足时，benchmark 必须失败，不得把期望值复制到结果中。
+批准增量、覆盖人数、授信增量和公平性差距不得作为结果输入，必须从固定逐行
+决策重新计算。若配置另设验收门槛，门槛必须与结果分字段记录、纳入配置哈希，
+且不得被复制为结果。
 
 ## 3. 公式与可复算结果
 
@@ -55,15 +55,15 @@ time_reduction_rate = 48 / 80 = 60%
 ### 覆盖人数
 
 ```text
-baseline_coverage_rate = 2,000 / 10,000 = 20%
-tool_coverage_rate = 10,000 / 10,000 = 100%
-additional_people_covered = 10,000 - 2,000 = 8,000
-coverage_increase = 100% - 20% = 80 percentage points
-coverage_multiple = 10,000 / 2,000 = 5×
+baseline_coverage_rate = baseline_covered_count / eligible_count
+tool_coverage_rate = tool_covered_count / eligible_count
+additional_people_covered = tool_covered_count - baseline_covered_count
+coverage_increase = tool_coverage_rate - baseline_coverage_rate
+coverage_multiple = tool_covered_count / baseline_covered_count
 ```
 
-结论：情景覆盖增加 `8,000` 人，由 `20%` 提升至 `100%`，增加 `80` 个百分点，
-相当于原覆盖人数的 `5` 倍。
+所有覆盖数字由 artifact 注入；在“覆盖”的行级判定和分母通过复审前，不得发布
+覆盖人数、覆盖率、增量或倍数。
 
 ### 批准与授信
 
@@ -71,13 +71,14 @@ coverage_multiple = 10,000 / 2,000 = 5×
 baseline_approved = count(row where baseline_decision == "approve")
 tool_approved = count(row where tool_decision == "approve")
 incremental_approvals = tool_approved - baseline_approved
-approval_rate_increase = incremental_approvals / 10,000
-incremental_credit = incremental_approvals × $8,000
+approval_rate_increase = incremental_approvals / eligible_count
+baseline_credit = sum(proposed_credit_amount for baseline approved rows)
+tool_credit = sum(proposed_credit_amount for tool approved rows)
+incremental_credit = tool_credit - baseline_credit
 ```
 
-benchmark 预设断言为 `incremental_approvals == 350`；只有逐行计算命中该断言
-且风险门禁通过时，才可报告批准率增加 `3.5` 个百分点及情景新增授信 `280`
-万美元。还必须分别报告新增批准集合和取消批准集合的数量及确定性摘要。
+只有逐行计算和风险门禁通过时，才可由 artifact 注入批准率变化及授信机会。
+还必须分别报告新增批准集合和取消批准集合的数量及确定性摘要。
 
 ### 公平性约束
 
@@ -88,9 +89,8 @@ gap_reduction = gap(baseline) - gap(tool)
 relative_gap_reduction = gap_reduction / gap(baseline)
 ```
 
-benchmark 预设断言为 `gap(baseline) == 0.12` 且 `gap(tool) == 0.05`。命中时，
-差距减少 `7` 个百分点、相对减少约 `58.3%`。必须同时报告各群体固定分母、
-批准数、批准率和差距；不得只报告改善百分比。
+必须同时报告各群体固定分母、批准数、批准率和差距；不得只报告改善百分比。
+候选文案中的公平性数字只能从通过复审的 artifact 注入。
 
 ### 风险非劣效门禁
 
@@ -137,11 +137,10 @@ risk_gate_pass = risk_delta <= 0.0000
 - 基线与工具流程使用完全相同的评估样本、标签、时间窗口、风险阈值、
   额度假设和群体定义；
 - 审查员确认所有数字可由 artifact 或本页公式得到；
-- `350`、`0.12` 和 `0.05` 只出现在期望断言中，决策函数和结果输入不读取
-  这些期望值；
+- 任何配置验收门槛与派生结果分字段记录，决策函数和结果输入不读取门槛值；
 - 风险指标没有恶化，公平性结果不是通过隐藏拒绝、改变分母或删除群体得到；
 - 对外文案使用“量化影响评估”“固定样本情景测算”“预计”或“测算可支持”，
-  不出现“客户实现”“生产提升”或“已创造 280 万美元”等事实性措辞；
+  不出现“客户实现”“生产提升”或“已创造授信额”等事实性措辞；
 - 外部行业数字有独立来源，不与 FairLendKit 情景结果混写。
 
 所有输出的证据类别必须是
@@ -153,15 +152,17 @@ risk_gate_pass = risk_delta <= 0.0000
 以下文字尚未批准发布。只有 benchmark artifact 全部门禁通过、结果字段由逐行
 决策计算且审查员签字后，才可将占位状态改为 `publishable`：
 
-> 在包含 10,000 名申请人的固定样本情景测算中，按预设流程工时假设，基线与
-> 工具辅助流程分别估算为 80 和 32 人时，对应预计减少 60%；评估覆盖由 2,000
-> 人扩展至 10,000 人。在既定风险约束和额度假设通过校验时，测算可支持约 350
-> 个新增批准，对应约 280 万美元授信机会；固定决策记录派生的受保护群体批准率
-> 差距由 12 个百分点降至 5 个百分点。
+> 在包含 `{eligible_count}` 名申请人的固定样本情景测算中，按预设人工流程工时
+> 假设，基线与工具辅助流程分别估算为 80 和 32 人时，对应预计减少 60%；评估
+> 覆盖由 `{baseline_covered_count}` 人扩展至 `{tool_covered_count}` 人。在既定
+> 风险约束和逐行额度通过校验时，测算可支持 `{incremental_approvals}` 个净新增
+> 批准，对应 `{incremental_credit}` 授信机会；固定决策记录派生的受保护群体
+> 批准率差距由 `{baseline_approval_rate_gap}` 变为 `{tool_approval_rate_gap}`。
 
 候选文案必须紧邻以下底注，二者不得拆分：
 
-> 结果基于固定样本、流程工时和授信额度假设，尚未经过客户生产环境试点验证。
+> 结果基于固定样本、预设人工流程工时和逐行授信额度，尚未经过客户生产环境
+> 试点验证。
 
 禁止删除或弱化底注，也不得把“预计”“测算可支持”改写为“已实现”或把流程
 工时假设改写为已观测客户工时。artifact 未通过前，该模板的状态必须保持
