@@ -5,6 +5,12 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import pytest
+
+
+KNOWN_HOST_USERNAME = "kouji175"
+KNOWN_ARCHIVE_FRAGMENT = "uci-south-german-credit-live/correspondence/"
+
 
 def test_domain_contracts_do_not_import_outer_layers():
     source = Path("src/fairlendkit/data/contracts.py").read_text()
@@ -120,22 +126,42 @@ def test_paper2_execution_gate_cannot_compute_dgp_or_statistics():
     assert "paper2.statistics" not in source
 
 
-def test_repository_documentation_does_not_disclose_host_archive_paths():
-    host_username = Path.home().name
+def _assert_document_has_no_host_archive_path(document: str) -> None:
+    forbidden_usernames = {Path.home().name, KNOWN_HOST_USERNAME}
     forbidden_fragments = (
         "/home/",
         "/Users/",
         "\\Users\\",
         "/tmp/",
         "/var/tmp/",
-        "uci-south-german-credit-live/correspondence/",
+        KNOWN_ARCHIVE_FRAGMENT,
     )
 
+    assert not any(fragment in document for fragment in forbidden_fragments)
+    assert not any(username in document for username in forbidden_usernames)
+
+
+def test_repository_documentation_does_not_disclose_host_archive_paths():
     for document_path in Path("docs").glob("**/*.md"):
         document = document_path.read_text()
-        assert not any(
-            fragment in document for fragment in forbidden_fragments
-        ), f"{document_path} discloses a host-specific absolute path"
-        assert host_username not in document, (
-            f"{document_path} discloses the current host username"
-        )
+        try:
+            _assert_document_has_no_host_archive_path(document)
+        except AssertionError as error:
+            raise AssertionError(
+                f"{document_path} discloses host-specific archive information"
+            ) from error
+
+
+@pytest.mark.parametrize(
+    "leaked_document",
+    (
+        f"sender workspace owner: {KNOWN_HOST_USERNAME}",
+        f"archive: {KNOWN_ARCHIVE_FRAGMENT}",
+    ),
+    ids=("host-username", "known-archive-fragment"),
+)
+def test_document_path_gate_rejects_known_leak_minimal_examples(
+    leaked_document: str,
+):
+    with pytest.raises(AssertionError):
+        _assert_document_has_no_host_archive_path(leaked_document)
