@@ -1,11 +1,17 @@
 """Static contract checks for the result-free HMDA implementation manifests."""
 
 import json
+import copy
+import importlib.util
 from pathlib import Path
 
 
 ROOT = Path(__file__).parents[1]
 HMDA = ROOT / "docs" / "research" / "hmda"
+SPEC = importlib.util.spec_from_file_location("validate_hmda_manifests", ROOT / "scripts" / "validate_hmda_manifests.py")
+assert SPEC is not None and SPEC.loader is not None
+VALIDATOR = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(VALIDATOR)
 
 
 def _load(name):
@@ -27,6 +33,15 @@ def test_manifest_envelopes_and_index_discoverability():
         assert payload["schema_version"] == "1.0.0"
         assert payload["contract_id"] == "HMDA-CA-2024-CD-V1"
         assert f"research/hmda/{name}" in index
+
+
+def test_schema_covers_nested_contract_objects():
+    schema = _load("hmda-manifest-schema-v1.json")
+    assert set(schema["$defs"]) == {"row_set", "estimand", "control_variable", "sensitivity"}
+    assert set(schema["$defs"]["row_set"]["required"]) == {"id", "start", "complete_case_fields"}
+    assert "failure_reason_codes" in schema["$defs"]["estimand"]["required"]
+    assert "reference_category" in schema["$defs"]["control_variable"]["required"]
+    assert "p_value" in schema["$defs"]["sensitivity"]["required"]
 
 
 def test_field_rules_freeze_mixed_enums_and_ordered_exclusions():
@@ -92,3 +107,32 @@ def test_cross_file_formula_and_mapping_consistency():
     assert fields["analysis_category_mappings"]["debt_to_income_ratio_primary"] == analysis["raw_to_analysis_mappings"]["dti_band"]
     assert fields["analysis_category_mappings"]["applicant_age_primary"] == analysis["raw_to_analysis_mappings"]["applicant_age"]
     assert controls["primary_regression_formula"] == analysis["estimands"]["regression_adjusted"]["formula"]
+    assert controls["primary_regression_population"] == analysis["estimands"]["regression_adjusted"]["row_set"]["id"]
+
+
+def test_stdlib_validator_accepts_frozen_contract():
+    VALIDATOR.validate_manifests(VALIDATOR.load_manifests())
+
+
+def test_validator_rejects_malformed_nested_structure():
+    payloads = VALIDATOR.load_manifests()
+    malformed = copy.deepcopy(payloads)
+    del malformed["analysis_spec"]["estimands"]["standardized"]["p_value"]
+    try:
+        VALIDATOR.validate_manifests(malformed)
+    except VALIDATOR.ContractValidationError as error:
+        assert "p_value" in str(error)
+    else:
+        raise AssertionError("malformed estimand was accepted")
+
+
+def test_validator_rejects_cross_file_row_set_drift():
+    payloads = VALIDATOR.load_manifests()
+    malformed = copy.deepcopy(payloads)
+    malformed["control_manifest"]["primary_regression_population"] = "wrong_rows"
+    try:
+        VALIDATOR.validate_manifests(malformed)
+    except VALIDATOR.ContractValidationError as error:
+        assert "row-set ID mismatch" in str(error)
+    else:
+        raise AssertionError("cross-file row-set drift was accepted")
