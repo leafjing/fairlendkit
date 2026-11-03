@@ -63,12 +63,14 @@ def test_draft_2020_12_oneof_schema_accepts_manifest(manifest_name):
         ("hmda-analysis-spec.json", lambda p: p["raw_to_analysis_mappings"].__setitem__("dti_band", "not_a_mapping")),
         ("hmda-sensitivity-spec.json", lambda p: p["analyses"][0].__setitem__("p_value", 0.5)),
         ("hmda-sensitivity-spec.json", lambda p: p["analyses"][0]["support"].__setitem__("unknown_field", True)),
+        ("hmda-field-rules.json", lambda p: p["normalization"].__setitem__("unknown_field", True)),
     ],
     ids=[
         "numeric-formula", "empty-variables", "array-to-string", "array-to-null",
         "sensitivity-child-type", "unknown-field", "missing-nested-field",
         "deep-analysis-variance-unknown", "deep-dti-mapping-as-string",
         "deep-sensitivity-p-value-as-number", "deep-sensitivity-support-unknown",
+        "deep-field-normalization-unknown",
     ],
 )
 def test_schema_rejects_malformed_internal_structure(manifest_name, mutate):
