@@ -56,6 +56,23 @@ SENSITIVITY_IDS = {
     "HMDA-SENS-GEOGRAPHY", "HMDA-SENS-LENDER", "HMDA-SENS-OVERLAP",
     "HMDA-SENS-YEAR",
 }
+SENSITIVITY_ESTIMANDS = {
+    "HMDA-SENS-ACTION-13": {"unadjusted", "standardized", "regression_adjusted"},
+    "HMDA-SENS-MISSING-COMPLETE": {"standardized", "regression_adjusted"},
+    "HMDA-SENS-MISSING-CATEGORY": {"standardized", "regression_adjusted"},
+    "HMDA-SENS-CONTROL-CORE": {"regression_adjusted"},
+    "HMDA-SENS-CONTROL-EXTENDED": {"regression_adjusted"},
+    "HMDA-SENS-BINS": {"standardized"},
+    "HMDA-SENS-GEOGRAPHY": {"standardized"},
+    "HMDA-SENS-LENDER": {"regression_adjusted"},
+    "HMDA-SENS-OVERLAP": {"standardized", "regression_adjusted"},
+}
+SENSITIVITY_FAILURE_REASONS = {
+    "hmda_sensitivity_not_implemented", "hmda_sensitivity_execution_failed",
+    "hmda_common_support_insufficient", "hmda_cluster_count_insufficient",
+    "hmda_bootstrap_insufficient_valid_replicates", "hmda_design_matrix_singular",
+    "hmda_model_nonconvergence", "hmda_regression_variance_undefined",
+}
 COHORT_RULES = (
     ("activity_year", {"2024"}, "hmda_wrong_activity_year"),
     ("state_code", {"CA"}, "hmda_outside_california"),
@@ -693,6 +710,54 @@ def success_artifact(
     source: SourceEvidence, estimands: Mapping[str, Any], cohort_flow: Mapping[str, Any], *,
     configuration_sha256: str, command: list[str] | None = None, generated_at_utc: str | None = None,
 ) -> dict[str, Any]:
+    def valid_executed(sensitivity_id: str, result: Mapping[str, Any]) -> bool:
+        groups = result.get("groups")
+        expected_estimands = SENSITIVITY_ESTIMANDS[sensitivity_id]
+        if not isinstance(groups, Mapping) or set(groups) != set(GROUPS):
+            return False
+        for group_result in groups.values():
+            if not isinstance(group_result, Mapping) or set(group_result) != expected_estimands:
+                return False
+            for estimand, estimate in group_result.items():
+                if not isinstance(estimate, Mapping):
+                    return False
+                flow = estimate.get("flow")
+                digest = estimate.get("row_set_digest")
+                if not (
+                    isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest)
+                    and isinstance(flow, Mapping) and flow.get("reconciled") is True
+                    and isinstance(estimate.get("raw_p_value"), (int, float))
+                    and isinstance(estimate.get("holm_adjusted_p_value"), (int, float))
+                ):
+                    return False
+                if estimand == "unadjusted" and not (
+                    isinstance(estimate.get("difference_ci"), list) and len(estimate["difference_ci"]) == 2
+                ):
+                    return False
+                if estimand == "standardized" and not (
+                    isinstance(estimate.get("ci"), list) and len(estimate["ci"]) == 2
+                    and isinstance(estimate.get("valid_replicates"), int)
+                ):
+                    return False
+                if estimand == "regression_adjusted" and not (
+                    isinstance(estimate.get("ci"), list) and len(estimate["ci"]) == 2
+                    and isinstance(estimate.get("standard_error"), (int, float))
+                    and isinstance(estimate.get("clusters"), int)
+                ):
+                    return False
+        return True
+
+    def valid_not_applicable(result: Mapping[str, Any]) -> bool:
+        evidence = result.get("applicability")
+        if not isinstance(evidence, Mapping) or evidence.get("applicable") is not False:
+            return False
+        checks = evidence.get("checks")
+        return (
+            isinstance(checks, list) and bool(checks)
+            and all(isinstance(check, Mapping) and bool(check) for check in checks)
+            and result.get("groups") is None
+        )
+
     sensitivities = estimands.get("sensitivities")
     registry_valid = isinstance(sensitivities, Mapping) and set(sensitivities) == SENSITIVITY_IDS
     if registry_valid:
@@ -706,11 +771,17 @@ def success_artifact(
             else:
                 registry_valid &= status in {"executed", "not_applicable", "failed"}
                 if status == "executed":
-                    registry_valid &= isinstance(result.get("groups"), Mapping)
+                    registry_valid &= valid_executed(sensitivity_id, result)
                 elif status == "not_applicable":
-                    registry_valid &= isinstance(result.get("applicability"), Mapping) and result.get("groups") is None
+                    registry_valid &= valid_not_applicable(result)
                 else:
-                    registry_valid &= result.get("results_emitted") is False and bool(result.get("reason_codes")) and result.get("groups") is None
+                    reasons = result.get("reason_codes")
+                    registry_valid &= (
+                        result.get("results_emitted") is False
+                        and isinstance(reasons, list) and bool(reasons)
+                        and all(isinstance(reason, str) and reason in SENSITIVITY_FAILURE_REASONS for reason in reasons)
+                        and result.get("groups") is None
+                    )
             if not registry_valid:
                 break
     if not registry_valid:

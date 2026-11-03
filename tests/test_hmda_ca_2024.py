@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import subprocess
 import sys
@@ -161,6 +162,24 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
             "results_emitted": False,
             "groups": None,
         }
+    source = SourceEvidence(
+        url="synthetic", archive_bytes=1, archive_sha256="a" * 64, member_name="data.csv",
+        member_bytes=2, header_sha256="b" * 64, ordered_header=("a",), row_count=len(_rows()),
+        duplicate_row_count=0, ordered_row_fingerprint_sha256="c" * 64,
+    )
+    empty_executed = copy.deepcopy(estimands)
+    empty_executed["sensitivities"]["HMDA-SENS-BINS"] = {"status": "executed", "groups": {}}
+    artifact = success_artifact(source, empty_executed, flow, configuration_sha256="d" * 64)
+    assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
+    assert "sensitivity_failures" not in artifact
+
+    empty_applicability = copy.deepcopy(estimands)
+    empty_applicability["sensitivities"]["HMDA-SENS-BINS"] = {
+        "status": "not_applicable", "applicability": {}, "groups": None,
+    }
+    artifact = success_artifact(source, empty_applicability, flow, configuration_sha256="d" * 64)
+    assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
+    assert "sensitivity_failures" not in artifact
 
 
 def test_regression_and_cluster_bootstrap_contracts():
