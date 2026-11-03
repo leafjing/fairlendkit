@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fairlendkit.example/schemas/hmda-manifest-schema-v1.json",
+  "title": "FairLendKit HMDA implementation manifest envelope",
+  "type": "object",
+  "required": ["manifest_kind", "schema_version", "contract_id"],
+  "properties": {
+    "manifest_kind": {"enum": ["field_rules", "control_manifest", "analysis_spec", "sensitivity_spec"]},
+    "schema_version": {"const": "1.0.0"},
+    "contract_id": {"const": "HMDA-CA-2024-CD-V1"}
+  },
+  "allOf": [
+    {"if": {"properties": {"manifest_kind": {"const": "field_rules"}}}, "then": {"required": ["source_sha256", "normalization", "required_fields", "ordered_cohort_rules", "outcomes", "group_contrasts"]}},
+    {"if": {"properties": {"manifest_kind": {"const": "control_manifest"}}}, "then": {"required": ["primary_regression_formula", "variables", "prohibited_field_patterns", "unavailable_concepts"]}},
+    {"if": {"properties": {"manifest_kind": {"const": "analysis_spec"}}}, "then": {"required": ["global_order", "raw_to_analysis_mappings", "estimands", "multiplicity"]}},
+    {"if": {"properties": {"manifest_kind": {"const": "sensitivity_spec"}}}, "then": {"required": ["analyses"]}}
+  ],
+  "additionalProperties": true
+}

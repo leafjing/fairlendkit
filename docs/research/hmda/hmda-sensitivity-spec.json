@@ -1,4 +1,6 @@
 {
+  "$schema": "./hmda-manifest-schema-v1.json",
+  "manifest_kind": "sensitivity_spec",
   "schema_version": "1.0.0",
   "contract_id": "HMDA-CA-2024-CD-V1",
   "analyses": [
@@ -7,7 +9,7 @@
     {"id": "HMDA-SENS-MISSING-CATEGORY", "change": {"categorical_missing_levels": {"debt_to_income_ratio": ["NA", "Exempt"], "combined_loan_to_value_ratio": ["NA", "Exempt"], "applicant_age": ["8888", "9999"]}, "numeric_missing": "still_excluded"}, "otherwise": "primary_configuration"},
     {"id": "HMDA-SENS-CONTROL-CORE", "change": {"formula": "primary_regression_formula"}, "otherwise": "primary_configuration"},
     {"id": "HMDA-SENS-CONTROL-EXTENDED", "change": {"append_terms": ["C(county_code, Treatment(reference=lexical_first))"]}, "eligibility": {"county_code": "nonmissing", "minimum_rows_per_level": 100}, "otherwise": "primary_configuration"},
-    {"id": "HMDA-SENS-BINS", "change": {"income_thousands": ["(-inf,0]", "(0,40]", "(40,80]", "(80,120]", "(120,200]", "(200,inf)"], "loan_amount_dollars": ["(0,150000]", "(150000,300000]", "(300000,450000]", "(450000,650000]", "(650000,inf)"], "dti_percent": ["<30", "30-36", "37-40", "41-43", "44-49", "50-60", ">60", "Exempt"], "cltv_percent": ["[0,70]", "(70,80]", "(80,95]", "(95,100]", "(100,1000]", "Exempt"]}, "otherwise": "primary_configuration"},
+    {"id": "HMDA-SENS-BINS", "change": {"income_thousands": ["(-inf,0]", "(0,40]", "(40,80]", "(80,120]", "(120,200]", "(200,inf)"], "loan_amount_dollars": ["(0,150000]", "(150000,300000]", "(300000,450000]", "(450000,650000]", "(650000,inf)"], "dti_percent": ["<30", "30-36", "37-40", "41-43", "44-49", "50-60", ">60", "Exempt"], "dti_raw_mapping": {"<20%": "<30", "20%-<30%": "<30", "30%-<36%": "30-36", "36": "30-36", "37": "37-40", "38": "37-40", "39": "37-40", "40": "37-40", "41": "41-43", "42": "41-43", "43": "41-43", "44": "44-49", "45": "44-49", "46": "44-49", "47": "44-49", "48": "44-49", "49": "44-49", "50%-60%": "50-60", ">60%": ">60", "Exempt": "Exempt", "NA": null}, "cltv_percent": ["[0,70]", "(70,80]", "(80,95]", "(95,100]", "(100,1000]", "Exempt"]}, "otherwise": "primary_configuration"},
     {"id": "HMDA-SENS-GEOGRAPHY", "change": {"append_stratum": "county_code"}, "eligibility": {"county_code": "nonmissing", "minimum_per_group_per_county": 100, "minimum_favorable_and_unfavorable_per_group": 10}, "otherwise": "primary_configuration"},
     {"id": "HMDA-SENS-LENDER", "change": {"append_terms": ["C(lei, Treatment(reference=lexical_first))"], "variance_cluster": "lei"}, "eligibility": {"minimum_lender_rows": 100, "minimum_lenders": 30, "each_retained_lender_has_both_groups": true}, "otherwise": "primary_configuration"},
     {"id": "HMDA-SENS-OVERLAP", "change": {"minimum_rows_per_group_per_stratum": 50, "minimum_favorable_and_unfavorable_per_group": 10, "minimum_group_retained_fraction": 0.8, "minimum_overall_supported_fraction": 0.8, "minimum_supported_strata": 20}, "otherwise": "primary_configuration"},
