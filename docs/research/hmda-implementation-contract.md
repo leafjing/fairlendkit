@@ -44,8 +44,13 @@ and application-level extracts must not be committed to Git.
 
 ## 2. Executable field and code rules
 
-The implementation checks in a machine-readable rule table. Categorical codes
-are trimmed strings and are never silently coerced to numbers.
+The normative machine-readable rule table is
+[`hmda/field-code-rules-v1.json`](hmda/field-code-rules-v1.json). Categorical
+codes are trimmed strings and are never silently coerced to numbers. The JSON
+freezes every required field's type, allowed values or validation pattern,
+special values, cohort rule, outcome mapping, and group contrast. Markdown in
+this section is explanatory; disagreement with the JSON fails with
+`hmda_rule_manifest_mismatch`.
 
 ### 2.1 Ordered cohort rules
 
@@ -101,8 +106,12 @@ exploratory and inherits every support and disclosure gate.
 
 ## 4. Control manifest
 
-The checked-in manifest contains `field`, `role`, `coding`, `missing_rule`,
-`rationale`, and `allowed_analyses`.
+The normative checked-in
+[`hmda/control-manifest-v1.json`](hmda/control-manifest-v1.json) contains
+`field`, `role`, `coding`, `missing_rule`, `rationale`, and
+`allowed_analyses` for every variable. It also freezes the primary regression
+formula. Markdown is explanatory; disagreement fails with
+`hmda_control_manifest_mismatch`.
 
 ### 4.1 Core controls
 
@@ -134,7 +143,24 @@ pricing exceptions, and detailed underwriting judgment are unavailable and
 must not be replaced with invented proxies. Manifest drift fails with
 `hmda_control_manifest_mismatch`.
 
-## 5. Strata, bins, support, and overlap
+## 5. Row sets, strata, bins, support, and overlap
+
+Row-set construction order is normative:
+
+1. `unadjusted_rows`: rows passing the cohort and one named binary group
+   contrast; control missingness does not remove these rows.
+2. `adjusted_complete_case_rows`: `unadjusted_rows` after applying every core
+   control's missing rule in `control-manifest-v1.json`. Thus `income<=0`,
+   nonpositive loan/property values, unavailable age, and other declared core
+   missing values are excluded before support is evaluated.
+3. `adjusted_common_support_rows`: `adjusted_complete_case_rows` restricted to
+   supported strata below. Both standardization and primary regression use
+   exactly this row-set digest.
+
+The unadjusted estimand uses `unadjusted_rows`; the standardized and regression
+estimands both use `adjusted_common_support_rows`. Each exclusion count is
+reported by group. No row may move between these sets based on observed outcome
+direction or model coefficient.
 
 All boundaries are frozen before outcome computation:
 
@@ -156,12 +182,23 @@ sparse-outcome strata, and supported target fraction. Standardization is
 less than 70%, overall supported fraction is below 70%, or fewer than 20 strata
 remain.
 
-Regression uses the same common-support population. Continuous transformations
-are fixed by the manifest; categorical terms use treatment coding with the
-lexically first nonmissing category as reference. No stepwise selection or
-unregistered interactions. Separation, non-convergence, singular design, or
-invalid predictions fail closed. Propensity scores are diagnostics only;
-weighting requires a reviewed amendment.
+Regression uses the same common-support population. Its exact V1 formula is:
+
+```text
+favorable_action ~ protected_group
+  + log1p_loan_amount + log1p_income
+  + C(dti_band, reference="<30")
+  + C(cltv_band, reference="[0,60]")
+  + log1p_property_value + loan_term_months
+  + C(applicant_age, reference="35-44")
+```
+
+There are no interactions or regularization. `county_code` and `lei` do not
+enter the primary design matrix; they are limited to named sensitivities, while
+`lei` remains the variance cluster. No stepwise selection or unregistered
+terms. Separation, non-convergence, singular design, or invalid predictions
+fail closed. Propensity scores are diagnostics only; weighting requires a
+reviewed amendment.
 
 ## 6. Estimands and formulas
 
@@ -192,6 +229,18 @@ conditional associations, not causal effects or explanations.
 - The three primary protected dimensions form one confirmatory family per
   estimand. Report raw intervals and Holm-adjusted two-sided p-values.
 
+Raw two-sided p-values are frozen as follows. Unadjusted differences use the
+two-sample score test with pooled null proportion. Standardized differences use
+the valid cluster-bootstrap replicates and
+`min(1, 2 * min((1 + count(delta_b <= 0))/(B_valid + 1),
+(1 + count(delta_b >= 0))/(B_valid + 1)))`; this is reported alongside, not
+derived from, the percentile interval. Regression marginal contrasts use the
+two-sided Wald normal p-value from the clustered delta-method standard error.
+Within each `(estimand, outcome)` family, order the ethnicity, race, and sex raw
+p-values ascending; Holm uses `max` with preceding adjusted values and caps at
+1. Undefined raw p-values make that family's multiplicity result undefined
+with `hmda_multiplicity_family_incomplete`, never zero or one.
+
 Artifacts record method IDs, versions, seed, replicate counts, valid counts,
 cluster counts, and formula version. Any change alters configuration SHA-256.
 
@@ -199,11 +248,14 @@ cluster counts, and formula version. Any change alters configuration SHA-256.
 
 Primary adjusted analyses use complete cases for registered core controls,
 reporting exclusions per field and group. They are not population estimates.
-Mandatory named sensitivities retain the design IDs: action `1` versus `3`;
-valid explicit missing categories; core versus reviewed extended controls;
-alternate bins; statewide versus supported counties; lender structure;
-alternate support; and adjacent year only after separate source admission.
-Multiple imputation is not authorized in V1.
+The normative
+[`hmda/sensitivity-manifest-v1.json`](hmda/sensitivity-manifest-v1.json)
+freezes every sensitivity's changed fields and all unchanged-primary semantics:
+action `1` versus `3`; complete-case and valid missing categories; core and
+extended controls; alternate bin boundaries; county and lender eligibility;
+alternate support thresholds; and adjacent year disabled pending separate
+source admission. Unlisted parameter changes are prohibited. Multiple
+imputation is not authorized in V1.
 
 ## 9. Cohort flow and reconciliation
 
@@ -251,6 +303,8 @@ hmda_schema_digest_mismatch
 hmda_code_value_invalid
 hmda_duplicate_rows_detected
 hmda_control_manifest_mismatch
+hmda_rule_manifest_mismatch
+hmda_sensitivity_manifest_mismatch
 hmda_cohort_flow_not_reconciled
 hmda_group_contract_invalid
 hmda_common_support_insufficient
@@ -258,6 +312,7 @@ hmda_model_nonconvergence
 hmda_model_separation
 hmda_cluster_count_insufficient
 hmda_bootstrap_insufficient_valid_replicates
+hmda_multiplicity_family_incomplete
 hmda_disclosure_gate_failed
 hmda_artifact_reproduction_mismatch
 ```
