@@ -26,8 +26,10 @@
         "coding": {"type": "string", "minLength": 1}, "missing_rule": {"type": "string", "minLength": 1},
         "rationale": {"type": "string", "minLength": 1},
         "allowed_analyses": {"type": "array", "items": {"enum": ["HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-GEOGRAPHY", "HMDA-SENS-LENDER", "ethnicity_contrast", "outcome_only", "primary_regression", "race_contrast", "sex_contrast", "standardized", "variance_cluster"]}, "uniqueItems": true},
-        "reference_category": {"type": ["string", "null"]}
-      }
+        "reference_category": {"type": ["string", "null"]},
+        "contrast_coding": {"const": "sum_to_zero"}
+      },
+      "allOf": [{"if": {"properties": {"field": {"enum": ["county_code", "lei"]}}, "required": ["field"]}, "then": {"required": ["contrast_coding"], "properties": {"reference_category": {"type": "null"}}}}]
     }
   }
 }

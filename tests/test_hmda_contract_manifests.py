@@ -93,6 +93,10 @@ def test_control_manifest_is_per_variable_and_primary_formula_is_closed():
     formula = payload["primary_regression_formula"]
     assert "county_code" not in formula and "lei" not in formula
     assert payload["primary_regression_interactions"] == []
+    by_field = {variable["field"]: variable for variable in payload["variables"]}
+    for field in ("county_code", "lei"):
+        assert by_field[field]["reference_category"] is None
+        assert by_field[field]["contrast_coding"] == "sum_to_zero"
 
 
 def test_estimands_have_independent_rows_support_and_p_values():
@@ -121,6 +125,10 @@ def test_sensitivity_parameters_are_frozen_and_adjacent_year_disabled():
     assert "otherwise" not in serialized
     assert "primary_configuration" not in serialized
     assert "lexical_first" not in serialized
+    assert "income50_loan100k_dti_primary_cltv_primary" not in serialized
+    for item in analyses.values():
+        if item["estimands"]:
+            assert {"income", "loan_amount", "dti", "cltv"} <= set(item["bins"])
 
 
 def test_cross_file_formula_and_mapping_consistency():

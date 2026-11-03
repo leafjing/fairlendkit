@@ -57,6 +57,10 @@ def validate_manifests(payloads):
         raise ContractValidationError("control_manifest: malformed variable")
     if not isinstance(controls["primary_regression_formula"], str):
         raise ContractValidationError("control_manifest: formula must be a string")
+    variables_by_field = {item["field"]: item for item in controls["variables"]}
+    for field in ("county_code", "lei"):
+        if variables_by_field[field].get("reference_category") is not None or variables_by_field[field].get("contrast_coding") != "sum_to_zero":
+            raise ContractValidationError(f"control_manifest.{field}: sum-to-zero coding is not explicit")
 
     analysis = payloads["analysis_spec"]
     _require(analysis, {"global_order", "raw_to_analysis_mappings", "estimands", "multiplicity"}, "analysis_spec")
@@ -94,6 +98,8 @@ def validate_manifests(payloads):
     for forbidden in ("otherwise", "primary_configuration", "lexical_first"):
         if forbidden in serialized:
             raise ContractValidationError(f"sensitivity_spec: forbidden placeholder {forbidden}")
+    if "income50_loan100k_dti_primary_cltv_primary" in serialized:
+        raise ContractValidationError("sensitivity_spec: bins alias is not self-contained")
 
 
 def main():
