@@ -22,7 +22,8 @@
       "row_set": {"start": "cohort_and_named_group_rows", "complete_case_fields": ["action_taken", "named_protected_group"], "support": "not_applicable"},
       "formula": {"group_rate": "favorable_count / group_denominator", "difference": "focal_rate - reference_rate", "ratio": "focal_rate / reference_rate_if_reference_positive"},
       "variance": {"rate_ci": "wilson_95_two_sided", "difference_ci": "newcombe_wilson_95_two_sided", "ratio_ci": "log_ratio_95_two_sided_if_positive_counts_and_denominators"},
-      "p_value": "two_sample_score_test_pooled_null_two_sided"
+      "p_value": "two_sample_score_test_pooled_null_two_sided",
+      "failure_reason_codes": ["hmda_group_denominator_empty", "hmda_reference_rate_zero", "hmda_unadjusted_variance_undefined"]
     },
     "standardized": {
       "row_set": {"start": "cohort_and_named_group_rows", "complete_case_fields": ["action_taken", "named_protected_group", "loan_amount", "income", "debt_to_income_ratio", "combined_loan_to_value_ratio"], "complete_case_rules": {"loan_amount": "finite_and_gt_0", "income": "finite_including_nonpositive", "debt_to_income_ratio": "mapped_nonnull_including_Exempt", "combined_loan_to_value_ratio": "mapped_nonnull_including_Exempt"}, "then": "standardized_support_only"},
@@ -32,7 +33,8 @@
       "target": "pooled_empirical_distribution_within_standardized_supported_rows",
       "formula": "sum_over_supported_strata(pooled_stratum_weight * group_stratum_rate); contrast=focal-reference",
       "variance": {"method": "cluster_bootstrap_lei", "replicates": 1000, "seed": 20241119, "ci": "percentile_[0.025,0.975]", "minimum_valid_replicates": 950, "support_reapplied_each_replicate": true},
-      "p_value": "min(1,2*min((1+count(theta_star<=0))/(B_valid+1),(1+count(theta_star>=0))/(B_valid+1)))"
+      "p_value": "min(1,2*min((1+count(theta_star<=0))/(B_valid+1),(1+count(theta_star>=0))/(B_valid+1)))",
+      "failure_reason_codes": ["hmda_standardized_complete_case_empty", "hmda_common_support_insufficient", "hmda_bootstrap_insufficient_valid_replicates", "hmda_standardized_variance_undefined"]
     },
     "regression_adjusted": {
       "row_set": {"start": "cohort_and_named_group_rows", "complete_case_fields": ["action_taken", "named_protected_group", "loan_amount", "income", "debt_to_income_ratio", "combined_loan_to_value_ratio", "property_value", "loan_term", "applicant_age"], "complete_case_rules": {"loan_amount": "finite_and_gt_0", "income": "finite_and_gt_0", "debt_to_income_ratio": "mapped_nonnull_including_Exempt", "combined_loan_to_value_ratio": "mapped_nonnull_including_Exempt", "property_value": "finite_and_gt_0", "loan_term": "integer_[1,600]", "applicant_age": "mapped_nonnull"}, "then": "regression_support_only"},
@@ -44,7 +46,8 @@
       "lei_in_primary_model": false,
       "contrast": "average_over_regression_supported_rows(prediction_if_focal-prediction_if_reference)",
       "variance": {"method": "sandwich_clustered_by_lei_delta_method", "ci": "normal_95_two_sided", "minimum_lender_clusters": 30},
-      "p_value": "two_sided_normal_wald_from_clustered_delta_method_standard_error"
+      "p_value": "two_sided_normal_wald_from_clustered_delta_method_standard_error",
+      "failure_reason_codes": ["hmda_regression_complete_case_empty", "hmda_common_support_insufficient", "hmda_model_nonconvergence", "hmda_model_separation", "hmda_design_matrix_singular", "hmda_cluster_count_insufficient", "hmda_regression_variance_undefined"]
     }
   },
   "multiplicity": {"family_definition": "within_each_estimand_and_outcome_across_ethnicity_race_sex", "method": "holm_step_down", "input": "estimand_specific_two_sided_raw_p_value", "algorithm": "sort ascending; adjusted_i=max(previous_adjusted,(m-i+1)*p_i); cap at 1; restore dimension order", "undefined_policy": "fail_hmda_multiplicity_family_incomplete"}

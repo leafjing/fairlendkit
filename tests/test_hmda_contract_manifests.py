@@ -39,6 +39,9 @@ def test_field_rules_freeze_mixed_enums_and_ordered_exclusions():
     assert fields["applicant_age"]["allowed"] == [
         "<25", "25-34", "35-44", "45-54", "55-64", "65-74", ">74", "8888", "9999"
     ]
+    mappings = payload["analysis_category_mappings"]
+    assert set(mappings["debt_to_income_ratio_primary"]) == set(fields["debt_to_income_ratio"]["allowed"])
+    assert set(mappings["applicant_age_primary"]) == set(fields["applicant_age"]["allowed"])
     orders = [rule["order"] for rule in payload["ordered_cohort_rules"]]
     reasons = [rule["exclude_reason"] for rule in payload["ordered_cohort_rules"]]
     assert orders == sorted(orders) and len(orders) == len(set(orders))
@@ -64,12 +67,28 @@ def test_estimands_have_independent_rows_support_and_p_values():
     assert estimands["regression_adjusted"]["lei_in_primary_model"] is False
     assert "B_valid+1" in estimands["standardized"]["p_value"]
     assert payload["multiplicity"]["method"] == "holm_step_down"
+    assert all(estimand["failure_reason_codes"] for estimand in estimands.values())
 
 
 def test_sensitivity_parameters_are_frozen_and_adjacent_year_disabled():
     payload = _load("hmda-sensitivity-spec.json")
     analyses = {item["id"]: item for item in payload["analyses"]}
-    assert analyses["HMDA-SENS-BINS"]["change"]["dti_percent"]
-    assert analyses["HMDA-SENS-CONTROL-EXTENDED"]["change"]["append_terms"]
-    assert analyses["HMDA-SENS-OVERLAP"]["change"]["minimum_group_retained_fraction"] == 0.8
+    assert analyses["HMDA-SENS-BINS"]["bins"]["dti"]
+    assert "county_code" in analyses["HMDA-SENS-CONTROL-EXTENDED"]["regression_formula"]
+    assert analyses["HMDA-SENS-OVERLAP"]["support"]["minimum_retained_fraction_each_group"] == 0.8
     assert analyses["HMDA-SENS-YEAR"]["status"] == "disabled_pending_separate_source_admission"
+    required = {"id", "estimands", "outcome", "complete_case", "formula", "regression_formula", "reference_categories", "bins", "support", "variance", "p_value"}
+    assert all(required <= set(item) for item in analyses.values())
+    serialized = json.dumps(payload)
+    assert "otherwise" not in serialized
+    assert "primary_configuration" not in serialized
+    assert "lexical_first" not in serialized
+
+
+def test_cross_file_formula_and_mapping_consistency():
+    fields = _load("hmda-field-rules.json")
+    controls = _load("hmda-control-manifest.json")
+    analysis = _load("hmda-analysis-spec.json")
+    assert fields["analysis_category_mappings"]["debt_to_income_ratio_primary"] == analysis["raw_to_analysis_mappings"]["dti_band"]
+    assert fields["analysis_category_mappings"]["applicant_age_primary"] == analysis["raw_to_analysis_mappings"]["applicant_age"]
+    assert controls["primary_regression_formula"] == analysis["estimands"]["regression_adjusted"]["formula"]
