@@ -1,6 +1,6 @@
 {
-  "$schema": "./hmda-control-manifest.schema.json",
-  "manifest_kind": "control_manifest",
+  "$schema": "./hmda-manifest-schema-v2.json",
+  "manifest_type": "control_manifest",
   "schema_version": "1.0.0",
   "contract_id": "HMDA-CA-2024-CD-V1",
   "primary_regression_formula": "favorable_action ~ protected_group + log1p_loan_amount + log1p_income + C(dti_band,Treatment(reference='<30')) + C(cltv_band,Treatment(reference='[0,60]')) + log1p_property_value + loan_term_months + C(applicant_age,Treatment(reference='35-44'))",

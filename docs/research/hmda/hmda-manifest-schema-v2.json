@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fairlendkit.example/schemas/hmda-manifest-schema-v2.json",
+  "oneOf": [
+    {"$ref": "#/$defs/field_rules"},
+    {"$ref": "#/$defs/control_manifest"},
+    {"$ref": "#/$defs/analysis_spec"},
+    {"$ref": "#/$defs/sensitivity_spec"}
+  ],
+  "$defs": {
+    "field_rules": {"$ref": "hmda-field-rules.schema.json"},
+    "control_manifest": {"$ref": "hmda-control-manifest.schema.json"},
+    "analysis_spec": {"$ref": "hmda-analysis-spec.schema.json"},
+    "sensitivity_spec": {"$ref": "hmda-sensitivity-spec.schema.json"}
+  }
+}

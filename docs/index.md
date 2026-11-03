@@ -47,6 +47,7 @@ page for each topic; it does not replace the normative contracts.
   - [Control manifest](research/hmda/hmda-control-manifest.json)
   - [Analysis specification](research/hmda/hmda-analysis-spec.json)
   - [Sensitivity specification](research/hmda/hmda-sensitivity-spec.json)
+  - [Unified Draft 2020-12 manifest schema](research/hmda/hmda-manifest-schema-v2.json)
   - [Field-rules schema](research/hmda/hmda-field-rules.schema.json)
   - [Control-manifest schema](research/hmda/hmda-control-manifest.schema.json)
   - [Analysis-spec schema](research/hmda/hmda-analysis-spec.schema.json)

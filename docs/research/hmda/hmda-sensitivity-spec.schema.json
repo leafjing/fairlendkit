@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://fairlendkit.example/schemas/hmda-sensitivity-spec.schema.json",
   "type": "object", "additionalProperties": false,
-  "required": ["$schema", "manifest_kind", "schema_version", "contract_id", "analyses"],
+  "required": ["$schema", "manifest_type", "schema_version", "contract_id", "analyses"],
   "properties": {
-    "$schema": {"const": "./hmda-sensitivity-spec.schema.json"}, "manifest_kind": {"const": "sensitivity_spec"},
+    "$schema": {"const": "./hmda-manifest-schema-v2.json"}, "manifest_type": {"const": "sensitivity_spec"},
     "schema_version": {"const": "1.0.0"}, "contract_id": {"const": "HMDA-CA-2024-CD-V1"},
     "analyses": {"type": "array", "minItems": 10, "items": {"$ref": "#/$defs/sensitivity"}}
   },

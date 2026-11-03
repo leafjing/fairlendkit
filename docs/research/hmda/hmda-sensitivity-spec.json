@@ -1,6 +1,6 @@
 {
-  "$schema": "./hmda-sensitivity-spec.schema.json",
-  "manifest_kind": "sensitivity_spec",
+  "$schema": "./hmda-manifest-schema-v2.json",
+  "manifest_type": "sensitivity_spec",
   "schema_version": "1.0.0",
   "contract_id": "HMDA-CA-2024-CD-V1",
   "analyses": [
