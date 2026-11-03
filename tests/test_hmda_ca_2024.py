@@ -18,6 +18,7 @@ from fairlendkit.research.hmda_ca_2024 import (
     SourceEvidence,
     add_alternate_strata,
     add_primary_strata,
+    apply_overlap_support,
     apply_common_support,
     construct_cohort,
     fail_closed_artifact,
@@ -204,10 +205,19 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
         assert result["flow"]["reconciled"] is True
         assert result["lender_coverage"]["reconciled"] is True
         assert len(result["lender_coverage"]["included_lenders"]) == 100
+    overlap = estimands["sensitivities"]["HMDA-SENS-OVERLAP"]
+    assert overlap["status"] == "executed"
+    for group in ("ethnicity", "race", "sex"):
+        for name in ("standardized", "regression_adjusted"):
+            result = overlap["groups"][group][name]
+            assert result["flow"]["reconciled"] is True
+            assert result["overlap_diagnostics"]["reconciled"] is True
+            assert result["overlap_diagnostics"]["thresholds"]["minimum_rows_per_group_per_stratum"] == 50
     unavailable = set(estimands["sensitivities"]) - {
         "HMDA-SENS-ACTION-13", "HMDA-SENS-MISSING-COMPLETE",
         "HMDA-SENS-MISSING-CATEGORY", "HMDA-SENS-CONTROL-CORE",
         "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-BINS", "HMDA-SENS-GEOGRAPHY", "HMDA-SENS-LENDER",
+        "HMDA-SENS-OVERLAP",
         "HMDA-SENS-YEAR",
     }
     for sensitivity_id in unavailable:
@@ -381,6 +391,75 @@ def test_lender_low_sample_single_valid_and_empty_fail_closed():
             lender_regression_estimate(
                 reduced, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
             )
+
+
+def _overlap_rows(strata: int = 20, rows_per_group: int = 50) -> pd.DataFrame:
+    rows = []
+    for stratum in range(strata):
+        for group in ("focal", "reference"):
+            for index in range(rows_per_group):
+                rows.append({
+                    "group": group, "income_band": f"income-{stratum}",
+                    "loan_amount_band": "loan", "dti_band": "dti", "cltv_band": "cltv",
+                    "favorable_action": int(index < 10), "_source_row_id": len(rows),
+                })
+    return pd.DataFrame(rows)
+
+
+def test_overlap_exact_threshold_boundary_and_reconciliation():
+    retained, evidence = apply_overlap_support(_overlap_rows(), "group", "focal", "reference")
+    assert len(retained) == 20 * 2 * 50
+    assert evidence["supported_strata"] == 20
+    assert evidence["retained_fraction"] == {"focal": 1.0, "reference": 1.0}
+    assert evidence["overall_supported_fraction"] == 1.0
+    assert evidence["reconciled"] is True
+
+
+def test_overlap_below_cell_outcome_strata_and_retention_thresholds_fail_closed():
+    below_rows = _overlap_rows()
+    below_rows = below_rows.drop(below_rows[(below_rows["income_band"] == "income-0") & (below_rows["group"] == "focal")].index[:1])
+    below_outcome = _overlap_rows()
+    mask = (below_outcome["income_band"] == "income-0") & (below_outcome["group"] == "focal")
+    below_outcome.loc[mask, "favorable_action"] = 0
+    retention = _overlap_rows(strata=25)
+    for stratum in range(6):
+        drop = retention[
+            (retention["income_band"] == f"income-{stratum}") & (retention["group"] == "focal")
+        ].index[:1]
+        retention = retention.drop(drop)
+    for frame in (below_rows, below_outcome, retention, _overlap_rows(strata=19), _overlap_rows().iloc[:0]):
+        with pytest.raises(HMDAContractError, match="hmda_common_support_insufficient"):
+            apply_overlap_support(frame, "group", "focal", "reference")
+
+
+def test_overlap_stricter_rules_change_analysis_row_set():
+    data = add_primary_strata(normalize_analysis_fields(_rows()))
+    keys = ["income_band", "loan_amount_band", "dti_band", "cltv_band"]
+    first_key = tuple(data[keys].drop_duplicates().iloc[0])
+    in_stratum = np.logical_and.reduce([data[key] == value for key, value in zip(keys, first_key)])
+    focal = in_stratum & (data["derived_ethnicity"] == "Hispanic or Latino")
+    drop = data.loc[focal].index[40:]
+    reduced = data.drop(drop)
+    primary_rows, _ = apply_common_support(
+        reduced, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
+    )
+    overlap_rows, evidence = apply_overlap_support(
+        reduced, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
+    )
+    assert len(overlap_rows) < len(primary_rows)
+    assert evidence["support_excluded_rows"] > 0
+    assert evidence["excluded_strata"]
+
+
+def test_overlap_bootstrap_insufficient_valid_replicates_fails_closed():
+    data = _overlap_rows()
+    data["lei"] = [f"LEI{i % 30:017d}" for i in range(len(data))]
+
+    def always_invalid(sample):
+        raise HMDAContractError("hmda_common_support_insufficient")
+
+    with pytest.raises(HMDAContractError, match="hmda_bootstrap_insufficient_valid_replicates"):
+        cluster_bootstrap_differences(data, always_invalid, replicates=5)
 
 def test_regression_and_cluster_bootstrap_contracts():
     data = add_primary_strata(normalize_analysis_fields(_rows()))

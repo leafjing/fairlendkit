@@ -456,6 +456,62 @@ def apply_common_support(frame: pd.DataFrame, group_field: str, focal: str, refe
     return retained, evidence
 
 
+def apply_overlap_support(
+    frame: pd.DataFrame, group_field: str, focal: str, reference: str,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Apply the frozen HMDA-SENS-OVERLAP 50/10/0.8/20 strata contract."""
+    keys = ["income_band", "loan_amount_band", "dti_band", "cltv_band"]
+    selected = frame.loc[frame[group_field].isin([focal, reference])].dropna(subset=keys).copy()
+    grouped = selected.groupby(keys + [group_field], observed=True)["favorable_action"].agg(["size", "sum"])
+    included: list[tuple[Any, ...]] = []
+    all_strata = sorted({key if isinstance(key, tuple) else (key,) for key in grouped.index.droplevel(group_field)})
+    counts: dict[str, Any] = {}
+    for key in all_strata:
+        detail: dict[str, Any] = {}
+        valid = True
+        for label, group in (("focal", focal), ("reference", reference)):
+            try:
+                row = grouped.loc[key + (group,)]
+                total, favorable = int(row["size"]), int(row["sum"])
+            except KeyError:
+                total = favorable = 0
+            detail[label] = {
+                "rows": total, "favorable": favorable, "unfavorable": total - favorable,
+            }
+            valid &= total >= 50 and favorable >= 10 and total - favorable >= 10
+        encoded = "|".join(map(str, key))
+        counts[encoded] = detail
+        if valid:
+            included.append(key)
+    included_index = pd.MultiIndex.from_tuples(included, names=keys)
+    retained = selected.loc[pd.MultiIndex.from_frame(selected[keys]).isin(included_index)].copy()
+    fractions = {
+        label: len(retained.loc[retained[group_field] == group]) / max(1, len(selected.loc[selected[group_field] == group]))
+        for label, group in (("focal", focal), ("reference", reference))
+    }
+    overall = len(retained) / max(1, len(selected))
+    evidence = {
+        "thresholds": {
+            "minimum_rows_per_group_per_stratum": 50,
+            "minimum_outcomes_each_direction": 10,
+            "minimum_retained_fraction_each_group": 0.8,
+            "minimum_overall_supported_fraction": 0.8,
+            "minimum_supported_strata": 20,
+        },
+        "input_rows": int(len(selected)), "supported_rows": int(len(retained)),
+        "support_excluded_rows": int(len(selected) - len(retained)),
+        "input_strata": len(all_strata), "supported_strata": len(included),
+        "included_strata": ["|".join(map(str, key)) for key in included],
+        "excluded_strata": ["|".join(map(str, key)) for key in all_strata if key not in set(included)],
+        "stratum_counts": counts, "retained_fraction": fractions,
+        "overall_supported_fraction": overall,
+        "reconciled": len(selected) == len(retained) + (len(selected) - len(retained)),
+    }
+    if len(included) < 20 or overall < 0.8 or min(fractions.values()) < 0.8:
+        raise HMDAContractError("hmda_common_support_insufficient", json.dumps(evidence, sort_keys=True))
+    return retained, evidence
+
+
 def standardized_estimate(frame: pd.DataFrame, group_field: str, focal: str, reference: str) -> dict[str, Any]:
     supported, evidence = apply_common_support(frame, group_field, focal, reference)
     keys = ["income_band", "loan_amount_band", "dti_band", "cltv_band"]
@@ -1068,6 +1124,79 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
     for group in GROUPS:
         lender_groups[group]["regression_adjusted"]["holm_adjusted_p_value"] = lender_adjusted[group]
 
+    overlap_groups: dict[str, Any] = {}
+    for group_name, (field, focal, reference) in GROUPS.items():
+        group_rows = normalized.loc[normalized[field].isin([focal, reference])].copy()
+        standardized_complete = group_rows.loc[
+            (group_rows["loan_amount_numeric"] > 0) & group_rows["income_numeric"].notna()
+            & group_rows["dti_band"].notna() & group_rows["cltv_band"].notna()
+        ].copy()
+        standardized_rows, standardized_overlap = apply_overlap_support(
+            standardized_complete, field, focal, reference,
+        )
+        standardized = standardized_estimate(standardized_rows, field, focal, reference)
+        standardized.update(cluster_bootstrap_differences(
+            standardized_complete,
+            lambda sample, gf=field, fo=focal, ref=reference: standardized_estimate(
+                apply_overlap_support(sample, gf, fo, ref)[0], gf, fo, ref,
+            ),
+            replicates=bootstrap_replicates,
+        ))
+        standardized["row_set_digest"] = row_set_digest(standardized_rows)
+        standardized["method_identity"] = "strict_registered_strata_overlap_lei_cluster_bootstrap_v1"
+        standardized["overlap_diagnostics"] = standardized_overlap
+        standardized["flow"] = {
+            "named_group_input_rows": int(len(normalized)),
+            "named_group_excluded_rows": int(len(normalized) - len(group_rows)),
+            "complete_case_input_rows": int(len(group_rows)),
+            "complete_case_excluded_rows": int(len(group_rows) - len(standardized_complete)),
+            "support_excluded_rows": int(len(standardized_complete) - len(standardized_rows)),
+            "final_rows": int(len(standardized_rows)),
+            "reconciled": len(normalized) == (
+                len(normalized) - len(group_rows) + len(group_rows) - len(standardized_complete)
+                + len(standardized_complete) - len(standardized_rows) + len(standardized_rows)
+            ),
+        }
+        regression_complete = group_rows.dropna(subset=[
+            "loan_amount_numeric", "income_numeric", "property_value_numeric", "loan_term_numeric",
+            "dti_band", "cltv_band", "applicant_age_band", "lei",
+        ]).copy()
+        regression_complete = regression_complete.loc[
+            (regression_complete["loan_amount_numeric"] > 0)
+            & (regression_complete["income_numeric"] > 0)
+            & (regression_complete["property_value_numeric"] > 0)
+            & regression_complete["loan_term_numeric"].between(1, 600)
+        ].copy()
+        regression_rows, regression_overlap = apply_overlap_support(
+            regression_complete, field, focal, reference,
+        )
+        regression = regression_adjusted_estimate(regression_rows, field, focal, reference)
+        regression["method_identity"] = "logit_core_strict_registered_strata_overlap_v1"
+        regression["overlap_diagnostics"] = regression_overlap
+        regression["flow"] = {
+            "named_group_input_rows": int(len(normalized)),
+            "named_group_excluded_rows": int(len(normalized) - len(group_rows)),
+            "complete_case_input_rows": int(len(group_rows)),
+            "complete_case_excluded_rows": int(len(group_rows) - len(regression_complete)),
+            "support_excluded_rows": int(len(regression_complete) - len(regression_rows)),
+            "final_rows": int(len(regression_rows)),
+            "reconciled": len(normalized) == (
+                len(normalized) - len(group_rows) + len(group_rows) - len(regression_complete)
+                + len(regression_complete) - len(regression_rows) + len(regression_rows)
+            ),
+        }
+        overlap_groups[group_name] = {
+            "standardized": standardized, "regression_adjusted": regression,
+        }
+    for estimand in ("standardized", "regression_adjusted"):
+        adjusted = holm_adjust({
+            group: overlap_groups[group][estimand]["raw_p_value"] for group in GROUPS
+        })
+        if adjusted is None:
+            raise HMDAContractError("hmda_multiplicity_family_incomplete")
+        for group in GROUPS:
+            overlap_groups[group][estimand]["holm_adjusted_p_value"] = adjusted[group]
+
     def unavailable() -> dict[str, Any]:
         return {
             "status": "failed",
@@ -1085,7 +1214,7 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
         "HMDA-SENS-BINS": {"status": "executed", "groups": bins_groups},
         "HMDA-SENS-GEOGRAPHY": {"status": "executed", "groups": geography_groups},
         "HMDA-SENS-LENDER": {"status": "executed", "groups": lender_groups},
-        "HMDA-SENS-OVERLAP": unavailable(),
+        "HMDA-SENS-OVERLAP": {"status": "executed", "groups": overlap_groups},
         "HMDA-SENS-YEAR": {
             "status": "disabled_pending_separate_source_admission", "groups": None,
         },
@@ -1165,6 +1294,19 @@ def success_artifact(
                         and isinstance(coverage.get("excluded_lenders"), list)
                         and isinstance(coverage.get("lender_counts"), Mapping)
                         and coverage.get("final_analysis_rows") == estimate.get("row_count")
+                    ):
+                        return False
+                if sensitivity_id == "HMDA-SENS-OVERLAP":
+                    diagnostics = estimate.get("overlap_diagnostics")
+                    if not (
+                        isinstance(diagnostics, Mapping)
+                        and diagnostics.get("reconciled") is True
+                        and diagnostics.get("supported_strata", 0) >= 20
+                        and diagnostics.get("overall_supported_fraction", 0) >= 0.8
+                        and min(diagnostics.get("retained_fraction", {}).values(), default=0) >= 0.8
+                        and isinstance(diagnostics.get("included_strata"), list)
+                        and isinstance(diagnostics.get("excluded_strata"), list)
+                        and diagnostics.get("supported_rows") == estimate.get("row_count")
                     ):
                         return False
                 if estimand == "regression_adjusted" and not (
