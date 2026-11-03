@@ -12,8 +12,23 @@
   "allOf": [
     {"if": {"properties": {"manifest_kind": {"const": "field_rules"}}}, "then": {"required": ["source_sha256", "normalization", "required_fields", "ordered_cohort_rules", "outcomes", "group_contrasts"]}},
     {"if": {"properties": {"manifest_kind": {"const": "control_manifest"}}}, "then": {"required": ["primary_regression_formula", "variables", "prohibited_field_patterns", "unavailable_concepts"]}},
-    {"if": {"properties": {"manifest_kind": {"const": "analysis_spec"}}}, "then": {"required": ["global_order", "raw_to_analysis_mappings", "estimands", "multiplicity"]}},
-    {"if": {"properties": {"manifest_kind": {"const": "sensitivity_spec"}}}, "then": {"required": ["analyses"]}}
+    {"if": {"properties": {"manifest_kind": {"const": "analysis_spec"}}}, "then": {"required": ["global_order", "raw_to_analysis_mappings", "estimands", "multiplicity"], "properties": {"estimands": {"required": ["unadjusted", "standardized", "regression_adjusted"]}}}},
+    {
+      "if": {"properties": {"manifest_kind": {"const": "sensitivity_spec"}}},
+      "then": {
+        "required": ["analyses"],
+        "properties": {
+          "analyses": {
+            "type": "array",
+            "minItems": 10,
+            "items": {
+              "type": "object",
+              "required": ["id", "estimands", "outcome", "complete_case", "formula", "regression_formula", "reference_categories", "bins", "support", "variance", "p_value"]
+            }
+          }
+        }
+      }
+    }
   ],
   "additionalProperties": true
 }

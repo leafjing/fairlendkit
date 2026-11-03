@@ -52,6 +52,18 @@
       "allowed": ["Male", "Female", "Joint", "Sex Not Available"]
     }
   },
+  "analysis_category_mappings": {
+    "debt_to_income_ratio_primary": {
+      "<20%": "<30", "20%-<30%": "<30",
+      "30%-<36%": "30-36", "36": "30-36",
+      "37": "37-43", "38": "37-43", "39": "37-43", "40": "37-43", "41": "37-43", "42": "37-43", "43": "37-43",
+      "44": "44-49", "45": "44-49", "46": "44-49", "47": "44-49", "48": "44-49", "49": "44-49",
+      "50%-60%": "50-60", ">60%": ">60", "NA": null, "Exempt": "Exempt"
+    },
+    "applicant_age_primary": {
+      "<25": "<25", "25-34": "25-34", "35-44": "35-44", "45-54": "45-54", "55-64": "55-64", "65-74": "65-74", ">74": ">74", "8888": null, "9999": null
+    }
+  },
   "ordered_cohort_rules": [
     {"order": 10, "field": "activity_year", "include": ["2024"], "exclude_reason": "hmda_wrong_activity_year"},
     {"order": 20, "field": "state_code", "include": ["CA"], "exclude_reason": "hmda_outside_california"},

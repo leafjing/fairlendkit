@@ -4,15 +4,98 @@
   "schema_version": "1.0.0",
   "contract_id": "HMDA-CA-2024-CD-V1",
   "analyses": [
-    {"id": "HMDA-SENS-ACTION-13", "change": {"favorable_action_codes": ["1"], "unfavorable_action_codes": ["3"]}, "otherwise": "primary_configuration"},
-    {"id": "HMDA-SENS-MISSING-COMPLETE", "change": {"missing_policy": "complete_case_all_core_controls"}, "otherwise": "primary_configuration"},
-    {"id": "HMDA-SENS-MISSING-CATEGORY", "change": {"categorical_missing_levels": {"debt_to_income_ratio": ["NA", "Exempt"], "combined_loan_to_value_ratio": ["NA", "Exempt"], "applicant_age": ["8888", "9999"]}, "numeric_missing": "still_excluded"}, "otherwise": "primary_configuration"},
-    {"id": "HMDA-SENS-CONTROL-CORE", "change": {"formula": "primary_regression_formula"}, "otherwise": "primary_configuration"},
-    {"id": "HMDA-SENS-CONTROL-EXTENDED", "change": {"append_terms": ["C(county_code, Treatment(reference=lexical_first))"]}, "eligibility": {"county_code": "nonmissing", "minimum_rows_per_level": 100}, "otherwise": "primary_configuration"},
-    {"id": "HMDA-SENS-BINS", "change": {"income_thousands": ["(-inf,0]", "(0,40]", "(40,80]", "(80,120]", "(120,200]", "(200,inf)"], "loan_amount_dollars": ["(0,150000]", "(150000,300000]", "(300000,450000]", "(450000,650000]", "(650000,inf)"], "dti_percent": ["<30", "30-36", "37-40", "41-43", "44-49", "50-60", ">60", "Exempt"], "dti_raw_mapping": {"<20%": "<30", "20%-<30%": "<30", "30%-<36%": "30-36", "36": "30-36", "37": "37-40", "38": "37-40", "39": "37-40", "40": "37-40", "41": "41-43", "42": "41-43", "43": "41-43", "44": "44-49", "45": "44-49", "46": "44-49", "47": "44-49", "48": "44-49", "49": "44-49", "50%-60%": "50-60", ">60%": ">60", "Exempt": "Exempt", "NA": null}, "cltv_percent": ["[0,70]", "(70,80]", "(80,95]", "(95,100]", "(100,1000]", "Exempt"]}, "otherwise": "primary_configuration"},
-    {"id": "HMDA-SENS-GEOGRAPHY", "change": {"append_stratum": "county_code"}, "eligibility": {"county_code": "nonmissing", "minimum_per_group_per_county": 100, "minimum_favorable_and_unfavorable_per_group": 10}, "otherwise": "primary_configuration"},
-    {"id": "HMDA-SENS-LENDER", "change": {"append_terms": ["C(lei, Treatment(reference=lexical_first))"], "variance_cluster": "lei"}, "eligibility": {"minimum_lender_rows": 100, "minimum_lenders": 30, "each_retained_lender_has_both_groups": true}, "otherwise": "primary_configuration"},
-    {"id": "HMDA-SENS-OVERLAP", "change": {"minimum_rows_per_group_per_stratum": 50, "minimum_favorable_and_unfavorable_per_group": 10, "minimum_group_retained_fraction": 0.8, "minimum_overall_supported_fraction": 0.8, "minimum_supported_strata": 20}, "otherwise": "primary_configuration"},
-    {"id": "HMDA-SENS-YEAR", "status": "disabled_pending_separate_source_admission", "change": {"activity_year": 2023}, "required_before_enable": ["source_url", "archive_sha256", "schema_digest", "reviewed_code_map"]}
+    {
+      "id": "HMDA-SENS-ACTION-13", "estimands": ["unadjusted", "standardized", "regression_adjusted"],
+      "outcome": {"favorable": ["1"], "unfavorable": ["3"]},
+      "complete_case": {"unadjusted": ["action_taken", "named_protected_group"], "standardized": ["action_taken", "named_protected_group", "loan_amount", "income", "debt_to_income_ratio", "combined_loan_to_value_ratio"], "regression_adjusted": ["action_taken", "named_protected_group", "loan_amount", "income", "debt_to_income_ratio", "combined_loan_to_value_ratio", "property_value", "loan_term", "applicant_age"]},
+      "formula": {"unadjusted": "focal_rate-reference_rate", "standardized": "sum_s(pooled_weight_s*(focal_rate_s-reference_rate_s))", "regression_adjusted": "mean(prediction_if_focal-prediction_if_reference)"},
+      "regression_formula": "favorable_action ~ protected_group + log1p_loan_amount + log1p_income + C(dti_band,Treatment(reference='<30')) + C(cltv_band,Treatment(reference='[0,60]')) + log1p_property_value + loan_term_months + C(applicant_age,Treatment(reference='35-44'))",
+      "reference_categories": {"protected_group": "per_named_contrast", "dti_band": "<30", "cltv_band": "[0,60]", "applicant_age": "35-44"},
+      "bins": {"income": ["(-inf,0]", "(0,50]", "(50,100]", "(100,150]", "(150,250]", "(250,inf)"], "loan_amount": ["(0,100000]", "(100000,250000]", "(250000,500000]", "(500000,750000]", "(750000,inf)"], "dti": ["<30", "30-36", "37-43", "44-49", "50-60", ">60", "Exempt"], "cltv": ["[0,60]", "(60,80]", "(80,90]", "(90,100]", "(100,1000]", "Exempt"]},
+      "support": {"minimum_rows_per_group_per_stratum": 30, "minimum_outcomes_each_direction": 5, "minimum_retained_fraction_each_group": 0.7, "minimum_overall_supported_fraction": 0.7, "minimum_supported_strata": 20},
+      "variance": {"unadjusted": "wilson_newcombe_log_ratio", "standardized": "lei_cluster_bootstrap_B1000_seed20241119_percentile95", "regression_adjusted": "lei_cluster_sandwich_delta_normal95_min30_clusters"},
+      "p_value": {"unadjusted": "pooled_score_two_sided", "standardized": "min(1,2*min((1+count(theta_star<=0))/(B_valid+1),(1+count(theta_star>=0))/(B_valid+1)))", "regression_adjusted": "clustered_delta_wald_normal_two_sided"}
+    },
+    {
+      "id": "HMDA-SENS-MISSING-COMPLETE", "estimands": ["standardized", "regression_adjusted"], "outcome": {"favorable": ["1", "2"], "unfavorable": ["3"]},
+      "complete_case": {"standardized": ["loan_amount>0", "income_finite", "dti_mapped_nonnull", "cltv_mapped_nonnull"], "regression_adjusted": ["loan_amount>0", "income>0", "dti_mapped_nonnull", "cltv_mapped_nonnull", "property_value>0", "loan_term_[1,600]", "applicant_age_mapped_nonnull"]},
+      "formula": {"standardized": "sum_s(pooled_weight_s*(focal_rate_s-reference_rate_s))", "regression_adjusted": "mean(prediction_if_focal-prediction_if_reference)"},
+      "regression_formula": "favorable_action ~ protected_group + log1p_loan_amount + log1p_income + C(dti_band,Treatment(reference='<30')) + C(cltv_band,Treatment(reference='[0,60]')) + log1p_property_value + loan_term_months + C(applicant_age,Treatment(reference='35-44'))",
+      "reference_categories": {"dti_band": "<30", "cltv_band": "[0,60]", "applicant_age": "35-44"},
+      "bins": {"income": ["(-inf,0]", "(0,50]", "(50,100]", "(100,150]", "(150,250]", "(250,inf)"], "loan_amount": ["(0,100000]", "(100000,250000]", "(250000,500000]", "(500000,750000]", "(750000,inf)"], "dti": ["<30", "30-36", "37-43", "44-49", "50-60", ">60", "Exempt"], "cltv": ["[0,60]", "(60,80]", "(80,90]", "(90,100]", "(100,1000]", "Exempt"]},
+      "support": {"minimum_rows_per_group_per_stratum": 30, "minimum_outcomes_each_direction": 5, "minimum_retained_fraction_each_group": 0.7, "minimum_overall_supported_fraction": 0.7, "minimum_supported_strata": 20},
+      "variance": {"standardized": "lei_cluster_bootstrap_B1000_seed20241119_percentile95", "regression_adjusted": "lei_cluster_sandwich_delta_normal95_min30_clusters"},
+      "p_value": {"standardized": "zero_centered_empirical_two_sided_plus1", "regression_adjusted": "clustered_delta_wald_normal_two_sided"}
+    },
+    {
+      "id": "HMDA-SENS-MISSING-CATEGORY", "estimands": ["standardized", "regression_adjusted"], "outcome": {"favorable": ["1", "2"], "unfavorable": ["3"]},
+      "complete_case": {"standardized": ["loan_amount>0", "income_finite"], "regression_adjusted": ["loan_amount>0", "income>0", "property_value>0", "loan_term_[1,600]"]},
+      "explicit_categories": {"dti": ["NA", "Exempt"], "cltv": ["NA", "Exempt"], "applicant_age": ["8888", "9999"]},
+      "formula": {"standardized": "sum_s(pooled_weight_s*(focal_rate_s-reference_rate_s))", "regression_adjusted": "mean(prediction_if_focal-prediction_if_reference)"},
+      "regression_formula": "favorable_action ~ protected_group + log1p_loan_amount + log1p_income + C(dti_band,Treatment(reference='<30')) + C(cltv_band,Treatment(reference='[0,60]')) + log1p_property_value + loan_term_months + C(applicant_age,Treatment(reference='35-44'))",
+      "reference_categories": {"dti_band": "<30", "cltv_band": "[0,60]", "applicant_age": "35-44"},
+      "bins": {"income": ["(-inf,0]", "(0,50]", "(50,100]", "(100,150]", "(150,250]", "(250,inf)"], "loan_amount": ["(0,100000]", "(100000,250000]", "(250000,500000]", "(500000,750000]", "(750000,inf)"], "dti": ["<30", "30-36", "37-43", "44-49", "50-60", ">60", "NA", "Exempt"], "cltv": ["[0,60]", "(60,80]", "(80,90]", "(90,100]", "(100,1000]", "NA", "Exempt"]},
+      "support": {"minimum_rows_per_group_per_stratum": 30, "minimum_outcomes_each_direction": 5, "minimum_retained_fraction_each_group": 0.7, "minimum_overall_supported_fraction": 0.7, "minimum_supported_strata": 20},
+      "variance": {"standardized": "lei_cluster_bootstrap_B1000_seed20241119_percentile95", "regression_adjusted": "lei_cluster_sandwich_delta_normal95_min30_clusters"},
+      "p_value": {"standardized": "zero_centered_empirical_two_sided_plus1", "regression_adjusted": "clustered_delta_wald_normal_two_sided"}
+    },
+    {
+      "id": "HMDA-SENS-CONTROL-CORE", "estimands": ["regression_adjusted"], "outcome": {"favorable": ["1", "2"], "unfavorable": ["3"]},
+      "complete_case": {"regression_adjusted": ["loan_amount>0", "income>0", "dti_mapped_nonnull", "cltv_mapped_nonnull", "property_value>0", "loan_term_[1,600]", "applicant_age_mapped_nonnull"]},
+      "formula": {"regression_adjusted": "mean(prediction_if_focal-prediction_if_reference)"},
+      "regression_formula": "favorable_action ~ protected_group + log1p_loan_amount + log1p_income + C(dti_band,Treatment(reference='<30')) + C(cltv_band,Treatment(reference='[0,60]')) + log1p_property_value + loan_term_months + C(applicant_age,Treatment(reference='35-44'))",
+      "reference_categories": {"dti_band": "<30", "cltv_band": "[0,60]", "applicant_age": "35-44"}, "bins": {"support": "income50_loan100k_dti_primary_cltv_primary"},
+      "support": {"minimum_rows_per_group_per_stratum": 30, "minimum_outcomes_each_direction": 5, "minimum_retained_fraction_each_group": 0.7, "minimum_overall_supported_fraction": 0.7, "minimum_supported_strata": 20},
+      "variance": {"regression_adjusted": "lei_cluster_sandwich_delta_normal95_min30_clusters"}, "p_value": {"regression_adjusted": "clustered_delta_wald_normal_two_sided"}
+    },
+    {
+      "id": "HMDA-SENS-CONTROL-EXTENDED", "estimands": ["regression_adjusted"], "outcome": {"favorable": ["1", "2"], "unfavorable": ["3"]},
+      "complete_case": {"regression_adjusted": ["loan_amount>0", "income>0", "dti_mapped_nonnull", "cltv_mapped_nonnull", "property_value>0", "loan_term_[1,600]", "applicant_age_mapped_nonnull", "county_code_nonmissing"]},
+      "formula": {"regression_adjusted": "mean(prediction_if_focal-prediction_if_reference)"},
+      "regression_formula": "favorable_action ~ protected_group + log1p_loan_amount + log1p_income + C(dti_band,Treatment(reference='<30')) + C(cltv_band,Treatment(reference='[0,60]')) + log1p_property_value + loan_term_months + C(applicant_age,Treatment(reference='35-44')) + C(county_code,Sum)",
+      "reference_categories": {"dti_band": "<30", "cltv_band": "[0,60]", "applicant_age": "35-44", "county_code": null}, "county_contrast_coding": "sum_to_zero_no_reference", "bins": {"support": "income50_loan100k_dti_primary_cltv_primary"},
+      "support": {"minimum_county_rows": 100, "minimum_rows_per_group_per_stratum": 30, "minimum_outcomes_each_direction": 5, "minimum_retained_fraction_each_group": 0.7, "minimum_overall_supported_fraction": 0.7, "minimum_supported_strata": 20},
+      "variance": {"regression_adjusted": "lei_cluster_sandwich_delta_normal95_min30_clusters"}, "p_value": {"regression_adjusted": "clustered_delta_wald_normal_two_sided"}
+    },
+    {
+      "id": "HMDA-SENS-BINS", "estimands": ["standardized"], "outcome": {"favorable": ["1", "2"], "unfavorable": ["3"]},
+      "complete_case": {"standardized": ["action_taken", "named_protected_group", "loan_amount>0", "income_finite", "dti_mapped_nonnull", "cltv_mapped_nonnull"]},
+      "formula": {"standardized": "sum_s(pooled_weight_s*(focal_rate_s-reference_rate_s))"}, "regression_formula": null,
+      "reference_categories": {"dti_band": "<30", "cltv_band": "[0,70]"},
+      "bins": {"income": ["(-inf,0]", "(0,40]", "(40,80]", "(80,120]", "(120,200]", "(200,inf)"], "loan_amount": ["(0,150000]", "(150000,300000]", "(300000,450000]", "(450000,650000]", "(650000,inf)"], "dti": ["<30", "30-36", "37-40", "41-43", "44-49", "50-60", ">60", "Exempt"], "cltv": ["[0,70]", "(70,80]", "(80,95]", "(95,100]", "(100,1000]", "Exempt"]},
+      "support": {"minimum_rows_per_group_per_stratum": 30, "minimum_outcomes_each_direction": 5, "minimum_retained_fraction_each_group": 0.7, "minimum_overall_supported_fraction": 0.7, "minimum_supported_strata": 20},
+      "variance": {"standardized": "lei_cluster_bootstrap_B1000_seed20241119_percentile95"}, "p_value": {"standardized": "min(1,2*min((1+count(theta_star<=0))/(B_valid+1),(1+count(theta_star>=0))/(B_valid+1)))"}
+    },
+    {
+      "id": "HMDA-SENS-GEOGRAPHY", "estimands": ["standardized"], "outcome": {"favorable": ["1", "2"], "unfavorable": ["3"]},
+      "complete_case": {"standardized": ["action_taken", "named_protected_group", "loan_amount>0", "income_finite", "dti_mapped_nonnull", "cltv_mapped_nonnull", "county_code_nonmissing"]},
+      "formula": {"standardized": "sum_s(pooled_weight_s*(focal_rate_s-reference_rate_s))"}, "regression_formula": null, "reference_categories": {"county_code": null},
+      "bins": {"income": ["(-inf,0]", "(0,50]", "(50,100]", "(100,150]", "(150,250]", "(250,inf)"], "loan_amount": ["(0,100000]", "(100000,250000]", "(250000,500000]", "(500000,750000]", "(750000,inf)"], "dti": ["<30", "30-36", "37-43", "44-49", "50-60", ">60", "Exempt"], "cltv": ["[0,60]", "(60,80]", "(80,90]", "(90,100]", "(100,1000]", "Exempt"], "append_exact_category": "county_code"},
+      "support": {"minimum_rows_per_group_per_county": 100, "minimum_outcomes_each_direction_per_group_county": 10, "minimum_retained_fraction_each_group": 0.7, "minimum_overall_supported_fraction": 0.7, "minimum_supported_strata": 20},
+      "variance": {"standardized": "lei_cluster_bootstrap_B1000_seed20241119_percentile95"}, "p_value": {"standardized": "zero_centered_empirical_two_sided_plus1"}
+    },
+    {
+      "id": "HMDA-SENS-LENDER", "estimands": ["regression_adjusted"], "outcome": {"favorable": ["1", "2"], "unfavorable": ["3"]},
+      "complete_case": {"regression_adjusted": ["loan_amount>0", "income>0", "dti_mapped_nonnull", "cltv_mapped_nonnull", "property_value>0", "loan_term_[1,600]", "applicant_age_mapped_nonnull", "lei_valid"]},
+      "formula": {"regression_adjusted": "mean(prediction_if_focal-prediction_if_reference)"},
+      "regression_formula": "favorable_action ~ protected_group + log1p_loan_amount + log1p_income + C(dti_band,Treatment(reference='<30')) + C(cltv_band,Treatment(reference='[0,60]')) + log1p_property_value + loan_term_months + C(applicant_age,Treatment(reference='35-44')) + C(lei,Sum)",
+      "reference_categories": {"dti_band": "<30", "cltv_band": "[0,60]", "applicant_age": "35-44", "lei": null}, "lender_contrast_coding": "sum_to_zero_no_reference", "bins": {"support": "income50_loan100k_dti_primary_cltv_primary"},
+      "support": {"minimum_lender_rows": 100, "minimum_lenders": 30, "each_retained_lender_has_both_groups": true, "minimum_rows_per_group_per_stratum": 30, "minimum_outcomes_each_direction": 5},
+      "variance": {"regression_adjusted": "lei_cluster_sandwich_delta_normal95_min30_clusters"}, "p_value": {"regression_adjusted": "clustered_delta_wald_normal_two_sided"}
+    },
+    {
+      "id": "HMDA-SENS-OVERLAP", "estimands": ["standardized", "regression_adjusted"], "outcome": {"favorable": ["1", "2"], "unfavorable": ["3"]},
+      "complete_case": {"standardized": ["loan_amount>0", "income_finite", "dti_mapped_nonnull", "cltv_mapped_nonnull"], "regression_adjusted": ["loan_amount>0", "income>0", "dti_mapped_nonnull", "cltv_mapped_nonnull", "property_value>0", "loan_term_[1,600]", "applicant_age_mapped_nonnull"]},
+      "formula": {"standardized": "sum_s(pooled_weight_s*(focal_rate_s-reference_rate_s))", "regression_adjusted": "mean(prediction_if_focal-prediction_if_reference)"},
+      "regression_formula": "favorable_action ~ protected_group + log1p_loan_amount + log1p_income + C(dti_band,Treatment(reference='<30')) + C(cltv_band,Treatment(reference='[0,60]')) + log1p_property_value + loan_term_months + C(applicant_age,Treatment(reference='35-44'))",
+      "reference_categories": {"dti_band": "<30", "cltv_band": "[0,60]", "applicant_age": "35-44"}, "bins": {"support": "income50_loan100k_dti_primary_cltv_primary"},
+      "support": {"minimum_rows_per_group_per_stratum": 50, "minimum_outcomes_each_direction": 10, "minimum_retained_fraction_each_group": 0.8, "minimum_overall_supported_fraction": 0.8, "minimum_supported_strata": 20},
+      "variance": {"standardized": "lei_cluster_bootstrap_B1000_seed20241119_percentile95", "regression_adjusted": "lei_cluster_sandwich_delta_normal95_min30_clusters"}, "p_value": {"standardized": "zero_centered_empirical_two_sided_plus1", "regression_adjusted": "clustered_delta_wald_normal_two_sided"}
+    },
+    {
+      "id": "HMDA-SENS-YEAR", "status": "disabled_pending_separate_source_admission", "estimands": [], "outcome": {"favorable": ["1", "2"], "unfavorable": ["3"]},
+      "complete_case": {}, "formula": {}, "regression_formula": null, "reference_categories": {}, "bins": {}, "support": {}, "variance": {}, "p_value": {},
+      "activity_year": 2023, "required_before_enable": ["official_source_url", "archive_bytes", "archive_sha256", "ordered_schema_digest", "reviewed_field_code_rules", "independent_contract_review"]
+    }
   ]
 }
