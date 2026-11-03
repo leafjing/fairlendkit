@@ -58,8 +58,13 @@ def test_draft_2020_12_oneof_schema_accepts_manifest(manifest_name):
         ("hmda-analysis-spec.json", lambda p: p.__setitem__("global_order", None)),
         ("hmda-sensitivity-spec.json", lambda p: p["analyses"][0].__setitem__("bins", "bad")),
         ("hmda-sensitivity-spec.json", lambda p: p["analyses"][0].__setitem__("unknown_field", True)),
+        ("hmda-analysis-spec.json", lambda p: p["estimands"]["standardized"]["variance"].__setitem__("unknown", 1)),
+        ("hmda-analysis-spec.json", lambda p: p["estimands"]["standardized"]["support"].__setitem__("minimum_supported_strata", "twenty")),
+        ("hmda-analysis-spec.json", lambda p: p["estimands"]["standardized"]["bins"].__setitem__("dti_band", "bad")),
+        ("hmda-sensitivity-spec.json", lambda p: p["analyses"][0]["reference_categories"].__setitem__("unknown", "bad")),
+        ("hmda-sensitivity-spec.json", lambda p: p["analyses"][0]["p_value"].__setitem__("unknown", "bad")),
     ],
-    ids=["numeric-formula", "empty-variables", "array-to-string", "array-to-null", "sensitivity-child-type", "unknown-field"],
+    ids=["numeric-formula", "empty-variables", "array-to-string", "array-to-null", "sensitivity-child-type", "unknown-field", "deep-variance-unknown", "deep-support-type", "deep-bin-type", "deep-reference-unknown", "deep-pvalue-unknown"],
 )
 def test_schema_rejects_malformed_internal_structure(manifest_name, mutate):
     payload = copy.deepcopy(_load(manifest_name))
@@ -127,6 +132,8 @@ def test_sensitivity_parameters_are_frozen_and_adjacent_year_disabled():
     assert "primary_configuration" not in serialized
     assert "lexical_first" not in serialized
     assert "income50_loan100k_dti_primary_cltv_primary" not in serialized
+    assert analyses["HMDA-SENS-CONTROL-EXTENDED"]["county_contrast_coding"] == "sum_to_zero"
+    assert analyses["HMDA-SENS-LENDER"]["lender_contrast_coding"] == "sum_to_zero"
     for item in analyses.values():
         if item["estimands"]:
             assert {"income", "loan_amount", "dti", "cltv"} <= set(item["bins"])

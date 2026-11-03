@@ -14,15 +14,21 @@
       "properties": {
         "id": {"type": "string", "pattern": "^HMDA-SENS-"},
         "estimands": {"type": "array", "items": {"enum": ["unadjusted", "standardized", "regression_adjusted"]}, "uniqueItems": true},
-        "row_set_ids": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}},
+        "row_set_ids": {"$ref": "#/$defs/estimand_string_map"},
         "outcome": {"type": "object", "required": ["favorable", "unfavorable"], "properties": {"favorable": {"type": "array", "minItems": 1}, "unfavorable": {"type": "array", "minItems": 1}}, "additionalProperties": false},
-        "complete_case": {"type": "object", "additionalProperties": {"type": "array", "minItems": 1, "items": {"type": "string"}}},
+        "complete_case": {"$ref": "#/$defs/complete_case"},
         "formula": {"type": "string", "minLength": 1}, "regression_formula": {"type": ["string", "null"]},
-        "reference_categories": {"type": "object"}, "bins": {"type": "object"}, "support": {"type": "object"},
-        "variance": {"type": "object"}, "p_value": {"type": "object"},
+        "reference_categories": {"$ref": "#/$defs/reference_categories"}, "bins": {"$ref": "#/$defs/bins"}, "support": {"$ref": "#/$defs/support"},
+        "variance": {"$ref": "#/$defs/estimand_string_map"}, "p_value": {"$ref": "#/$defs/estimand_string_map"},
         "status": {"type": "string"}, "activity_year": {"type": "integer"}, "required_before_enable": {"type": "array"},
-        "explicit_categories": {"type": "object"}, "county_contrast_coding": {"type": "string"}, "lender_contrast_coding": {"type": "string"}
+        "explicit_categories": {"type": "object", "additionalProperties": false, "properties": {"county_code": {"type": "string"}, "lei": {"type": "string"}, "applicant_age": {"$ref": "#/$defs/string_array"}, "cltv": {"$ref": "#/$defs/string_array"}, "dti": {"$ref": "#/$defs/string_array"}}}, "county_contrast_coding": {"const": "sum_to_zero"}, "lender_contrast_coding": {"const": "sum_to_zero"}
       }
-    }
+    },
+    "estimand_string_map": {"type": "object", "additionalProperties": false, "properties": {"unadjusted": {"type": "string"}, "standardized": {"type": "string"}, "regression_adjusted": {"type": "string"}}},
+    "complete_case": {"type": "object", "additionalProperties": false, "properties": {"unadjusted": {"$ref": "#/$defs/string_array"}, "standardized": {"$ref": "#/$defs/string_array"}, "regression_adjusted": {"$ref": "#/$defs/string_array"}}},
+    "reference_categories": {"type": "object", "additionalProperties": false, "properties": {"protected_group": {"type": "string"}, "dti_band": {"type": "string"}, "cltv_band": {"type": "string"}, "applicant_age": {"type": "string"}, "county_code": {"type": "null"}, "lei": {"type": "null"}}},
+    "bins": {"type": "object", "additionalProperties": false, "properties": {"income": {"$ref": "#/$defs/string_array"}, "loan_amount": {"$ref": "#/$defs/string_array"}, "dti": {"$ref": "#/$defs/string_array"}, "cltv": {"$ref": "#/$defs/string_array"}, "append_exact_category": {"type": "string"}}},
+    "support": {"type": "object", "additionalProperties": false, "properties": {"minimum_rows_per_group_per_stratum": {"type": "integer"}, "minimum_outcomes_each_direction": {"type": "integer"}, "minimum_retained_fraction_each_group": {"type": "number"}, "minimum_overall_supported_fraction": {"type": "number"}, "minimum_supported_strata": {"type": "integer"}, "minimum_county_rows": {"type": "integer"}, "minimum_rows_per_group_per_county": {"type": "integer"}, "minimum_outcomes_each_direction_per_group_county": {"type": "integer"}, "minimum_lender_rows": {"type": "integer"}, "minimum_lenders": {"type": "integer"}, "each_retained_lender_has_both_groups": {"type": "boolean"}}},
+    "string_array": {"type": "array", "minItems": 1, "items": {"type": "string"}}
   }
 }
