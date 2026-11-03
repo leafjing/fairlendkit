@@ -10,7 +10,6 @@ disclosure gate passes.
 from __future__ import annotations
 
 import csv
-import copy
 import hashlib
 import io
 import json
@@ -388,7 +387,15 @@ def apply_common_support(frame: pd.DataFrame, group_field: str, focal: str, refe
         for label, group in (("focal", focal), ("reference", reference))
     }
     overall = len(retained) / max(1, len(selected))
-    evidence = {"supported_strata": len(supported), "retained_fraction": fractions, "overall_supported_fraction": overall}
+    evidence = {
+        "input_rows": int(len(selected)),
+        "supported_rows": int(len(retained)),
+        "support_excluded_rows": int(len(selected) - len(retained)),
+        "supported_strata": len(supported),
+        "retained_fraction": fractions,
+        "overall_supported_fraction": overall,
+        "reconciled": len(selected) == len(retained) + (len(selected) - len(retained)),
+    }
     if len(supported) < 20 or overall < 0.7 or min(fractions.values()) < 0.7:
         raise HMDAContractError("hmda_common_support_insufficient", json.dumps(evidence, sort_keys=True))
     return retained, evidence
@@ -398,12 +405,20 @@ def standardized_estimate(frame: pd.DataFrame, group_field: str, focal: str, ref
     supported, evidence = apply_common_support(frame, group_field, focal, reference)
     keys = ["income_band", "loan_amount_band", "dti_band", "cltv_band"]
     total = len(supported)
-    difference = 0.0
+    focal_rate = 0.0
+    reference_rate = 0.0
     for _, block in supported.groupby(keys, observed=True):
         weight = len(block) / total
         rates = block.groupby(group_field, observed=True)["favorable_action"].mean()
-        difference += weight * (float(rates[focal]) - float(rates[reference]))
-    return {"row_count": total, "difference": difference, "support": evidence}
+        focal_rate += weight * float(rates[focal])
+        reference_rate += weight * float(rates[reference])
+    return {
+        "row_count": total,
+        "focal_rate": focal_rate,
+        "reference_rate": reference_rate,
+        "difference": focal_rate - reference_rate,
+        "support": evidence,
+    }
 
 
 def cluster_bootstrap_differences(
@@ -554,6 +569,15 @@ def _estimand_bundle(
     unadjusted_rows = group_rows.dropna(subset=["favorable_action"])
     unadjusted = unadjusted_estimate(unadjusted_rows, group_field, focal, reference)
     unadjusted["row_set_digest"] = row_set_digest(unadjusted_rows)
+    unadjusted["flow"] = {
+        "named_group_input_rows": int(len(frame)),
+        "named_group_excluded_rows": int(len(frame) - len(group_rows)),
+        "complete_case_input_rows": int(len(group_rows)),
+        "complete_case_excluded_rows": int(len(group_rows) - len(unadjusted_rows)),
+        "support_excluded_rows": 0,
+        "final_rows": int(len(unadjusted_rows)),
+        "reconciled": len(frame) == (len(frame) - len(group_rows)) + (len(group_rows) - len(unadjusted_rows)) + len(unadjusted_rows),
+    }
 
     standardized_rows = group_rows.loc[
         (group_rows["loan_amount_numeric"] > 0)
@@ -570,6 +594,15 @@ def _estimand_bundle(
     )
     standardized.update(bootstrap)
     standardized["row_set_digest"] = row_set_digest(supported_rows)
+    standardized["flow"] = {
+        "named_group_input_rows": int(len(frame)),
+        "named_group_excluded_rows": int(len(frame) - len(group_rows)),
+        "complete_case_input_rows": int(len(group_rows)),
+        "complete_case_excluded_rows": int(len(group_rows) - len(standardized_rows)),
+        "support_excluded_rows": int(len(standardized_rows) - len(supported_rows)),
+        "final_rows": int(len(supported_rows)),
+        "reconciled": len(frame) == (len(frame) - len(group_rows)) + (len(group_rows) - len(standardized_rows)) + (len(standardized_rows) - len(supported_rows)) + len(supported_rows),
+    }
 
     regression = regression_adjusted_estimate(group_rows, group_field, focal, reference)
     regression_rows = group_rows.dropna(subset=[
@@ -582,6 +615,15 @@ def _estimand_bundle(
     ]
     regression_rows, _ = apply_common_support(regression_rows, group_field, focal, reference)
     regression["row_set_digest"] = row_set_digest(regression_rows)
+    regression["flow"] = {
+        "named_group_input_rows": int(len(frame)),
+        "named_group_excluded_rows": int(len(frame) - len(group_rows)),
+        "complete_case_input_rows": int(len(group_rows)),
+        "complete_case_excluded_rows": int(len(group_rows) - len(regression_rows) - regression["support"]["support_excluded_rows"]),
+        "support_excluded_rows": int(regression["support"]["support_excluded_rows"]),
+        "final_rows": int(len(regression_rows)),
+        "reconciled": len(frame) == (len(frame) - len(group_rows)) + (len(group_rows) - len(regression_rows) - regression["support"]["support_excluded_rows"]) + regression["support"]["support_excluded_rows"] + len(regression_rows),
+    }
     return {"unadjusted": unadjusted, "standardized": standardized, "regression_adjusted": regression}
 
 
@@ -615,42 +657,24 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
         for group in GROUPS:
             action_13[group][estimand]["holm_adjusted_p_value"] = adjusted[group]
 
-    def project(*estimand_names: str, change: str) -> dict[str, Any]:
-        """Record a registered sensitivity whose fixture population is unchanged.
-
-        These projections are valid only when the changed rule does not alter
-        the admitted population/design (as in the complete synthetic evidence
-        fixture).  The explicit applicability field prevents a future source
-        from silently treating the projection as an executed changed design.
-        """
+    def unavailable() -> dict[str, Any]:
         return {
-            "status": "passed_no_effect_on_admitted_rows",
-            "applicability": "all_changed_fields_constant_or_no_affected_rows",
-            "changed_rule": change,
-            "groups": {
-                group: {name: copy.deepcopy(primary[group][name]) for name in estimand_names}
-                for group in GROUPS
-            },
+            "status": "failed",
+            "reason_codes": ["hmda_sensitivity_not_implemented"],
+            "results_emitted": False,
+            "groups": None,
         }
 
     sensitivities: dict[str, Any] = {
         "HMDA-SENS-ACTION-13": {"status": "executed", "groups": action_13},
-        "HMDA-SENS-MISSING-COMPLETE": project(
-            "standardized", "regression_adjusted", change="complete_case_categories_excluded"
-        ),
-        "HMDA-SENS-MISSING-CATEGORY": project(
-            "standardized", "regression_adjusted", change="valid_missing_categories_explicit"
-        ),
-        "HMDA-SENS-CONTROL-CORE": project("regression_adjusted", change="core_controls_only"),
-        "HMDA-SENS-CONTROL-EXTENDED": project(
-            "regression_adjusted", change="county_sum_to_zero_fixed_effect"
-        ),
-        "HMDA-SENS-BINS": project("standardized", change="alternate_registered_bins"),
-        "HMDA-SENS-GEOGRAPHY": project("standardized", change="supported_county_strata"),
-        "HMDA-SENS-LENDER": project("regression_adjusted", change="lender_sum_to_zero_fixed_effect"),
-        "HMDA-SENS-OVERLAP": project(
-            "standardized", "regression_adjusted", change="stricter_registered_support"
-        ),
+        "HMDA-SENS-MISSING-COMPLETE": unavailable(),
+        "HMDA-SENS-MISSING-CATEGORY": unavailable(),
+        "HMDA-SENS-CONTROL-CORE": unavailable(),
+        "HMDA-SENS-CONTROL-EXTENDED": unavailable(),
+        "HMDA-SENS-BINS": unavailable(),
+        "HMDA-SENS-GEOGRAPHY": unavailable(),
+        "HMDA-SENS-LENDER": unavailable(),
+        "HMDA-SENS-OVERLAP": unavailable(),
         "HMDA-SENS-YEAR": {
             "status": "disabled_pending_separate_source_admission", "groups": None,
         },
@@ -662,6 +686,21 @@ def success_artifact(
     source: SourceEvidence, estimands: Mapping[str, Any], cohort_flow: Mapping[str, Any], *,
     configuration_sha256: str, command: list[str] | None = None, generated_at_utc: str | None = None,
 ) -> dict[str, Any]:
+    failed_sensitivities = sorted(
+        sensitivity_id
+        for sensitivity_id, result in estimands.get("sensitivities", {}).items()
+        if result.get("status") == "failed"
+    )
+    if failed_sensitivities:
+        artifact = fail_closed_artifact(
+            source,
+            ["hmda_sensitivity_registry_incomplete"],
+            configuration_sha256=configuration_sha256,
+            command=command,
+            generated_at_utc=generated_at_utc,
+        )
+        artifact["sensitivity_failures"] = failed_sensitivities
+        return artifact
     artifact = {
         "schema_version": "1.0.0", "contract_id": CONTRACT_ID,
         "source": source.as_dict(), "configuration_sha256": configuration_sha256,

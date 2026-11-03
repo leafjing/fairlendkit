@@ -17,6 +17,7 @@ from fairlendkit.research.hmda_ca_2024 import (
     apply_common_support,
     construct_cohort,
     fail_closed_artifact,
+    success_artifact,
     holm_adjust,
     normalize_analysis_fields,
     regression_adjusted_estimate,
@@ -62,6 +63,17 @@ def test_cohort_normalization_and_unadjusted_contract():
     assert result["raw_p_value"] is not None
     assert len(result["difference_ci"]) == 2
     assert len(result["ratio_ci"]) == 2
+
+
+def test_newcombe_wilson_difference_ci_exact_values():
+    frame = pd.DataFrame({
+        "group": ["focal"] * 70 + ["reference"] * 80,
+        "favorable_action": [1] * 56 + [0] * 14 + [1] * 48 + [0] * 32,
+    })
+    result = unadjusted_estimate(frame, "group", "focal", "reference")
+    assert result["difference_ci"] == pytest.approx(
+        [0.05243147240236498, 0.333872654036906], abs=1e-15
+    )
 
 
 @pytest.mark.parametrize(
@@ -119,6 +131,11 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
         assert set(group) == {"unadjusted", "standardized", "regression_adjusted"}
         assert all("holm_adjusted_p_value" in value for value in group.values())
         assert all(len(value["row_set_digest"]) == 64 for value in group.values())
+        assert all(value["flow"]["reconciled"] is True for value in group.values())
+        standardized = group["standardized"]
+        assert standardized["difference"] == pytest.approx(
+            standardized["focal_rate"] - standardized["reference_rate"]
+        )
     assert set(estimands["sensitivities"]) == {
         "HMDA-SENS-ACTION-13", "HMDA-SENS-MISSING-COMPLETE",
         "HMDA-SENS-MISSING-CATEGORY", "HMDA-SENS-CONTROL-CORE",
@@ -133,6 +150,15 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
         for group in action["groups"].values() for result in group.values()
     )
     assert estimands["sensitivities"]["HMDA-SENS-YEAR"]["groups"] is None
+    unavailable = set(estimands["sensitivities"]) - {"HMDA-SENS-ACTION-13", "HMDA-SENS-YEAR"}
+    for sensitivity_id in unavailable:
+        sensitivity = estimands["sensitivities"][sensitivity_id]
+        assert sensitivity == {
+            "status": "failed",
+            "reason_codes": ["hmda_sensitivity_not_implemented"],
+            "results_emitted": False,
+            "groups": None,
+        }
 
 
 def test_regression_and_cluster_bootstrap_contracts():
@@ -168,6 +194,24 @@ def test_disclosure_gate_never_emits_failed_results(tmp_path: Path):
     assert artifact["generated_at_utc"].endswith("+00:00")
     assert artifact["method_identity"]["multiplicity"].startswith("holm_")
     assert not any(isinstance(value, float) for value in artifact.values())
+
+
+def test_incomplete_sensitivity_registry_cannot_create_success_artifact():
+    source = SourceEvidence(
+        url="synthetic", archive_bytes=1, archive_sha256="a" * 64, member_name="data.csv",
+        member_bytes=2, header_sha256="b" * 64, ordered_header=("a",), row_count=3,
+        duplicate_row_count=0, ordered_row_fingerprint_sha256="c" * 64,
+    )
+    artifact = success_artifact(
+        source,
+        {"sensitivities": {"HMDA-SENS-BINS": {"status": "failed"}}},
+        {"reconciled": True},
+        configuration_sha256="d" * 64,
+    )
+    assert artifact["constraint_status"] == "failed"
+    assert artifact["results_emitted"] is False
+    assert artifact["estimands"] is None
+    assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
 
 
 def test_wrong_source_identity_fails_before_parsing(tmp_path: Path):
