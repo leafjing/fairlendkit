@@ -55,6 +55,8 @@ def validate_manifests(payloads):
     variable_keys = {"field", "role", "coding", "missing_rule", "rationale", "allowed_analyses", "reference_category"}
     if not controls["variables"] or any(not variable_keys <= set(item) for item in controls["variables"]):
         raise ContractValidationError("control_manifest: malformed variable")
+    if not isinstance(controls["primary_regression_formula"], str):
+        raise ContractValidationError("control_manifest: formula must be a string")
 
     analysis = payloads["analysis_spec"]
     _require(analysis, {"global_order", "raw_to_analysis_mappings", "estimands", "multiplicity"}, "analysis_spec")
@@ -64,6 +66,8 @@ def validate_manifests(payloads):
     for name, estimand in analysis["estimands"].items():
         _require(estimand, estimand_keys, f"analysis_spec.estimands.{name}")
         _require(estimand["row_set"], {"id", "start", "complete_case_fields"}, f"analysis_spec.estimands.{name}.row_set")
+        if not isinstance(estimand["formula"], str):
+            raise ContractValidationError(f"analysis_spec.estimands.{name}: formula must be a string")
         if not estimand["failure_reason_codes"]:
             raise ContractValidationError(f"analysis_spec.estimands.{name}: empty failure reasons")
     regression = analysis["estimands"]["regression_adjusted"]
@@ -81,6 +85,11 @@ def validate_manifests(payloads):
     required = {"id", "estimands", "outcome", "complete_case", "formula", "regression_formula", "reference_categories", "bins", "support", "variance", "p_value"}
     if len(sensitivity["analyses"]) != 10 or any(not required <= set(item) for item in sensitivity["analyses"]):
         raise ContractValidationError("sensitivity_spec: malformed or incomplete analysis")
+    for item in sensitivity["analyses"]:
+        if not isinstance(item["formula"], str):
+            raise ContractValidationError(f"sensitivity_spec.{item['id']}: formula must be a string")
+        if "regression_adjusted" in item["estimands"] and item["row_set_ids"].get("regression_adjusted") != regression["row_set"]["id"]:
+            raise ContractValidationError(f"sensitivity_spec.{item['id']}: regression row-set ID mismatch")
     serialized = json.dumps(sensitivity)
     for forbidden in ("otherwise", "primary_configuration", "lexical_first"):
         if forbidden in serialized:

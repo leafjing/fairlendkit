@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fairlendkit.example/schemas/hmda-field-rules.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["$schema", "manifest_kind", "schema_version", "contract_id", "source_sha256", "normalization", "required_fields", "analysis_category_mappings", "ordered_cohort_rules", "outcomes", "group_contrasts"],
+  "properties": {
+    "$schema": {"const": "./hmda-field-rules.schema.json"}, "manifest_kind": {"const": "field_rules"},
+    "schema_version": {"const": "1.0.0"}, "contract_id": {"const": "HMDA-CA-2024-CD-V1"},
+    "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "normalization": {"type": "object", "minProperties": 6, "additionalProperties": {"type": "string"}},
+    "required_fields": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/field"}},
+    "analysis_category_mappings": {"type": "object", "minProperties": 2, "additionalProperties": {"type": "object", "minProperties": 1, "additionalProperties": {"type": ["string", "null"]}}},
+    "ordered_cohort_rules": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/cohort"}},
+    "outcomes": {"type": "object", "minProperties": 2, "additionalProperties": {"$ref": "#/$defs/outcome"}},
+    "group_contrasts": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/contrast"}}
+  },
+  "$defs": {
+    "field": {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {
+      "type": {"enum": ["categorical", "decimal", "integer", "mixed_enum", "string"]}, "allowed": {"type": "array", "minItems": 1},
+      "allowed_for_cohort": {"type": "array", "minItems": 1}, "other_valid_values": {"type": ["array", "string"]},
+      "special_meaning": {"type": "object"}, "special": {"type": ["object", "array"]}, "minimum": {"type": "number"},
+      "maximum": {"type": "number"}, "pattern": {"type": "string", "minLength": 1}
+    }},
+    "cohort": {"type": "object", "additionalProperties": false, "required": ["order", "field", "include", "exclude_reason"], "properties": {
+      "order": {"type": "integer", "minimum": 1}, "field": {"type": "string", "minLength": 1},
+      "include": {}, "exclude_reason": {"type": "string", "minLength": 1}
+    }},
+    "outcome": {"type": "object", "additionalProperties": false, "required": ["favorable", "unfavorable"], "properties": {
+      "favorable": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "unfavorable": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+    }},
+    "contrast": {"type": "object", "additionalProperties": false, "required": ["field", "focal", "reference"], "properties": {
+      "field": {"type": "string", "minLength": 1}, "focal": {"type": "string", "minLength": 1}, "reference": {"type": "string", "minLength": 1}
+    }}
+  }
+}
