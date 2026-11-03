@@ -157,7 +157,8 @@ applies its own complete-case rules and support rules:
    Standardization support is then computed only on this population.
 3. `regression_complete_case_rows` applies every field in the exact regression
    formula; `income<=0`, nonpositive loan/property values, and unavailable age
-   are excluded. Regression support is recomputed on this distinct population.
+   are excluded. Regression support is recomputed on this distinct population
+   and its only stable output row-set ID is `regression_support_only`.
 
 The three estimands have independent row-set digests. They must not be claimed
 to use identical rows, and no row moves based on outcome direction or fitted

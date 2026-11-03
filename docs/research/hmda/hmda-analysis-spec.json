@@ -1,5 +1,5 @@
 {
-  "$schema": "./hmda-manifest-schema-v1.json",
+  "$schema": "./hmda-analysis-spec.schema.json",
   "manifest_kind": "analysis_spec",
   "schema_version": "1.0.0",
   "contract_id": "HMDA-CA-2024-CD-V1",
@@ -20,7 +20,7 @@
   "estimands": {
     "unadjusted": {
       "row_set": {"id": "hmda_unadjusted_rows_v1", "start": "cohort_and_named_group_rows", "complete_case_fields": ["action_taken", "named_protected_group"], "support": "not_applicable"},
-      "formula": {"group_rate": "favorable_count / group_denominator", "difference": "focal_rate - reference_rate", "ratio": "focal_rate / reference_rate_if_reference_positive"},
+      "formula": "group_rate=favorable_count/group_denominator; difference=focal_rate-reference_rate; ratio=focal_rate/reference_rate_if_reference_positive",
       "variance": {"rate_ci": "wilson_95_two_sided", "difference_ci": "newcombe_wilson_95_two_sided", "ratio_ci": "log_ratio_95_two_sided_if_positive_counts_and_denominators"},
       "p_value": "two_sample_score_test_pooled_null_two_sided",
       "failure_reason_codes": ["hmda_group_denominator_empty", "hmda_reference_rate_zero", "hmda_unadjusted_variance_undefined"]
@@ -37,7 +37,7 @@
       "failure_reason_codes": ["hmda_standardized_complete_case_empty", "hmda_common_support_insufficient", "hmda_bootstrap_insufficient_valid_replicates", "hmda_standardized_variance_undefined"]
     },
     "regression_adjusted": {
-      "row_set": {"id": "hmda_regression_supported_rows_v1", "start": "cohort_and_named_group_rows", "complete_case_fields": ["action_taken", "named_protected_group", "loan_amount", "income", "debt_to_income_ratio", "combined_loan_to_value_ratio", "property_value", "loan_term", "applicant_age"], "complete_case_rules": {"loan_amount": "finite_and_gt_0", "income": "finite_and_gt_0", "debt_to_income_ratio": "mapped_nonnull_including_Exempt", "combined_loan_to_value_ratio": "mapped_nonnull_including_Exempt", "property_value": "finite_and_gt_0", "loan_term": "integer_[1,600]", "applicant_age": "mapped_nonnull"}, "then": "hmda_regression_supported_rows_v1"},
+      "row_set": {"id": "regression_support_only", "start": "cohort_and_named_group_rows", "complete_case_fields": ["action_taken", "named_protected_group", "loan_amount", "income", "debt_to_income_ratio", "combined_loan_to_value_ratio", "property_value", "loan_term", "applicant_age"], "complete_case_rules": {"loan_amount": "finite_and_gt_0", "income": "finite_and_gt_0", "debt_to_income_ratio": "mapped_nonnull_including_Exempt", "combined_loan_to_value_ratio": "mapped_nonnull_including_Exempt", "property_value": "finite_and_gt_0", "loan_term": "integer_[1,600]", "applicant_age": "mapped_nonnull"}, "then": "regression_support_only"},
       "support": {"stratum_key_and_thresholds": "same_values_as_standardized_but_recomputed_on_regression_complete_cases", "row_set_digest_must_differ_if_input_membership_differs": true},
       "model_family": "binomial_logit_unregularized",
       "formula": "favorable_action ~ protected_group + log1p_loan_amount + log1p_income + C(dti_band,Treatment(reference='<30')) + C(cltv_band,Treatment(reference='[0,60]')) + log1p_property_value + loan_term_months + C(applicant_age,Treatment(reference='35-44'))",

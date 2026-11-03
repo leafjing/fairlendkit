@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fairlendkit.example/schemas/hmda-sensitivity-spec.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["$schema", "manifest_kind", "schema_version", "contract_id", "analyses"],
+  "properties": {
+    "$schema": {"const": "./hmda-sensitivity-spec.schema.json"}, "manifest_kind": {"const": "sensitivity_spec"},
+    "schema_version": {"const": "1.0.0"}, "contract_id": {"const": "HMDA-CA-2024-CD-V1"},
+    "analyses": {"type": "array", "minItems": 10, "items": {"$ref": "#/$defs/sensitivity"}}
+  },
+  "$defs": {
+    "sensitivity": {"type": "object", "additionalProperties": false,
+      "required": ["id", "estimands", "row_set_ids", "outcome", "complete_case", "formula", "regression_formula", "reference_categories", "bins", "support", "variance", "p_value"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^HMDA-SENS-"},
+        "estimands": {"type": "array", "items": {"enum": ["unadjusted", "standardized", "regression_adjusted"]}, "uniqueItems": true},
+        "row_set_ids": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}},
+        "outcome": {"type": "object", "required": ["favorable", "unfavorable"], "properties": {"favorable": {"type": "array", "minItems": 1}, "unfavorable": {"type": "array", "minItems": 1}}, "additionalProperties": false},
+        "complete_case": {"type": "object", "additionalProperties": {"type": "array", "minItems": 1, "items": {"type": "string"}}},
+        "formula": {"type": "string", "minLength": 1}, "regression_formula": {"type": ["string", "null"]},
+        "reference_categories": {"type": "object"}, "bins": {"type": "object"}, "support": {"type": "object"},
+        "variance": {"type": "object"}, "p_value": {"type": "object"},
+        "status": {"type": "string"}, "activity_year": {"type": "integer"}, "required_before_enable": {"type": "array"},
+        "explicit_categories": {"type": "object"}, "county_contrast_coding": {"type": "string"}, "lender_contrast_coding": {"type": "string"}
+      }
+    }
+  }
+}

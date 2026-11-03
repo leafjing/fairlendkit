@@ -39,7 +39,7 @@ dependencies = [
 fairlendkit = "fairlendkit.cli:main"
 
 [project.optional-dependencies]
-test = ["pytest>=8.0"]
+test = ["pytest>=8.0", "jsonschema>=4.18"]
 paper2 = ["numpy==1.26.4", "scipy==1.17.1"]
 
 [project.urls]

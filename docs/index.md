@@ -47,6 +47,10 @@ page for each topic; it does not replace the normative contracts.
   - [Control manifest](research/hmda/hmda-control-manifest.json)
   - [Analysis specification](research/hmda/hmda-analysis-spec.json)
   - [Sensitivity specification](research/hmda/hmda-sensitivity-spec.json)
+  - [Field-rules schema](research/hmda/hmda-field-rules.schema.json)
+  - [Control-manifest schema](research/hmda/hmda-control-manifest.schema.json)
+  - [Analysis-spec schema](research/hmda/hmda-analysis-spec.schema.json)
+  - [Sensitivity-spec schema](research/hmda/hmda-sensitivity-spec.schema.json)
 - [Repository discoverability decisions](discoverability-audit.md)
 - [Technical discovery configuration and site templates](repository-discoverability-config.md)
 
