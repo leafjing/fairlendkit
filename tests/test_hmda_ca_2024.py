@@ -262,6 +262,83 @@ def test_sensitivity_registry_shape_is_exact_and_fail_closed(mutation):
     assert artifact["results_emitted"] is False
 
 
+def _structurally_valid_registry():
+    common = {"row_set_digest": "a" * 64, "flow": {"reconciled": True},
+              "raw_p_value": 0.1, "holm_adjusted_p_value": 0.2}
+    bundle = {
+        "unadjusted": {**common, "difference_ci": [-0.1, 0.3]},
+        "standardized": {**common, "ci": [-0.1, 0.3], "valid_replicates": 950},
+        "regression_adjusted": {**common, "ci": [-0.1, 0.3], "standard_error": 0.1, "clusters": 30},
+    }
+    registry = {
+        "HMDA-SENS-ACTION-13": {
+            "status": "executed", "groups": {group: copy.deepcopy(bundle) for group in ("ethnicity", "race", "sex")},
+        },
+        "HMDA-SENS-YEAR": {"status": "disabled_pending_separate_source_admission", "groups": None},
+    }
+    for sensitivity_id in (
+        "HMDA-SENS-MISSING-COMPLETE", "HMDA-SENS-MISSING-CATEGORY", "HMDA-SENS-CONTROL-CORE",
+        "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-BINS", "HMDA-SENS-GEOGRAPHY",
+        "HMDA-SENS-LENDER", "HMDA-SENS-OVERLAP",
+    ):
+        registry[sensitivity_id] = {
+            "status": "failed", "reason_codes": ["hmda_sensitivity_not_implemented"],
+            "results_emitted": False, "groups": None,
+        }
+    return registry
+
+
+def _registry_artifact(registry):
+    source = SourceEvidence(
+        url="synthetic", archive_bytes=1, archive_sha256="a" * 64, member_name="data.csv",
+        member_bytes=2, header_sha256="b" * 64, ordered_header=("a",), row_count=3,
+        duplicate_row_count=0, ordered_row_fingerprint_sha256="c" * 64,
+    )
+    return success_artifact(source, {"sensitivities": registry}, {}, configuration_sha256="d" * 64)
+
+
+def test_action_13_cannot_be_not_applicable_and_arbitrary_checks_are_rejected():
+    registry = _structurally_valid_registry()
+    valid = _registry_artifact(registry)
+    assert len(valid["sensitivity_failures"]) == 8
+    registry["HMDA-SENS-ACTION-13"] = {
+        "status": "not_applicable",
+        "applicability": {"applicable": False, "checks": [{"x": 1}]},
+        "groups": None,
+    }
+    invalid = _registry_artifact(registry)
+    assert invalid["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
+    assert "sensitivity_failures" not in invalid
+
+
+@pytest.mark.parametrize("field,value", [
+    ("raw_p_value", True), ("raw_p_value", float("nan")),
+    ("raw_p_value", float("inf")), ("raw_p_value", 1.01),
+    ("holm_adjusted_p_value", -0.01),
+])
+def test_executed_sensitivity_rejects_invalid_probability_values(field, value):
+    registry = _structurally_valid_registry()
+    registry["HMDA-SENS-ACTION-13"]["groups"]["ethnicity"]["unadjusted"][field] = value
+    artifact = _registry_artifact(registry)
+    assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
+    assert "sensitivity_failures" not in artifact
+
+
+@pytest.mark.parametrize("estimand,field,value", [
+    ("standardized", "ci", [0.0, float("nan")]),
+    ("standardized", "valid_replicates", True),
+    ("standardized", "valid_replicates", 949),
+    ("regression_adjusted", "standard_error", float("inf")),
+    ("regression_adjusted", "standard_error", -0.1),
+    ("regression_adjusted", "clusters", 29),
+])
+def test_executed_sensitivity_rejects_invalid_variance_evidence(estimand, field, value):
+    registry = _structurally_valid_registry()
+    registry["HMDA-SENS-ACTION-13"]["groups"]["ethnicity"][estimand][field] = value
+    artifact = _registry_artifact(registry)
+    assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
+
+
 def test_wrong_source_identity_fails_before_parsing(tmp_path: Path):
     archive = tmp_path / "not-official.zip"
     archive.write_bytes(b"PK\x05\x06" + b"\0" * 18)
@@ -296,7 +373,7 @@ def test_synthetic_execution_artifact_fails_closed_on_incomplete_registry():
     assert artifact["command"][1] == "scripts/generate_hmda_synthetic_artifact.py"
     assert artifact["estimands"] is None
     assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
-    assert len(artifact["sensitivity_failures"]) == 8
+    assert "sensitivity_failures" not in artifact
 
 
 def test_synthetic_artifact_normalized_regeneration_equality(tmp_path: Path):

@@ -710,6 +710,19 @@ def success_artifact(
     source: SourceEvidence, estimands: Mapping[str, Any], cohort_flow: Mapping[str, Any], *,
     configuration_sha256: str, command: list[str] | None = None, generated_at_utc: str | None = None,
 ) -> dict[str, Any]:
+    def finite_number(value: Any) -> bool:
+        return isinstance(value, (int, float)) and not isinstance(value, (bool, np.bool_)) and math.isfinite(float(value))
+
+    def probability(value: Any) -> bool:
+        return finite_number(value) and 0.0 <= float(value) <= 1.0
+
+    def finite_interval(value: Any) -> bool:
+        return (
+            isinstance(value, list) and len(value) == 2
+            and all(finite_number(bound) for bound in value)
+            and float(value[0]) <= float(value[1])
+        )
+
     def valid_executed(sensitivity_id: str, result: Mapping[str, Any]) -> bool:
         groups = result.get("groups")
         expected_estimands = SENSITIVITY_ESTIMANDS[sensitivity_id]
@@ -726,37 +739,29 @@ def success_artifact(
                 if not (
                     isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest)
                     and isinstance(flow, Mapping) and flow.get("reconciled") is True
-                    and isinstance(estimate.get("raw_p_value"), (int, float))
-                    and isinstance(estimate.get("holm_adjusted_p_value"), (int, float))
+                    and probability(estimate.get("raw_p_value"))
+                    and probability(estimate.get("holm_adjusted_p_value"))
                 ):
                     return False
-                if estimand == "unadjusted" and not (
-                    isinstance(estimate.get("difference_ci"), list) and len(estimate["difference_ci"]) == 2
-                ):
+                if estimand == "unadjusted" and not finite_interval(estimate.get("difference_ci")):
                     return False
                 if estimand == "standardized" and not (
-                    isinstance(estimate.get("ci"), list) and len(estimate["ci"]) == 2
+                    finite_interval(estimate.get("ci"))
                     and isinstance(estimate.get("valid_replicates"), int)
+                    and not isinstance(estimate.get("valid_replicates"), bool)
+                    and estimate["valid_replicates"] >= 950
                 ):
                     return False
                 if estimand == "regression_adjusted" and not (
-                    isinstance(estimate.get("ci"), list) and len(estimate["ci"]) == 2
-                    and isinstance(estimate.get("standard_error"), (int, float))
+                    finite_interval(estimate.get("ci"))
+                    and finite_number(estimate.get("standard_error"))
+                    and estimate["standard_error"] >= 0
                     and isinstance(estimate.get("clusters"), int)
+                    and not isinstance(estimate.get("clusters"), bool)
+                    and estimate["clusters"] >= 30
                 ):
                     return False
         return True
-
-    def valid_not_applicable(result: Mapping[str, Any]) -> bool:
-        evidence = result.get("applicability")
-        if not isinstance(evidence, Mapping) or evidence.get("applicable") is not False:
-            return False
-        checks = evidence.get("checks")
-        return (
-            isinstance(checks, list) and bool(checks)
-            and all(isinstance(check, Mapping) and bool(check) for check in checks)
-            and result.get("groups") is None
-        )
 
     sensitivities = estimands.get("sensitivities")
     registry_valid = isinstance(sensitivities, Mapping) and set(sensitivities) == SENSITIVITY_IDS
@@ -769,12 +774,12 @@ def success_artifact(
             if sensitivity_id == "HMDA-SENS-YEAR":
                 registry_valid &= status == "disabled_pending_separate_source_admission" and result.get("groups") is None
             else:
-                registry_valid &= status in {"executed", "not_applicable", "failed"}
+                registry_valid &= status in {"executed", "failed"}
+                if sensitivity_id == "HMDA-SENS-ACTION-13":
+                    registry_valid &= status == "executed"
                 if status == "executed":
                     registry_valid &= valid_executed(sensitivity_id, result)
-                elif status == "not_applicable":
-                    registry_valid &= valid_not_applicable(result)
-                else:
+                elif status == "failed":
                     reasons = result.get("reason_codes")
                     registry_valid &= (
                         result.get("results_emitted") is False
@@ -782,6 +787,8 @@ def success_artifact(
                         and all(isinstance(reason, str) and reason in SENSITIVITY_FAILURE_REASONS for reason in reasons)
                         and result.get("groups") is None
                     )
+                else:
+                    registry_valid = False
             if not registry_valid:
                 break
     if not registry_valid:
