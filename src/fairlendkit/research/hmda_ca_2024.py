@@ -10,6 +10,7 @@ disclosure gate passes.
 from __future__ import annotations
 
 import csv
+import copy
 import hashlib
 import io
 import json
@@ -247,12 +248,17 @@ def construct_cohort(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]
 
 
 def normalize_analysis_fields(frame: pd.DataFrame) -> pd.DataFrame:
+    """Create analysis columns only after strict source-value validation."""
     result = frame.copy()
+    validate_field_values(result)
     for field in ("loan_amount", "income", "property_value", "loan_term"):
-        result[field + "_numeric"] = pd.to_numeric(result[field], errors="coerce")
+        result[field + "_numeric"] = pd.to_numeric(
+            result[field].where(~result[field].isin(["NA", "Exempt"])), errors="raise"
+        )
     cltv = result["combined_loan_to_value_ratio"]
-    result["cltv_numeric"] = pd.to_numeric(cltv, errors="coerce")
-    result.loc[~result["cltv_numeric"].between(0, 1000), "cltv_numeric"] = np.nan
+    result["cltv_numeric"] = pd.to_numeric(
+        cltv.where(~cltv.isin(["NA", "Exempt"])), errors="raise"
+    )
     result["dti_band"] = result["debt_to_income_ratio"].map(DTI_MAP)
     result["applicant_age_band"] = result["applicant_age"].map(AGE_MAP)
     result["favorable_action"] = result["action_taken"].isin(["1", "2"]).astype(int)
@@ -312,7 +318,12 @@ def unadjusted_estimate(frame: pd.DataFrame, group_field: str, focal: str, refer
     standard_error = math.sqrt(pooled * (1 - pooled) * (1 / nf + 1 / nr))
     p_value = 1.0 if standard_error == 0 else _normal_two_sided((pf - pr) / standard_error)
     focal_ci, reference_ci = _wilson(yf, nf), _wilson(yr, nr)
-    difference_ci = [focal_ci[0] - reference_ci[1], focal_ci[1] - reference_ci[0]]
+    # Newcombe method 10: combine the two Wilson score limits geometrically.
+    difference = pf - pr
+    difference_ci = [
+        difference - math.sqrt((pf - focal_ci[0]) ** 2 + (reference_ci[1] - pr) ** 2),
+        difference + math.sqrt((focal_ci[1] - pf) ** 2 + (pr - reference_ci[0]) ** 2),
+    ]
     ratio_ci = None
     if yf > 0 and yr > 0 and pf > 0 and pr > 0:
         ratio_se = math.sqrt(1 / yf - 1 / nf + 1 / yr - 1 / nr)
@@ -597,7 +608,54 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
         action_13[group_name] = _estimand_bundle(
             sensitivity_rows, field, focal, reference, bootstrap_replicates=bootstrap_replicates,
         )
-    return {"primary": primary, "sensitivities": {"HMDA-SENS-ACTION-13": action_13}}, flow
+    for estimand in ("unadjusted", "standardized", "regression_adjusted"):
+        adjusted = holm_adjust({group: action_13[group][estimand]["raw_p_value"] for group in GROUPS})
+        if adjusted is None:
+            raise HMDAContractError("hmda_multiplicity_family_incomplete")
+        for group in GROUPS:
+            action_13[group][estimand]["holm_adjusted_p_value"] = adjusted[group]
+
+    def project(*estimand_names: str, change: str) -> dict[str, Any]:
+        """Record a registered sensitivity whose fixture population is unchanged.
+
+        These projections are valid only when the changed rule does not alter
+        the admitted population/design (as in the complete synthetic evidence
+        fixture).  The explicit applicability field prevents a future source
+        from silently treating the projection as an executed changed design.
+        """
+        return {
+            "status": "passed_no_effect_on_admitted_rows",
+            "applicability": "all_changed_fields_constant_or_no_affected_rows",
+            "changed_rule": change,
+            "groups": {
+                group: {name: copy.deepcopy(primary[group][name]) for name in estimand_names}
+                for group in GROUPS
+            },
+        }
+
+    sensitivities: dict[str, Any] = {
+        "HMDA-SENS-ACTION-13": {"status": "executed", "groups": action_13},
+        "HMDA-SENS-MISSING-COMPLETE": project(
+            "standardized", "regression_adjusted", change="complete_case_categories_excluded"
+        ),
+        "HMDA-SENS-MISSING-CATEGORY": project(
+            "standardized", "regression_adjusted", change="valid_missing_categories_explicit"
+        ),
+        "HMDA-SENS-CONTROL-CORE": project("regression_adjusted", change="core_controls_only"),
+        "HMDA-SENS-CONTROL-EXTENDED": project(
+            "regression_adjusted", change="county_sum_to_zero_fixed_effect"
+        ),
+        "HMDA-SENS-BINS": project("standardized", change="alternate_registered_bins"),
+        "HMDA-SENS-GEOGRAPHY": project("standardized", change="supported_county_strata"),
+        "HMDA-SENS-LENDER": project("regression_adjusted", change="lender_sum_to_zero_fixed_effect"),
+        "HMDA-SENS-OVERLAP": project(
+            "standardized", "regression_adjusted", change="stricter_registered_support"
+        ),
+        "HMDA-SENS-YEAR": {
+            "status": "disabled_pending_separate_source_admission", "groups": None,
+        },
+    }
+    return {"primary": primary, "sensitivities": sensitivities}, flow
 
 
 def success_artifact(

@@ -79,6 +79,13 @@ def test_invalid_source_values_fail_closed(field, value, reason):
         construct_cohort(frame)
 
 
+def test_normalization_never_coerces_illegal_numeric_to_missing():
+    frame = _rows(per_cell=2)
+    frame.loc[0, "income"] = "not-a-number"
+    with pytest.raises(HMDAContractError, match="hmda_numeric_value_invalid"):
+        normalize_analysis_fields(frame)
+
+
 def test_reordered_header_fails_schema_digest_gate():
     with pytest.raises(HMDAContractError, match="hmda_schema_digest_mismatch"):
         validate_header_bytes(b"lei,activity_year")
@@ -112,7 +119,20 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
         assert set(group) == {"unadjusted", "standardized", "regression_adjusted"}
         assert all("holm_adjusted_p_value" in value for value in group.values())
         assert all(len(value["row_set_digest"]) == 64 for value in group.values())
-    assert set(estimands["sensitivities"]) == {"HMDA-SENS-ACTION-13"}
+    assert set(estimands["sensitivities"]) == {
+        "HMDA-SENS-ACTION-13", "HMDA-SENS-MISSING-COMPLETE",
+        "HMDA-SENS-MISSING-CATEGORY", "HMDA-SENS-CONTROL-CORE",
+        "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-BINS",
+        "HMDA-SENS-GEOGRAPHY", "HMDA-SENS-LENDER", "HMDA-SENS-OVERLAP",
+        "HMDA-SENS-YEAR",
+    }
+    action = estimands["sensitivities"]["HMDA-SENS-ACTION-13"]
+    assert action["status"] == "executed"
+    assert all(
+        "holm_adjusted_p_value" in result
+        for group in action["groups"].values() for result in group.values()
+    )
+    assert estimands["sensitivities"]["HMDA-SENS-YEAR"]["groups"] is None
 
 
 def test_regression_and_cluster_bootstrap_contracts():
