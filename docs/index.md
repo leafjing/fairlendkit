@@ -42,6 +42,7 @@ page for each topic; it does not replace the normative contracts.
 - [Alternative-data potential proxy-risk screening](alternative-data-proxy-screening.md)
 - [Citation and research relationship](citation-and-research.md)
 - [Conditional disparity and HMDA case-study contract](research/conditional-disparity-and-hmda-case-study.md)
+- [HMDA conditional-disparity implementation contract](research/hmda-implementation-contract.md)
 - [Repository discoverability decisions](discoverability-audit.md)
 - [Technical discovery configuration and site templates](repository-discoverability-config.md)
 

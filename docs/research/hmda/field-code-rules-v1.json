@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "HMDA-CA-2024-CD-V1",
+  "source_sha256": "9383890f38c2ae1ef46942e72e1a2a211aa0b979c0e46db5fd6d7eb8669f22c1",
+  "normalization": {
+    "categorical": "strip_ascii_whitespace_then_exact_string_match",
+    "numeric": "base_10_finite_decimal_without_group_separators",
+    "unlisted_categorical_value": "fail_hmda_code_value_invalid"
+  },
+  "required_fields": {
+    "activity_year": {"type": "categorical", "allowed": ["2024"]},
+    "lei": {"type": "string", "pattern": "^[A-Z0-9]{20}$"},
+    "state_code": {"type": "categorical", "allowed_for_cohort": ["CA"], "other_valid_values": "official_two_character_state_or_territory_code"},
+    "county_code": {"type": "categorical", "pattern": "^[0-9]{5}$", "special": ["NA"]},
+    "census_tract": {"type": "categorical", "pattern": "^[0-9]{11}$", "special": ["NA"]},
+    "action_taken": {"type": "categorical", "allowed": ["1", "2", "3", "4", "5", "6", "7", "8"]},
+    "loan_type": {"type": "categorical", "allowed": ["1", "2", "3", "4"]},
+    "lien_status": {"type": "categorical", "allowed": ["1", "2"]},
+    "loan_purpose": {"type": "categorical", "allowed": ["1", "2", "4", "5", "31", "32"]},
+    "occupancy_type": {"type": "categorical", "allowed": ["1", "2", "3"]},
+    "construction_method": {"type": "categorical", "allowed": ["1", "2"]},
+    "total_units": {"type": "categorical", "allowed": ["1", "2", "3", "4", "5-24", "25-49", "50-99", "100-149", ">149"]},
+    "loan_amount": {"type": "decimal", "special": ["NA", "Exempt"]},
+    "income": {"type": "decimal", "special": ["NA", "Exempt"]},
+    "debt_to_income_ratio": {
+      "type": "mixed_enum",
+      "allowed": ["<20%", "20%-<30%", "30%-<36%", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50%-60%", ">60%", "NA", "Exempt"]
+    },
+    "combined_loan_to_value_ratio": {"type": "decimal", "minimum": 0, "maximum": 1000, "special": ["NA", "Exempt"]},
+    "property_value": {"type": "decimal", "special": ["NA", "Exempt"]},
+    "loan_term": {"type": "integer", "minimum": 1, "maximum": 600, "special": ["NA", "Exempt"]},
+    "applicant_age": {
+      "type": "categorical",
+      "allowed": ["<25", "25-34", "35-44", "45-54", "55-64", "65-74", ">74", "8888", "9999"],
+      "special_meaning": {"8888": "not_applicable", "9999": "age_not_available"}
+    },
+    "derived_ethnicity": {
+      "type": "categorical",
+      "allowed": ["Hispanic or Latino", "Not Hispanic or Latino", "Joint", "Ethnicity Not Available", "Free Form Text Only"]
+    },
+    "derived_race": {
+      "type": "categorical",
+      "allowed": ["American Indian or Alaska Native", "Asian", "Black or African American", "Native Hawaiian or Other Pacific Islander", "White", "2 or more minority races", "Joint", "Race Not Available", "Free Form Text Only"]
+    },
+    "derived_sex": {
+      "type": "categorical",
+      "allowed": ["Male", "Female", "Joint", "Sex Not Available"]
+    }
+  },
+  "ordered_cohort_rules": [
+    {"order": 10, "field": "activity_year", "include": ["2024"], "exclude_reason": "hmda_wrong_activity_year"},
+    {"order": 20, "field": "state_code", "include": ["CA"], "exclude_reason": "hmda_outside_california"},
+    {"order": 30, "field": "loan_type", "include": ["1"], "exclude_reason": "hmda_nonconventional_loan"},
+    {"order": 40, "field": "lien_status", "include": ["1"], "exclude_reason": "hmda_not_first_lien"},
+    {"order": 50, "field": "loan_purpose", "include": ["1"], "exclude_reason": "hmda_not_home_purchase"},
+    {"order": 60, "field": "occupancy_type", "include": ["1"], "exclude_reason": "hmda_not_owner_occupied"},
+    {"order": 70, "field": "construction_method", "include": ["1"], "exclude_reason": "hmda_not_site_built"},
+    {"order": 80, "field": "total_units", "include": ["1"], "exclude_reason": "hmda_not_one_unit"},
+    {"order": 90, "field": "action_taken", "include": ["1", "2", "3"], "exclude_reason": "hmda_action_outside_primary_contrast"}
+  ],
+  "outcomes": {
+    "primary": {"favorable": ["1", "2"], "unfavorable": ["3"]},
+    "HMDA-SENS-ACTION-13": {"favorable": ["1"], "unfavorable": ["3"]}
+  },
+  "group_contrasts": {
+    "ethnicity": {"field": "derived_ethnicity", "focal": "Hispanic or Latino", "reference": "Not Hispanic or Latino"},
+    "race": {"field": "derived_race", "focal": "Black or African American", "reference": "White"},
+    "sex": {"field": "derived_sex", "focal": "Female", "reference": "Male"}
+  }
+}

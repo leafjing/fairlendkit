@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "HMDA-CA-2024-CD-V1",
+  "analyses": [
+    {"id": "HMDA-SENS-ACTION-13", "change": {"favorable_action_codes": ["1"], "unfavorable_action_codes": ["3"]}, "otherwise": "primary_configuration"},
+    {"id": "HMDA-SENS-MISSING-COMPLETE", "change": {"missing_policy": "complete_case_all_core_controls"}, "otherwise": "primary_configuration"},
+    {"id": "HMDA-SENS-MISSING-CATEGORY", "change": {"categorical_missing_levels": {"debt_to_income_ratio": ["NA", "Exempt"], "combined_loan_to_value_ratio": ["NA", "Exempt"], "applicant_age": ["8888", "9999"]}, "numeric_missing": "still_excluded"}, "otherwise": "primary_configuration"},
+    {"id": "HMDA-SENS-CONTROL-CORE", "change": {"formula": "primary_regression_formula"}, "otherwise": "primary_configuration"},
+    {"id": "HMDA-SENS-CONTROL-EXTENDED", "change": {"append_terms": ["C(county_code, Treatment(reference=lexical_first))"]}, "eligibility": {"county_code": "nonmissing", "minimum_rows_per_level": 100}, "otherwise": "primary_configuration"},
+    {"id": "HMDA-SENS-BINS", "change": {"income_thousands": ["(-inf,0]", "(0,40]", "(40,80]", "(80,120]", "(120,200]", "(200,inf)"], "loan_amount_dollars": ["(0,150000]", "(150000,300000]", "(300000,450000]", "(450000,650000]", "(650000,inf)"], "dti_percent": ["<30", "30-36", "37-40", "41-43", "44-49", "50-60", ">60", "Exempt"], "cltv_percent": ["[0,70]", "(70,80]", "(80,95]", "(95,100]", "(100,1000]", "Exempt"]}, "otherwise": "primary_configuration"},
+    {"id": "HMDA-SENS-GEOGRAPHY", "change": {"append_stratum": "county_code"}, "eligibility": {"county_code": "nonmissing", "minimum_per_group_per_county": 100, "minimum_favorable_and_unfavorable_per_group": 10}, "otherwise": "primary_configuration"},
+    {"id": "HMDA-SENS-LENDER", "change": {"append_terms": ["C(lei, Treatment(reference=lexical_first))"], "variance_cluster": "lei"}, "eligibility": {"minimum_lender_rows": 100, "minimum_lenders": 30, "each_retained_lender_has_both_groups": true}, "otherwise": "primary_configuration"},
+    {"id": "HMDA-SENS-OVERLAP", "change": {"minimum_rows_per_group_per_stratum": 50, "minimum_favorable_and_unfavorable_per_group": 10, "minimum_group_retained_fraction": 0.8, "minimum_overall_supported_fraction": 0.8, "minimum_supported_strata": 20}, "otherwise": "primary_configuration"},
+    {"id": "HMDA-SENS-YEAR", "status": "disabled_pending_separate_source_admission", "change": {"activity_year": 2023}, "required_before_enable": ["source_url", "archive_sha256", "schema_digest", "reviewed_code_map"]}
+  ]
+}
