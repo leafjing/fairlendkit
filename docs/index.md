@@ -43,6 +43,10 @@ page for each topic; it does not replace the normative contracts.
 - [Citation and research relationship](citation-and-research.md)
 - [Conditional disparity and HMDA case-study contract](research/conditional-disparity-and-hmda-case-study.md)
 - [HMDA conditional-disparity implementation contract](research/hmda-implementation-contract.md)
+  - [Executable field and code rules](research/hmda/hmda-field-rules.json)
+  - [Control manifest](research/hmda/hmda-control-manifest.json)
+  - [Analysis specification](research/hmda/hmda-analysis-spec.json)
+  - [Sensitivity specification](research/hmda/hmda-sensitivity-spec.json)
 - [Repository discoverability decisions](discoverability-audit.md)
 - [Technical discovery configuration and site templates](repository-discoverability-config.md)
 

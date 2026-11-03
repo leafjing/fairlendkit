@@ -45,7 +45,7 @@ and application-level extracts must not be committed to Git.
 ## 2. Executable field and code rules
 
 The normative machine-readable rule table is
-[`hmda/field-code-rules-v1.json`](hmda/field-code-rules-v1.json). Categorical
+[`hmda/hmda-field-rules.json`](hmda/hmda-field-rules.json). Categorical
 codes are trimmed strings and are never silently coerced to numbers. The JSON
 freezes every required field's type, allowed values or validation pattern,
 special values, cohort rule, outcome mapping, and group contrast. Markdown in
@@ -107,7 +107,7 @@ exploratory and inherits every support and disclosure gate.
 ## 4. Control manifest
 
 The normative checked-in
-[`hmda/control-manifest-v1.json`](hmda/control-manifest-v1.json) contains
+[`hmda/hmda-control-manifest.json`](hmda/hmda-control-manifest.json) contains
 `field`, `role`, `coding`, `missing_rule`, `rationale`, and
 `allowed_analyses` for every variable. It also freezes the primary regression
 formula. Markdown is explanatory; disagreement fails with
@@ -145,22 +145,23 @@ must not be replaced with invented proxies. Manifest drift fails with
 
 ## 5. Row sets, strata, bins, support, and overlap
 
-Row-set construction order is normative:
+The normative executable specification is
+[`hmda/hmda-analysis-spec.json`](hmda/hmda-analysis-spec.json). Row-set
+construction order is source/cohort/group first, then each estimand independently
+applies its own complete-case rules and support rules:
 
 1. `unadjusted_rows`: rows passing the cohort and one named binary group
    contrast; control missingness does not remove these rows.
-2. `adjusted_complete_case_rows`: `unadjusted_rows` after applying every core
-   control's missing rule in `control-manifest-v1.json`. Thus `income<=0`,
-   nonpositive loan/property values, unavailable age, and other declared core
-   missing values are excluded before support is evaluated.
-3. `adjusted_common_support_rows`: `adjusted_complete_case_rows` restricted to
-   supported strata below. Both standardization and primary regression use
-   exactly this row-set digest.
+2. `standardized_complete_case_rows` applies only the standardization fields;
+   notably finite `income<=0` remains in its frozen nonpositive income bin.
+   Standardization support is then computed only on this population.
+3. `regression_complete_case_rows` applies every field in the exact regression
+   formula; `income<=0`, nonpositive loan/property values, and unavailable age
+   are excluded. Regression support is recomputed on this distinct population.
 
-The unadjusted estimand uses `unadjusted_rows`; the standardized and regression
-estimands both use `adjusted_common_support_rows`. Each exclusion count is
-reported by group. No row may move between these sets based on observed outcome
-direction or model coefficient.
+The three estimands have independent row-set digests. They must not be claimed
+to use identical rows, and no row moves based on outcome direction or fitted
+coefficient.
 
 All boundaries are frozen before outcome computation:
 
@@ -171,7 +172,7 @@ dti_percent: ['<30', '30-36', '37-43', '44-49', '50-60', '>60', 'Exempt']
 cltv_percent: ['[0,60]', '(60,80]', '(80,90]', '(90,100]', '(100,1000]', 'Exempt']
 ```
 
-The primary stratum key is their Cartesian product. A stratum is supported only
+The standardization stratum key is their Cartesian product. A stratum is supported only
 when each group has at least 30 rows and at least 5 favorable and 5 unfavorable
 outcomes. No post-result pooling is allowed. The target is the pooled empirical
 distribution restricted to common-support strata.
@@ -182,7 +183,7 @@ sparse-outcome strata, and supported target fraction. Standardization is
 less than 70%, overall supported fraction is below 70%, or fewer than 20 strata
 remain.
 
-Regression uses the same common-support population. Its exact V1 formula is:
+Regression recomputes support after its own complete-case rules. Its exact V1 formula is:
 
 ```text
 favorable_action ~ protected_group
@@ -249,7 +250,7 @@ cluster counts, and formula version. Any change alters configuration SHA-256.
 Primary adjusted analyses use complete cases for registered core controls,
 reporting exclusions per field and group. They are not population estimates.
 The normative
-[`hmda/sensitivity-manifest-v1.json`](hmda/sensitivity-manifest-v1.json)
+[`hmda/hmda-sensitivity-spec.json`](hmda/hmda-sensitivity-spec.json)
 freezes every sensitivity's changed fields and all unchanged-primary semantics:
 action `1` versus `3`; complete-case and valid missing categories; core and
 extended controls; alternate bin boundaries; county and lender eligibility;
