@@ -238,14 +238,14 @@ def test_real_source_evidence_is_frozen_and_results_are_locked():
     assert artifact["estimands"] is None
 
 
-def test_synthetic_execution_artifact_is_recomputable_and_complete():
+def test_synthetic_execution_artifact_fails_closed_on_incomplete_registry():
     artifact_path = Path(__file__).parents[1] / "docs" / "artifacts" / "hmda-ca-2024-synthetic-v1.json"
     artifact = json.loads(artifact_path.read_text())
-    assert artifact["constraint_status"] == "passed"
+    assert artifact["constraint_status"] == "failed"
     assert artifact["candidate_copy_status"] == "locked_research_only"
-    assert artifact["results_emitted"] is True
-    assert artifact["commit"] == "f31d600e6c20e49f93492606d3555a1f2814d0cf"
+    assert artifact["results_emitted"] is False
+    assert artifact["commit"] == "06eb96bcf8fd18cb8bb254524de0f3a4b32beee5"
     assert artifact["command"][-1].endswith("test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity")
-    assert set(artifact["estimands"]["primary"]) == {"ethnicity", "race", "sex"}
-    assert len(artifact["estimands"]["sensitivities"]) == 10
-    assert artifact["cohort_flow"]["reconciled"] is True
+    assert artifact["estimands"] is None
+    assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
+    assert len(artifact["sensitivity_failures"]) == 8
