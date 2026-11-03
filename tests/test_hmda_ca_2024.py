@@ -16,6 +16,7 @@ from fairlendkit.research.hmda_ca_2024 import (
     SOURCE_SHA256,
     SOURCE_URL,
     SourceEvidence,
+    add_alternate_strata,
     add_primary_strata,
     apply_common_support,
     construct_cohort,
@@ -175,10 +176,17 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
         assert extended_result["difference"] != pytest.approx(
             estimands["primary"][group]["regression_adjusted"]["difference"], abs=1e-10
         )
+    bins = estimands["sensitivities"]["HMDA-SENS-BINS"]
+    assert bins["status"] == "executed"
+    for group in ("ethnicity", "race", "sex"):
+        result = bins["groups"][group]["standardized"]
+        assert result["method_identity"] == "alternate_registered_bins_lei_cluster_bootstrap_v1"
+        assert result["flow"]["reconciled"] is True
+        assert len(result["row_set_digest"]) == 64
     unavailable = set(estimands["sensitivities"]) - {
         "HMDA-SENS-ACTION-13", "HMDA-SENS-MISSING-COMPLETE",
         "HMDA-SENS-MISSING-CATEGORY", "HMDA-SENS-CONTROL-CORE",
-        "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-YEAR",
+        "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-BINS", "HMDA-SENS-YEAR",
     }
     for sensitivity_id in unavailable:
         sensitivity = estimands["sensitivities"][sensitivity_id]
@@ -246,6 +254,41 @@ def test_extended_control_missing_or_single_level_county_fails_closed():
         regression_adjusted_estimate(
             data, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino",
             fixed_effect="county_code",
+        )
+
+
+def test_alternate_bins_exact_boundaries_and_missing_values():
+    frame = pd.DataFrame({
+        "income_numeric": [-1, 0, 0.1, 40, 40.1, 80, 80.1, 120, 120.1, 200, 200.1, np.nan],
+        "loan_amount_numeric": [0, 150000, 150000.1, 300000, 300000.1, 450000, 450000.1, 650000, 650000.1, 700000, 800000, np.nan],
+        "debt_to_income_ratio": ["40", "41"] * 6,
+        "cltv_numeric": [0, 70, 70.1, 80, 80.1, 95, 95.1, 100, 100.1, 1000, np.nan, np.nan],
+        "combined_loan_to_value_ratio": ["0", "70", "70.1", "80", "80.1", "95", "95.1", "100", "100.1", "1000", "NA", "Exempt"],
+    })
+    result = add_alternate_strata(frame)
+    assert result["income_band"].tolist() == [
+        "(-inf,0]", "(-inf,0]", "(0,40]", "(0,40]", "(40,80]", "(40,80]",
+        "(80,120]", "(80,120]", "(120,200]", "(120,200]", "(200,inf)", pd.NA,
+    ]
+    assert result["loan_amount_band"].tolist()[0] is pd.NA
+    assert result["loan_amount_band"].tolist()[1:9] == [
+        "(0,150000]", "(150000,300000]", "(150000,300000]", "(300000,450000]",
+        "(300000,450000]", "(450000,650000]", "(450000,650000]", "(650000,inf)",
+    ]
+    assert result.loc[0, "dti_band"] == "37-40"
+    assert result.loc[1, "dti_band"] == "41-43"
+    assert result["cltv_band"].tolist()[:10] == [
+        "[0,70]", "[0,70]", "(70,80]", "(70,80]", "(80,95]", "(80,95]",
+        "(95,100]", "(95,100]", "(100,1000]", "(100,1000]",
+    ]
+    assert result.loc[11, "cltv_band"] == "Exempt"
+
+
+def test_alternate_bins_sparse_support_fails_closed():
+    data = add_alternate_strata(normalize_analysis_fields(_rows(per_cell=4)))
+    with pytest.raises(HMDAContractError, match="hmda_common_support_insufficient"):
+        standardized_estimate(
+            data, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
         )
 
 def test_regression_and_cluster_bootstrap_contracts():

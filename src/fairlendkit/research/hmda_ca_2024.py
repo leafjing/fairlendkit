@@ -90,6 +90,13 @@ DTI_MAP = {
     **{str(v): "44-49" for v in range(44, 50)},
     "50%-60%": "50-60", ">60%": ">60", "Exempt": "Exempt", "NA": None,
 }
+ALT_DTI_MAP = {
+    "<20%": "<30", "20%-<30%": "<30", "30%-<36%": "30-36", "36": "30-36",
+    **{str(v): "37-40" for v in range(37, 41)},
+    **{str(v): "41-43" for v in range(41, 44)},
+    **{str(v): "44-49" for v in range(44, 50)},
+    "50%-60%": "50-60", ">60%": ">60", "Exempt": "Exempt", "NA": None,
+}
 AGE_MAP = {v: v for v in ("<25", "25-34", "35-44", "45-54", "55-64", "65-74", ">74")}
 AGE_MAP.update({"8888": None, "9999": None})
 ALLOWED_VALUES = {
@@ -362,8 +369,10 @@ def unadjusted_estimate(frame: pd.DataFrame, group_field: str, focal: str, refer
     }
 
 
-def _bin_series(values: pd.Series, breaks: list[float], labels: list[str]) -> pd.Series:
-    return pd.cut(values, bins=breaks, labels=labels, include_lowest=True, right=True).astype("string")
+def _bin_series(
+    values: pd.Series, breaks: list[float], labels: list[str], *, include_lowest: bool = True,
+) -> pd.Series:
+    return pd.cut(values, bins=breaks, labels=labels, include_lowest=include_lowest, right=True).astype("string")
 
 
 def add_primary_strata(frame: pd.DataFrame) -> pd.DataFrame:
@@ -375,11 +384,33 @@ def add_primary_strata(frame: pd.DataFrame) -> pd.DataFrame:
     result["loan_amount_band"] = _bin_series(
         result["loan_amount_numeric"], [0, 100000, 250000, 500000, 750000, np.inf],
         ["(0,100000]", "(100000,250000]", "(250000,500000]", "(500000,750000]", "(750000,inf)"],
+        include_lowest=False,
     )
     numeric = result["cltv_numeric"]
     result["cltv_band"] = _bin_series(
         numeric, [0, 60, 80, 90, 100, 1000],
         ["[0,60]", "(60,80]", "(80,90]", "(90,100]", "(100,1000]"],
+    )
+    result.loc[result["combined_loan_to_value_ratio"] == "Exempt", "cltv_band"] = "Exempt"
+    return result
+
+
+def add_alternate_strata(frame: pd.DataFrame) -> pd.DataFrame:
+    """Apply the frozen HMDA-SENS-BINS boundaries and right-closed labels."""
+    result = frame.copy()
+    result["income_band"] = _bin_series(
+        result["income_numeric"], [-np.inf, 0, 40, 80, 120, 200, np.inf],
+        ["(-inf,0]", "(0,40]", "(40,80]", "(80,120]", "(120,200]", "(200,inf)"],
+    )
+    result["loan_amount_band"] = _bin_series(
+        result["loan_amount_numeric"], [0, 150000, 300000, 450000, 650000, np.inf],
+        ["(0,150000]", "(150000,300000]", "(300000,450000]", "(450000,650000]", "(650000,inf)"],
+        include_lowest=False,
+    )
+    result["dti_band"] = result["debt_to_income_ratio"].map(ALT_DTI_MAP)
+    result["cltv_band"] = _bin_series(
+        result["cltv_numeric"], [0, 70, 80, 95, 100, 1000],
+        ["[0,70]", "(70,80]", "(80,95]", "(95,100]", "(100,1000]"],
     )
     result.loc[result["combined_loan_to_value_ratio"] == "Exempt", "cltv_band"] = "Exempt"
     return result
@@ -788,6 +819,46 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
     control_core = run_control_sensitivity(extended=False)
     control_extended = run_control_sensitivity(extended=True)
 
+    alternate_rows = add_alternate_strata(normalized)
+    bins_groups: dict[str, Any] = {}
+    for group_name, (field, focal, reference) in GROUPS.items():
+        group_rows = alternate_rows.loc[alternate_rows[field].isin([focal, reference])].copy()
+        complete_rows = group_rows.loc[
+            (group_rows["loan_amount_numeric"] > 0)
+            & group_rows["income_numeric"].notna()
+            & group_rows["dti_band"].notna()
+            & group_rows["cltv_band"].notna()
+        ].copy()
+        estimate = standardized_estimate(complete_rows, field, focal, reference)
+        supported_rows, _ = apply_common_support(complete_rows, field, focal, reference)
+        estimate.update(cluster_bootstrap_differences(
+            complete_rows,
+            lambda sample, gf=field, fo=focal, ref=reference: standardized_estimate(sample, gf, fo, ref),
+            replicates=bootstrap_replicates,
+        ))
+        estimate["row_set_digest"] = row_set_digest(supported_rows)
+        estimate["method_identity"] = "alternate_registered_bins_lei_cluster_bootstrap_v1"
+        estimate["flow"] = {
+            "named_group_input_rows": int(len(alternate_rows)),
+            "named_group_excluded_rows": int(len(alternate_rows) - len(group_rows)),
+            "complete_case_input_rows": int(len(group_rows)),
+            "complete_case_excluded_rows": int(len(group_rows) - len(complete_rows)),
+            "support_excluded_rows": int(len(complete_rows) - len(supported_rows)),
+            "final_rows": int(len(supported_rows)),
+            "reconciled": len(alternate_rows) == (
+                len(alternate_rows) - len(group_rows) + len(group_rows) - len(complete_rows)
+                + len(complete_rows) - len(supported_rows) + len(supported_rows)
+            ),
+        }
+        bins_groups[group_name] = {"standardized": estimate}
+    bins_adjusted = holm_adjust({
+        group: bins_groups[group]["standardized"]["raw_p_value"] for group in GROUPS
+    })
+    if bins_adjusted is None:
+        raise HMDAContractError("hmda_multiplicity_family_incomplete")
+    for group in GROUPS:
+        bins_groups[group]["standardized"]["holm_adjusted_p_value"] = bins_adjusted[group]
+
     def unavailable() -> dict[str, Any]:
         return {
             "status": "failed",
@@ -802,7 +873,7 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
         "HMDA-SENS-MISSING-CATEGORY": {"status": "executed", "groups": missing_category},
         "HMDA-SENS-CONTROL-CORE": {"status": "executed", "groups": control_core},
         "HMDA-SENS-CONTROL-EXTENDED": {"status": "executed", "groups": control_extended},
-        "HMDA-SENS-BINS": unavailable(),
+        "HMDA-SENS-BINS": {"status": "executed", "groups": bins_groups},
         "HMDA-SENS-GEOGRAPHY": unavailable(),
         "HMDA-SENS-LENDER": unavailable(),
         "HMDA-SENS-OVERLAP": unavailable(),
