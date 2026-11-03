@@ -1,16 +1,38 @@
 {
   "candidate_copy_status": "locked_research_only",
   "cohort_flow": null,
+  "command": [
+    "python",
+    "scripts/run_hmda_ca_2024.py",
+    "--archive",
+    "/tmp/fairlendkit-hmda-ca-2024/2024_public_lar_csv.zip",
+    "--output",
+    "docs/artifacts/hmda-ca-2024-v1.json"
+  ],
+  "commit": "bef3efb4f3eb030a0686e05c4a9ea66f4770c13d",
   "configuration_sha256": "83016efb709efc093d14a0025425e551f743983e41111e837c2159eb78fe83c1",
   "constraint_status": "failed",
   "contract_id": "HMDA-CA-2024-CD-V1",
+  "environment": {
+    "numpy": "1.26.4",
+    "pandas": "2.2.2",
+    "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+    "python": "3.12.3"
+  },
   "estimands": null,
+  "generated_at_utc": "2026-11-03T04:01:29.207215+00:00",
   "interpretation_limits": [
     "association_only",
     "no_causal_claim",
     "no_discrimination_finding",
     "no_legal_conclusion"
   ],
+  "method_identity": {
+    "multiplicity": "holm_three_group_family_per_estimand_v1",
+    "regression_adjusted": "logit_cluster_sandwich_delta_v1",
+    "standardized": "pooled_strata_lei_bootstrap_v1",
+    "unadjusted": "wilson_newcombe_log_ratio_pooled_score_v1"
+  },
   "reason_codes": [
     "hmda_duplicate_rows_detected"
   ],
