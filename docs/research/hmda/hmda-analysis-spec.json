@@ -1,6 +1,6 @@
 {
-  "$schema": "./hmda-analysis-spec.schema.json",
-  "manifest_kind": "analysis_spec",
+  "$schema": "./hmda-manifest-schema-v2.json",
+  "manifest_type": "analysis_spec",
   "schema_version": "1.0.0",
   "contract_id": "HMDA-CA-2024-CD-V1",
   "global_order": ["source_admission", "ordered_cohort_rules", "named_group_contrast", "estimand_specific_complete_case", "estimand_specific_support", "estimation", "variance", "multiplicity", "disclosure_gate"],

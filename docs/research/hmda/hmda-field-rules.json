@@ -1,6 +1,6 @@
 {
-  "$schema": "./hmda-field-rules.schema.json",
-  "manifest_kind": "field_rules",
+  "$schema": "./hmda-manifest-schema-v2.json",
+  "manifest_type": "field_rules",
   "schema_version": "1.0.0",
   "contract_id": "HMDA-CA-2024-CD-V1",
   "source_sha256": "9383890f38c2ae1ef46942e72e1a2a211aa0b979c0e46db5fd6d7eb8669f22c1",
