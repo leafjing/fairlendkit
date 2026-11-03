@@ -273,8 +273,8 @@ def test_synthetic_execution_artifact_fails_closed_on_incomplete_registry():
     assert artifact["constraint_status"] == "failed"
     assert artifact["candidate_copy_status"] == "locked_research_only"
     assert artifact["results_emitted"] is False
-    assert artifact["commit"] == "06eb96bcf8fd18cb8bb254524de0f3a4b32beee5"
-    assert artifact["command"][-1].endswith("test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity")
+    assert artifact["commit"] == "4ca8d88efe3a9517a7547018e3de01f9a1910fac"
+    assert artifact["command"][1] == "scripts/generate_hmda_synthetic_artifact.py"
     assert artifact["estimands"] is None
     assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
     assert len(artifact["sensitivity_failures"]) == 8

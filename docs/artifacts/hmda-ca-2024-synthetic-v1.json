@@ -2,12 +2,16 @@
   "candidate_copy_status": "locked_research_only",
   "cohort_flow": null,
   "command": [
-    "PYTHONPATH=src",
-    "pytest",
-    "-q",
-    "tests/test_hmda_ca_2024.py::test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity"
+    "/usr/bin/python3",
+    "scripts/generate_hmda_synthetic_artifact.py",
+    "--output",
+    "docs/artifacts/hmda-ca-2024-synthetic-v1.json",
+    "--generated-at-utc",
+    "2026-11-03T04:30:00+00:00",
+    "--bootstrap-replicates",
+    "5"
   ],
-  "commit": "06eb96bcf8fd18cb8bb254524de0f3a4b32beee5",
+  "commit": "4ca8d88efe3a9517a7547018e3de01f9a1910fac",
   "configuration_sha256": "83016efb709efc093d14a0025425e551f743983e41111e837c2159eb78fe83c1",
   "constraint_status": "failed",
   "contract_id": "HMDA-CA-2024-CD-V1",
@@ -79,6 +83,6 @@
     ],
     "ordered_row_fingerprint_sha256": "caa4365629d52349ceeffba49efd081d2635b7c1bc74308c3c522c5ec5edb1ff",
     "row_count": 12000,
-    "url": "synthetic://tests.test_hmda_ca_2024._rows"
+    "url": "synthetic://generate_hmda_synthetic_artifact.synthetic_rows"
   }
 }
