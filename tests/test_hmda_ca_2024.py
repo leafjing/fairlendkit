@@ -67,12 +67,12 @@ def test_cohort_normalization_and_unadjusted_contract():
 
 def test_newcombe_wilson_difference_ci_exact_values():
     frame = pd.DataFrame({
-        "group": ["focal"] * 70 + ["reference"] * 80,
-        "favorable_action": [1] * 56 + [0] * 14 + [1] * 48 + [0] * 32,
+        "group": ["focal"] * 100 + ["reference"] * 100,
+        "favorable_action": [1] * 80 + [0] * 20 + [1] * 60 + [0] * 40,
     })
     result = unadjusted_estimate(frame, "group", "focal", "reference")
     assert result["difference_ci"] == pytest.approx(
-        [0.05243147240236498, 0.333872654036906], abs=1e-15
+        [0.07311915999619883, 0.3185050993390346], abs=1e-15
     )
 
 
