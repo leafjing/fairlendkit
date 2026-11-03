@@ -648,7 +648,7 @@ def test_synthetic_execution_artifact_fails_closed_on_incomplete_registry():
     assert artifact["constraint_status"] == "failed"
     assert artifact["candidate_copy_status"] == "locked_research_only"
     assert artifact["results_emitted"] is False
-    assert artifact["commit"] == "73a9ff1d4a375a335d5d464b378edbed4009339d"
+    assert artifact["commit"] == "1dba4c8b989e1384906325c9a145a3b9410e33ba"
     assert artifact["command"][1] == "scripts/generate_hmda_synthetic_artifact.py"
     assert artifact["estimands"] is None
     assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
