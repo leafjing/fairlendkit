@@ -24,8 +24,8 @@ def synthetic_rows(per_cell: int = 300) -> pd.DataFrame:
                 for index in range(per_cell):
                     rows.append({
                         "activity_year": "2024", "lei": f"LEI{index:017d}", "state_code": "CA",
-                        "county_code": "06001", "census_tract": "06001000100",
-                        "action_taken": "1" if (index // 4) % 2 == (group == "focal") else "3",
+                        "county_code": "06001" if ((index % 4 != 0) if group == "focal" else (index % 4 == 0)) else "06013", "census_tract": "06001000100",
+                        "action_taken": "1" if (index * 37) % 100 < ((65 if ((index % 4 != 0) if group == "focal" else (index % 4 == 0)) else 45) + (5 if group == "focal" else 0)) else "3",
                         "loan_type": "1", "lien_status": "1", "loan_purpose": "1", "occupancy_type": "1",
                         "construction_method": "1", "total_units": "1", "loan_amount": str(loan_amount),
                         "income": str(income), "debt_to_income_ratio": "<20%" if index % 2 == 0 else "40",

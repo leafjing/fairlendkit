@@ -480,7 +480,20 @@ def cluster_bootstrap_differences(
     return {"valid_replicates": len(values), "ci": np.quantile(values, [0.025, 0.975]).tolist(), "raw_p_value": p_value}
 
 
-def _design_matrix(frame: pd.DataFrame, group_field: str, focal: str) -> np.ndarray:
+def _effect_coding(frame: pd.DataFrame, field: str) -> np.ndarray:
+    levels = sorted(frame[field].dropna().unique())
+    if len(levels) < 2:
+        raise HMDAContractError("hmda_design_matrix_singular", f"{field} needs two levels")
+    omitted = levels[-1]
+    return np.column_stack([
+        np.where(frame[field] == level, 1.0, np.where(frame[field] == omitted, -1.0, 0.0))
+        for level in levels[:-1]
+    ])
+
+
+def _design_matrix(
+    frame: pd.DataFrame, group_field: str, focal: str, *, fixed_effect: str | None = None,
+) -> np.ndarray:
     categorical = pd.DataFrame({
         "protected_group": (frame[group_field] == focal).astype(float),
         "log1p_loan_amount": np.log1p(frame["loan_amount_numeric"]),
@@ -495,17 +508,30 @@ def _design_matrix(frame: pd.DataFrame, group_field: str, focal: str) -> np.ndar
     for reference in ("dti_band_<30", "cltv_band_[0,60]", "applicant_age_band_35-44"):
         if reference in dummies:
             dummies = dummies.drop(columns=reference)
-    return np.column_stack([np.ones(len(frame)), categorical.to_numpy(float), dummies.to_numpy(float)])
+    blocks = [np.ones(len(frame)), categorical.to_numpy(float), dummies.to_numpy(float)]
+    if fixed_effect is not None:
+        blocks.append(_effect_coding(frame, fixed_effect))
+    matrix = np.column_stack(blocks)
+    if np.linalg.matrix_rank(matrix) != matrix.shape[1]:
+        raise HMDAContractError("hmda_design_matrix_singular")
+    return matrix
 
 
-def regression_adjusted_estimate(frame: pd.DataFrame, group_field: str, focal: str, reference: str) -> dict[str, Any]:
+def regression_adjusted_estimate(
+    frame: pd.DataFrame, group_field: str, focal: str, reference: str, *,
+    fixed_effect: str | None = None,
+) -> dict[str, Any]:
     required = ["loan_amount_numeric", "income_numeric", "property_value_numeric", "loan_term_numeric", "dti_band", "cltv_band", "applicant_age_band", "lei"]
+    if fixed_effect is not None:
+        if fixed_effect not in frame:
+            raise HMDAContractError("hmda_schema_required_field_missing", fixed_effect)
+        required.append(fixed_effect)
     data = frame.dropna(subset=required).copy()
     data = data.loc[(data["loan_amount_numeric"] > 0) & (data["income_numeric"] > 0) & (data["property_value_numeric"] > 0) & data["loan_term_numeric"].between(1, 600)]
     data, support = apply_common_support(data, group_field, focal, reference)
     if data["lei"].nunique() < 30:
         raise HMDAContractError("hmda_cluster_count_insufficient")
-    x = _design_matrix(data, group_field, focal)
+    x = _design_matrix(data, group_field, focal, fixed_effect=fixed_effect)
     y = data["favorable_action"].to_numpy(float)
     beta = np.zeros(x.shape[1])
     for _ in range(100):
@@ -540,7 +566,15 @@ def regression_adjusted_estimate(frame: pd.DataFrame, group_field: str, focal: s
     if not math.isfinite(variance) or variance <= 0:
         raise HMDAContractError("hmda_regression_variance_undefined")
     standard_error = math.sqrt(variance)
-    return {"row_count": len(data), "difference": difference, "standard_error": standard_error, "ci": [difference - 1.959963984540054 * standard_error, difference + 1.959963984540054 * standard_error], "raw_p_value": _normal_two_sided(difference / standard_error), "clusters": int(data["lei"].nunique()), "support": support}
+    return {
+        "row_count": len(data), "difference": difference, "standard_error": standard_error,
+        "ci": [difference - 1.959963984540054 * standard_error, difference + 1.959963984540054 * standard_error],
+        "raw_p_value": _normal_two_sided(difference / standard_error),
+        "clusters": int(data["lei"].nunique()), "support": support,
+        "row_set_digest": row_set_digest(data),
+        "method_identity": "logit_core_v1" if fixed_effect is None else f"logit_core_plus_{fixed_effect}_sum_to_zero_v1",
+        "design_columns": int(x.shape[1]),
+    }
 
 
 def holm_adjust(p_values: Mapping[str, float | None]) -> dict[str, float] | None:
@@ -711,6 +745,47 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
     ] = missing_category_rows["applicant_age"]
     missing_category = run_adjusted_sensitivity(missing_category_rows)
 
+    def run_control_sensitivity(*, extended: bool) -> dict[str, Any]:
+        groups: dict[str, Any] = {}
+        source_rows = normalized
+        if extended:
+            county_counts = source_rows.loc[source_rows["county_code"] != "NA", "county_code"].value_counts()
+            eligible = set(county_counts[county_counts >= 100].index)
+            source_rows = source_rows.loc[source_rows["county_code"].isin(eligible)].copy()
+        for group_name, (field, focal, reference) in GROUPS.items():
+            all_group_rows = normalized.loc[normalized[field].isin([focal, reference])]
+            group_rows = source_rows.loc[source_rows[field].isin([focal, reference])]
+            estimate = regression_adjusted_estimate(
+                group_rows, field, focal, reference,
+                fixed_effect="county_code" if extended else None,
+            )
+            support = estimate["support"]
+            estimate["flow"] = {
+                "named_group_input_rows": int(len(normalized)),
+                "named_group_excluded_rows": int(len(normalized) - len(all_group_rows)),
+                "complete_case_input_rows": int(len(all_group_rows)),
+                "complete_case_excluded_rows": int(len(all_group_rows) - support["input_rows"]),
+                "support_excluded_rows": int(support["support_excluded_rows"]),
+                "final_rows": int(estimate["row_count"]),
+                "reconciled": len(normalized) == (
+                    len(normalized) - len(all_group_rows)
+                    + len(all_group_rows) - support["input_rows"]
+                    + support["support_excluded_rows"] + estimate["row_count"]
+                ),
+            }
+            groups[group_name] = {"regression_adjusted": estimate}
+        adjusted = holm_adjust({
+            group: groups[group]["regression_adjusted"]["raw_p_value"] for group in GROUPS
+        })
+        if adjusted is None:
+            raise HMDAContractError("hmda_multiplicity_family_incomplete")
+        for group in GROUPS:
+            groups[group]["regression_adjusted"]["holm_adjusted_p_value"] = adjusted[group]
+        return groups
+
+    control_core = run_control_sensitivity(extended=False)
+    control_extended = run_control_sensitivity(extended=True)
+
     def unavailable() -> dict[str, Any]:
         return {
             "status": "failed",
@@ -723,8 +798,8 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
         "HMDA-SENS-ACTION-13": {"status": "executed", "groups": action_13},
         "HMDA-SENS-MISSING-COMPLETE": {"status": "executed", "groups": missing_complete},
         "HMDA-SENS-MISSING-CATEGORY": {"status": "executed", "groups": missing_category},
-        "HMDA-SENS-CONTROL-CORE": unavailable(),
-        "HMDA-SENS-CONTROL-EXTENDED": unavailable(),
+        "HMDA-SENS-CONTROL-CORE": {"status": "executed", "groups": control_core},
+        "HMDA-SENS-CONTROL-EXTENDED": {"status": "executed", "groups": control_extended},
         "HMDA-SENS-BINS": unavailable(),
         "HMDA-SENS-GEOGRAPHY": unavailable(),
         "HMDA-SENS-LENDER": unavailable(),

@@ -41,7 +41,7 @@ def _rows(per_cell: int = 300) -> pd.DataFrame:
             for index in range(per_cell):
                 rows.append({
                     "activity_year": "2024", "lei": f"LEI{index:017d}", "state_code": "CA",
-                    "county_code": "06001", "census_tract": "06001000100", "action_taken": "1" if (index // 4) % 2 == (group == "focal") else "3",
+                    "county_code": "06001" if ((index % 4 != 0) if group == "focal" else (index % 4 == 0)) else "06013", "census_tract": "06001000100", "action_taken": "1" if (index * 37) % 100 < ((65 if ((index % 4 != 0) if group == "focal" else (index % 4 == 0)) else 45) + (5 if group == "focal" else 0)) else "3",
                     "loan_type": "1", "lien_status": "1", "loan_purpose": "1", "occupancy_type": "1",
                     "construction_method": "1", "total_units": "1", "loan_amount": str(loan_amount), "income": str(income),
                     "debt_to_income_ratio": "<20%" if index % 2 == 0 else "40",
@@ -161,9 +161,24 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
             set(group) == {"standardized", "regression_adjusted"}
             for group in sensitivity["groups"].values()
         )
+    core = estimands["sensitivities"]["HMDA-SENS-CONTROL-CORE"]
+    extended = estimands["sensitivities"]["HMDA-SENS-CONTROL-EXTENDED"]
+    assert core["status"] == extended["status"] == "executed"
+    for group in ("ethnicity", "race", "sex"):
+        core_result = core["groups"][group]["regression_adjusted"]
+        extended_result = extended["groups"][group]["regression_adjusted"]
+        assert core_result["method_identity"] == "logit_core_v1"
+        assert extended_result["method_identity"] == "logit_core_plus_county_code_sum_to_zero_v1"
+        assert extended_result["design_columns"] > core_result["design_columns"]
+        assert core_result["flow"]["reconciled"] is True
+        assert extended_result["flow"]["reconciled"] is True
+        assert extended_result["difference"] != pytest.approx(
+            estimands["primary"][group]["regression_adjusted"]["difference"], abs=1e-10
+        )
     unavailable = set(estimands["sensitivities"]) - {
         "HMDA-SENS-ACTION-13", "HMDA-SENS-MISSING-COMPLETE",
-        "HMDA-SENS-MISSING-CATEGORY", "HMDA-SENS-YEAR",
+        "HMDA-SENS-MISSING-CATEGORY", "HMDA-SENS-CONTROL-CORE",
+        "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-YEAR",
     }
     for sensitivity_id in unavailable:
         sensitivity = estimands["sensitivities"][sensitivity_id]
@@ -216,6 +231,21 @@ def test_missing_category_collinearity_fails_closed():
     with pytest.raises(HMDAContractError, match="hmda_design_matrix_singular"):
         regression_adjusted_estimate(
             data, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
+        )
+
+
+def test_extended_control_missing_or_single_level_county_fails_closed():
+    data = add_primary_strata(normalize_analysis_fields(_rows()))
+    with pytest.raises(HMDAContractError, match="hmda_schema_required_field_missing"):
+        regression_adjusted_estimate(
+            data.drop(columns="county_code"), "derived_ethnicity",
+            "Hispanic or Latino", "Not Hispanic or Latino", fixed_effect="county_code",
+        )
+    data["county_code"] = "06001"
+    with pytest.raises(HMDAContractError, match="hmda_design_matrix_singular"):
+        regression_adjusted_estimate(
+            data, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino",
+            fixed_effect="county_code",
         )
 
 def test_regression_and_cluster_bootstrap_contracts():
