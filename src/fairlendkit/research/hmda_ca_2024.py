@@ -566,15 +566,17 @@ def regression_adjusted_estimate(
     if not math.isfinite(variance) or variance <= 0:
         raise HMDAContractError("hmda_regression_variance_undefined")
     standard_error = math.sqrt(variance)
-    return {
+    result = {
         "row_count": len(data), "difference": difference, "standard_error": standard_error,
         "ci": [difference - 1.959963984540054 * standard_error, difference + 1.959963984540054 * standard_error],
         "raw_p_value": _normal_two_sided(difference / standard_error),
         "clusters": int(data["lei"].nunique()), "support": support,
-        "row_set_digest": row_set_digest(data),
         "method_identity": "logit_core_v1" if fixed_effect is None else f"logit_core_plus_{fixed_effect}_sum_to_zero_v1",
         "design_columns": int(x.shape[1]),
     }
+    if "_source_row_id" in data:
+        result["row_set_digest"] = row_set_digest(data)
+    return result
 
 
 def holm_adjust(p_values: Mapping[str, float | None]) -> dict[str, float] | None:
