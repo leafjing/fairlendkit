@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -214,6 +216,33 @@ def test_incomplete_sensitivity_registry_cannot_create_success_artifact():
     assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
 
 
+@pytest.mark.parametrize("mutation", ["missing", "unknown", "illegal_status", "year_enabled"])
+def test_sensitivity_registry_shape_is_exact_and_fail_closed(mutation):
+    source = SourceEvidence(
+        url="synthetic", archive_bytes=1, archive_sha256="a" * 64, member_name="data.csv",
+        member_bytes=2, header_sha256="b" * 64, ordered_header=("a",), row_count=3,
+        duplicate_row_count=0, ordered_row_fingerprint_sha256="c" * 64,
+    )
+    ids = {
+        "HMDA-SENS-ACTION-13", "HMDA-SENS-MISSING-COMPLETE", "HMDA-SENS-MISSING-CATEGORY",
+        "HMDA-SENS-CONTROL-CORE", "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-BINS",
+        "HMDA-SENS-GEOGRAPHY", "HMDA-SENS-LENDER", "HMDA-SENS-OVERLAP", "HMDA-SENS-YEAR",
+    }
+    registry = {key: {"status": "executed", "groups": {}} for key in ids}
+    registry["HMDA-SENS-YEAR"] = {"status": "disabled_pending_separate_source_admission", "groups": None}
+    if mutation == "missing":
+        registry.pop("HMDA-SENS-BINS")
+    elif mutation == "unknown":
+        registry["HMDA-SENS-UNKNOWN"] = {"status": "executed", "groups": {}}
+    elif mutation == "illegal_status":
+        registry["HMDA-SENS-BINS"]["status"] = "passed"
+    else:
+        registry["HMDA-SENS-YEAR"] = {"status": "executed", "groups": {}}
+    artifact = success_artifact(source, {"sensitivities": registry}, {}, configuration_sha256="d" * 64)
+    assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
+    assert artifact["results_emitted"] is False
+
+
 def test_wrong_source_identity_fails_before_parsing(tmp_path: Path):
     archive = tmp_path / "not-official.zip"
     archive.write_bytes(b"PK\x05\x06" + b"\0" * 18)
@@ -249,3 +278,23 @@ def test_synthetic_execution_artifact_fails_closed_on_incomplete_registry():
     assert artifact["estimands"] is None
     assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
     assert len(artifact["sensitivity_failures"]) == 8
+
+
+def test_synthetic_artifact_normalized_regeneration_equality(tmp_path: Path):
+    checked_path = Path(__file__).parents[1] / "docs" / "artifacts" / "hmda-ca-2024-synthetic-v1.json"
+    checked = json.loads(checked_path.read_text())
+    generated = tmp_path / "artifact.json"
+    subprocess.run([
+        sys.executable, "scripts/generate_hmda_synthetic_artifact.py",
+        "--output", str(generated), "--generated-at-utc", checked["generated_at_utc"],
+        "--bootstrap-replicates", "5",
+    ], check=True)
+    actual = json.loads(generated.read_text())
+
+    def normalize(value):
+        result = json.loads(json.dumps(value))
+        output_index = result["command"].index("--output") + 1
+        result["command"][output_index] = "<OUTPUT>"
+        return result
+
+    assert normalize(actual) == normalize(checked)

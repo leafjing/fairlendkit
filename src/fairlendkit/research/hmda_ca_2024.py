@@ -49,6 +49,13 @@ GROUPS = {
     "race": ("derived_race", "Black or African American", "White"),
     "sex": ("derived_sex", "Female", "Male"),
 }
+SENSITIVITY_IDS = {
+    "HMDA-SENS-ACTION-13", "HMDA-SENS-MISSING-COMPLETE",
+    "HMDA-SENS-MISSING-CATEGORY", "HMDA-SENS-CONTROL-CORE",
+    "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-BINS",
+    "HMDA-SENS-GEOGRAPHY", "HMDA-SENS-LENDER", "HMDA-SENS-OVERLAP",
+    "HMDA-SENS-YEAR",
+}
 COHORT_RULES = (
     ("activity_year", {"2024"}, "hmda_wrong_activity_year"),
     ("state_code", {"CA"}, "hmda_outside_california"),
@@ -686,9 +693,35 @@ def success_artifact(
     source: SourceEvidence, estimands: Mapping[str, Any], cohort_flow: Mapping[str, Any], *,
     configuration_sha256: str, command: list[str] | None = None, generated_at_utc: str | None = None,
 ) -> dict[str, Any]:
+    sensitivities = estimands.get("sensitivities")
+    registry_valid = isinstance(sensitivities, Mapping) and set(sensitivities) == SENSITIVITY_IDS
+    if registry_valid:
+        for sensitivity_id, result in sensitivities.items():
+            if not isinstance(result, Mapping):
+                registry_valid = False
+                break
+            status = result.get("status")
+            if sensitivity_id == "HMDA-SENS-YEAR":
+                registry_valid &= status == "disabled_pending_separate_source_admission" and result.get("groups") is None
+            else:
+                registry_valid &= status in {"executed", "not_applicable", "failed"}
+                if status == "executed":
+                    registry_valid &= isinstance(result.get("groups"), Mapping)
+                elif status == "not_applicable":
+                    registry_valid &= isinstance(result.get("applicability"), Mapping) and result.get("groups") is None
+                else:
+                    registry_valid &= result.get("results_emitted") is False and bool(result.get("reason_codes")) and result.get("groups") is None
+            if not registry_valid:
+                break
+    if not registry_valid:
+        return fail_closed_artifact(
+            source, ["hmda_sensitivity_registry_incomplete"],
+            configuration_sha256=configuration_sha256, command=command,
+            generated_at_utc=generated_at_utc,
+        )
     failed_sensitivities = sorted(
         sensitivity_id
-        for sensitivity_id, result in estimands.get("sensitivities", {}).items()
+        for sensitivity_id, result in sensitivities.items()
         if result.get("status") == "failed"
     )
     if failed_sensitivities:
