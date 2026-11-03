@@ -681,6 +681,36 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
         for group in GROUPS:
             action_13[group][estimand]["holm_adjusted_p_value"] = adjusted[group]
 
+    def run_adjusted_sensitivity(data: pd.DataFrame) -> dict[str, Any]:
+        groups: dict[str, Any] = {}
+        for group_name, (field, focal, reference) in GROUPS.items():
+            bundle = _estimand_bundle(
+                data, field, focal, reference, bootstrap_replicates=bootstrap_replicates,
+            )
+            groups[group_name] = {
+                name: bundle[name] for name in ("standardized", "regression_adjusted")
+            }
+        for estimand in ("standardized", "regression_adjusted"):
+            adjusted = holm_adjust({group: groups[group][estimand]["raw_p_value"] for group in GROUPS})
+            if adjusted is None:
+                raise HMDAContractError("hmda_multiplicity_family_incomplete")
+            for group in GROUPS:
+                groups[group][estimand]["holm_adjusted_p_value"] = adjusted[group]
+        return groups
+
+    missing_complete = run_adjusted_sensitivity(normalized)
+    missing_category_rows = normalized.copy()
+    missing_category_rows.loc[
+        missing_category_rows["debt_to_income_ratio"] == "NA", "dti_band"
+    ] = "NA"
+    missing_category_rows.loc[
+        missing_category_rows["combined_loan_to_value_ratio"] == "NA", "cltv_band"
+    ] = "NA"
+    missing_category_rows.loc[
+        missing_category_rows["applicant_age"].isin(["8888", "9999"]), "applicant_age_band"
+    ] = missing_category_rows["applicant_age"]
+    missing_category = run_adjusted_sensitivity(missing_category_rows)
+
     def unavailable() -> dict[str, Any]:
         return {
             "status": "failed",
@@ -691,8 +721,8 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
 
     sensitivities: dict[str, Any] = {
         "HMDA-SENS-ACTION-13": {"status": "executed", "groups": action_13},
-        "HMDA-SENS-MISSING-COMPLETE": unavailable(),
-        "HMDA-SENS-MISSING-CATEGORY": unavailable(),
+        "HMDA-SENS-MISSING-COMPLETE": {"status": "executed", "groups": missing_complete},
+        "HMDA-SENS-MISSING-CATEGORY": {"status": "executed", "groups": missing_category},
         "HMDA-SENS-CONTROL-CORE": unavailable(),
         "HMDA-SENS-CONTROL-EXTENDED": unavailable(),
         "HMDA-SENS-BINS": unavailable(),

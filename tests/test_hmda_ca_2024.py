@@ -44,8 +44,8 @@ def _rows(per_cell: int = 300) -> pd.DataFrame:
                     "county_code": "06001", "census_tract": "06001000100", "action_taken": "1" if (index // 4) % 2 == (group == "focal") else "3",
                     "loan_type": "1", "lien_status": "1", "loan_purpose": "1", "occupancy_type": "1",
                     "construction_method": "1", "total_units": "1", "loan_amount": str(loan_amount), "income": str(income),
-                    "debt_to_income_ratio": "36" if index % 2 == 0 else "40",
-                    "combined_loan_to_value_ratio": "75" if (index // 2) % 2 == 0 else "85",
+                    "debt_to_income_ratio": "<20%" if index % 2 == 0 else "40",
+                    "combined_loan_to_value_ratio": "50" if (index // 2) % 2 == 0 else "85",
                     "property_value": str(loan_amount + 100000 + index * index * 10),
                     "loan_term": str(120 + (index * 7) % 360),
                     "applicant_age": ("<25", "25-34", "35-44", "45-54", "55-64", "65-74", ">74")[index % 7],
@@ -153,7 +153,18 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
         for group in action["groups"].values() for result in group.values()
     )
     assert estimands["sensitivities"]["HMDA-SENS-YEAR"]["groups"] is None
-    unavailable = set(estimands["sensitivities"]) - {"HMDA-SENS-ACTION-13", "HMDA-SENS-YEAR"}
+    for sensitivity_id in ("HMDA-SENS-MISSING-COMPLETE", "HMDA-SENS-MISSING-CATEGORY"):
+        sensitivity = estimands["sensitivities"][sensitivity_id]
+        assert sensitivity["status"] == "executed"
+        assert set(sensitivity["groups"]) == {"ethnicity", "race", "sex"}
+        assert all(
+            set(group) == {"standardized", "regression_adjusted"}
+            for group in sensitivity["groups"].values()
+        )
+    unavailable = set(estimands["sensitivities"]) - {
+        "HMDA-SENS-ACTION-13", "HMDA-SENS-MISSING-COMPLETE",
+        "HMDA-SENS-MISSING-CATEGORY", "HMDA-SENS-YEAR",
+    }
     for sensitivity_id in unavailable:
         sensitivity = estimands["sensitivities"][sensitivity_id]
         assert sensitivity == {
@@ -172,7 +183,6 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
     artifact = success_artifact(source, empty_executed, flow, configuration_sha256="d" * 64)
     assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
     assert "sensitivity_failures" not in artifact
-
     empty_applicability = copy.deepcopy(estimands)
     empty_applicability["sensitivities"]["HMDA-SENS-BINS"] = {
         "status": "not_applicable", "applicability": {}, "groups": None,
@@ -181,6 +191,32 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
     assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]
     assert "sensitivity_failures" not in artifact
 
+
+def test_missing_category_rebuild_changes_rows_and_reconciles_flow():
+    frame = _rows()
+    loan = frame["loan_amount"] == "75000"
+    frame.loc[loan & (frame["income"] == "25"), "debt_to_income_ratio"] = "NA"
+    frame.loc[loan & (frame["income"] == "75"), "combined_loan_to_value_ratio"] = "NA"
+    frame.loc[loan & (frame["income"] == "125"), "applicant_age"] = "9999"
+    estimands, _ = analyze_frame(frame, bootstrap_replicates=5)
+    complete = estimands["sensitivities"]["HMDA-SENS-MISSING-COMPLETE"]["groups"]
+    category = estimands["sensitivities"]["HMDA-SENS-MISSING-CATEGORY"]["groups"]
+    for group in ("ethnicity", "race", "sex"):
+        for estimand in ("standardized", "regression_adjusted"):
+            assert category[group][estimand]["row_count"] > complete[group][estimand]["row_count"]
+            assert category[group][estimand]["row_set_digest"] != complete[group][estimand]["row_set_digest"]
+            assert complete[group][estimand]["flow"]["reconciled"] is True
+            assert category[group][estimand]["flow"]["reconciled"] is True
+
+
+def test_missing_category_collinearity_fails_closed():
+    data = add_primary_strata(normalize_analysis_fields(_rows()))
+    affected = (data["income"] == "25") & (data["loan_amount"] == "75000")
+    data.loc[affected, ["dti_band", "cltv_band", "applicant_age_band"]] = ["NA", "NA", "9999"]
+    with pytest.raises(HMDAContractError, match="hmda_design_matrix_singular"):
+        regression_adjusted_estimate(
+            data, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
+        )
 
 def test_regression_and_cluster_bootstrap_contracts():
     data = add_primary_strata(normalize_analysis_fields(_rows()))
