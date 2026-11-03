@@ -14,7 +14,11 @@ import hashlib
 import io
 import json
 import math
+import platform
 import re
+import sys
+import subprocess
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping
@@ -27,6 +31,9 @@ import pandas as pd
 SOURCE_URL = "https://files.ffiec.cfpb.gov/static-data/snapshot/2024/2024_public_lar_csv.zip"
 SOURCE_BYTES = 664_242_987
 SOURCE_SHA256 = "9383890f38c2ae1ef46942e72e1a2a211aa0b979c0e46db5fd6d7eb8669f22c1"
+SOURCE_MEMBER_BYTES = 4_625_405_352
+MAX_UNCOMPRESSED_BYTES = 5_000_000_000
+HEADER_SHA256 = "dbef604276f5b4e28b72634d143f23f6b3b5a7ed9284671ac79cbba8bd126063"
 CONTRACT_ID = "HMDA-CA-2024-CD-V1"
 LOCKED_STATUS = "locked_research_only"
 REQUIRED_FIELDS = (
@@ -61,6 +68,18 @@ DTI_MAP = {
 }
 AGE_MAP = {v: v for v in ("<25", "25-34", "35-44", "45-54", "55-64", "65-74", ">74")}
 AGE_MAP.update({"8888": None, "9999": None})
+ALLOWED_VALUES = {
+    "activity_year": {"2024"}, "action_taken": set("12345678"),
+    "loan_type": set("1234"), "lien_status": {"1", "2"},
+    "loan_purpose": {"1", "2", "4", "5", "31", "32"},
+    "occupancy_type": {"1", "2", "3"}, "construction_method": {"1", "2"},
+    "total_units": {"1", "2", "3", "4", "5-24", "25-49", "50-99", "100-149", ">149"},
+    "debt_to_income_ratio": set(DTI_MAP), "applicant_age": set(AGE_MAP),
+    "derived_ethnicity": {"Hispanic or Latino", "Not Hispanic or Latino", "Joint", "Ethnicity Not Available", "Free Form Text Only"},
+    "derived_race": {"American Indian or Alaska Native", "Asian", "Black or African American", "Native Hawaiian or Other Pacific Islander", "White", "2 or more minority races", "Joint", "Race Not Available", "Free Form Text Only"},
+    "derived_sex": {"Male", "Female", "Joint", "Sex Not Available"},
+}
+DECIMAL_PATTERN = re.compile(r"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$")
 
 
 class HMDAContractError(ValueError):
@@ -100,6 +119,18 @@ def _sha256_file(path: Path) -> tuple[int, str]:
     return size, digest.hexdigest()
 
 
+def validate_header_bytes(header_raw: bytes) -> tuple[str, ...]:
+    try:
+        header = tuple(next(csv.reader([header_raw.decode("utf-8-sig")])))
+    except (UnicodeDecodeError, csv.Error) as exc:
+        raise HMDAContractError("hmda_source_identity_mismatch", "invalid header") from exc
+    if hashlib.sha256(header_raw).hexdigest() != HEADER_SHA256:
+        raise HMDAContractError("hmda_schema_digest_mismatch")
+    if not set(REQUIRED_FIELDS).issubset(header):
+        raise HMDAContractError("hmda_schema_required_field_missing")
+    return header
+
+
 def admit_source_archive(path: str | Path, *, source_url: str = SOURCE_URL) -> SourceEvidence:
     """Validate the frozen official ZIP and scan full-row duplicate evidence."""
 
@@ -118,16 +149,14 @@ def admit_source_archive(path: str | Path, *, source_url: str = SOURCE_URL) -> S
             or member_path.is_absolute()
             or ".." in member_path.parts
             or member_path.suffix.lower() != ".csv"
+            or member.file_size != SOURCE_MEMBER_BYTES
+            or member.file_size > MAX_UNCOMPRESSED_BYTES
         ):
             raise HMDAContractError("hmda_source_identity_mismatch", "unsafe member")
         with zipped.open(member) as raw:
             header_raw = raw.readline().rstrip(b"\r\n")
-            try:
-                header = tuple(next(csv.reader([header_raw.decode("utf-8-sig")])))
-            except (UnicodeDecodeError, csv.Error) as exc:
-                raise HMDAContractError("hmda_source_identity_mismatch", "invalid header") from exc
-            if not set(REQUIRED_FIELDS).issubset(header):
-                raise HMDAContractError("hmda_schema_required_field_missing")
+            header = validate_header_bytes(header_raw)
+            header_digest = hashlib.sha256(header_raw).hexdigest()
             seen: set[bytes] = set()
             duplicate_count = 0
             rows = 0
@@ -144,7 +173,7 @@ def admit_source_archive(path: str | Path, *, source_url: str = SOURCE_URL) -> S
         archive_sha256=digest,
         member_name=member.filename,
         member_bytes=member.file_size,
-        header_sha256=hashlib.sha256(header_raw).hexdigest(),
+        header_sha256=header_digest,
         ordered_header=header,
         row_count=rows,
         duplicate_row_count=duplicate_count,
@@ -159,6 +188,42 @@ def _clean_strings(frame: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def validate_field_values(frame: pd.DataFrame) -> None:
+    """Apply frozen categorical, pattern, and strict numeric source rules."""
+
+    for field, allowed in ALLOWED_VALUES.items():
+        invalid = ~frame[field].isin(allowed)
+        if invalid.any():
+            raise HMDAContractError("hmda_code_value_invalid", field)
+    patterns = {
+        "lei": re.compile(r"^[A-Z0-9]{20}$"),
+        "state_code": re.compile(r"^(?:[A-Z]{2}|NA)$"),
+        "county_code": re.compile(r"^(?:[0-9]{5}|NA)$"),
+        "census_tract": re.compile(r"^(?:[0-9]{11}|NA)$"),
+    }
+    for field, pattern in patterns.items():
+        if (~frame[field].str.fullmatch(pattern)).any():
+            raise HMDAContractError("hmda_code_value_invalid", field)
+    for field in ("loan_amount", "income", "property_value"):
+        invalid = ~frame[field].isin(["NA", "Exempt"]) & ~frame[field].str.fullmatch(DECIMAL_PATTERN)
+        if invalid.any():
+            raise HMDAContractError("hmda_numeric_value_invalid", field)
+    cltv = frame["combined_loan_to_value_ratio"]
+    cltv_special = cltv.isin(["NA", "Exempt"])
+    if (~cltv_special & ~cltv.str.fullmatch(DECIMAL_PATTERN)).any():
+        raise HMDAContractError("hmda_numeric_value_invalid", "combined_loan_to_value_ratio")
+    cltv_numeric = pd.to_numeric(cltv.where(~cltv_special), errors="raise")
+    if (~cltv_special & ~cltv_numeric.between(0, 1000)).any():
+        raise HMDAContractError("hmda_numeric_value_invalid", "combined_loan_to_value_ratio")
+    term = frame["loan_term"]
+    term_special = term.isin(["NA", "Exempt"])
+    if (~term_special & ~term.str.fullmatch(r"^(?:0|[1-9][0-9]*)$")).any():
+        raise HMDAContractError("hmda_numeric_value_invalid", "loan_term")
+    term_numeric = pd.to_numeric(term.where(~term_special), errors="raise")
+    if (~term_special & ~term_numeric.between(1, 600)).any():
+        raise HMDAContractError("hmda_numeric_value_invalid", "loan_term")
+
+
 def construct_cohort(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Apply the frozen ordered cohort rules and return aggregate flow only."""
 
@@ -166,12 +231,18 @@ def construct_cohort(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]
     if missing:
         raise HMDAContractError("hmda_schema_required_field_missing", ",".join(missing))
     current = _clean_strings(frame)
+    validate_field_values(current)
+    if "_source_row_id" not in current:
+        current["_source_row_id"] = np.arange(len(current), dtype=np.int64)
     flow: dict[str, Any] = {"source_rows": int(len(current)), "exclusions": []}
     for field, allowed, reason in COHORT_RULES:
         keep = current[field].isin(allowed)
         flow["exclusions"].append({"reason_code": reason, "rows": int((~keep).sum())})
         current = current.loc[keep].copy()
     flow["cohort_rows"] = int(len(current))
+    flow["reconciled"] = flow["source_rows"] == flow["cohort_rows"] + sum(item["rows"] for item in flow["exclusions"])
+    if not flow["reconciled"]:
+        raise HMDAContractError("hmda_cohort_flow_not_reconciled")
     return current, flow
 
 
@@ -186,6 +257,30 @@ def normalize_analysis_fields(frame: pd.DataFrame) -> pd.DataFrame:
     result["applicant_age_band"] = result["applicant_age"].map(AGE_MAP)
     result["favorable_action"] = result["action_taken"].isin(["1", "2"]).astype(int)
     return result
+
+
+def row_set_digest(frame: pd.DataFrame) -> str:
+    if "_source_row_id" not in frame:
+        raise HMDAContractError("hmda_artifact_reproduction_mismatch", "missing source row ID")
+    digest = hashlib.sha256()
+    for value in frame["_source_row_id"].astype("int64"):
+        digest.update(int(value).to_bytes(8, "big", signed=False))
+    return digest.hexdigest()
+
+
+def load_admitted_rows(path: str | Path, *, chunksize: int = 250_000) -> pd.DataFrame:
+    """Load only frozen analysis columns after archive identity admission."""
+    pieces: list[pd.DataFrame] = []
+    with ZipFile(path) as zipped:
+        member = next(item for item in zipped.infolist() if not item.is_dir())
+        with zipped.open(member) as raw:
+            for chunk in pd.read_csv(raw, dtype="string", usecols=list(REQUIRED_FIELDS), chunksize=chunksize):
+                cleaned = _clean_strings(chunk)
+                validate_field_values(cleaned)
+                pieces.append(cleaned)
+    if not pieces:
+        raise HMDAContractError("hmda_cohort_empty")
+    return pd.concat(pieces, ignore_index=True)
 
 
 def _wilson(successes: float, total: float, z: float = 1.959963984540054) -> list[float] | None:
@@ -216,11 +311,19 @@ def unadjusted_estimate(frame: pd.DataFrame, group_field: str, focal: str, refer
     pooled = (yf + yr) / (nf + nr)
     standard_error = math.sqrt(pooled * (1 - pooled) * (1 / nf + 1 / nr))
     p_value = 1.0 if standard_error == 0 else _normal_two_sided((pf - pr) / standard_error)
+    focal_ci, reference_ci = _wilson(yf, nf), _wilson(yr, nr)
+    difference_ci = [focal_ci[0] - reference_ci[1], focal_ci[1] - reference_ci[0]]
+    ratio_ci = None
+    if yf > 0 and yr > 0 and pf > 0 and pr > 0:
+        ratio_se = math.sqrt(1 / yf - 1 / nf + 1 / yr - 1 / nr)
+        log_ratio = math.log(pf / pr)
+        ratio_ci = [math.exp(log_ratio - 1.959963984540054 * ratio_se), math.exp(log_ratio + 1.959963984540054 * ratio_se)]
     return {
         "row_count": int(len(selected)), "counts": counts,
         "focal_rate": pf, "reference_rate": pr, "difference": pf - pr,
         "ratio": None if pr == 0 else pf / pr,
-        "focal_rate_ci": _wilson(yf, nf), "reference_rate_ci": _wilson(yr, nr),
+        "focal_rate_ci": focal_ci, "reference_rate_ci": reference_ci,
+        "difference_ci": difference_ci, "ratio_ci": ratio_ci,
         "raw_p_value": p_value,
     }
 
@@ -403,8 +506,121 @@ def holm_adjust(p_values: Mapping[str, float | None]) -> dict[str, float] | None
     return adjusted
 
 
-def fail_closed_artifact(source: SourceEvidence, reason_codes: Iterable[str], *, configuration_sha256: str) -> dict[str, Any]:
+def _git_commit() -> str:
+    try:
+        return subprocess.run(
+            ["git", "log", "-1", "--format=%H", "--", "src/fairlendkit/research/hmda_ca_2024.py", "scripts/run_hmda_ca_2024.py"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unavailable"
+
+
+def artifact_identity(*, command: list[str] | None = None, generated_at_utc: str | None = None) -> dict[str, Any]:
     return {
+        "commit": _git_commit(),
+        "command": command or list(sys.argv),
+        "generated_at_utc": generated_at_utc or datetime.now(timezone.utc).isoformat(),
+        "environment": {
+            "python": platform.python_version(), "platform": platform.platform(),
+            "pandas": pd.__version__, "numpy": np.__version__,
+        },
+        "method_identity": {
+            "unadjusted": "wilson_newcombe_log_ratio_pooled_score_v1",
+            "standardized": "pooled_strata_lei_bootstrap_v1",
+            "regression_adjusted": "logit_cluster_sandwich_delta_v1",
+            "multiplicity": "holm_three_group_family_per_estimand_v1",
+        },
+    }
+
+
+def _estimand_bundle(
+    frame: pd.DataFrame, group_field: str, focal: str, reference: str, *, bootstrap_replicates: int,
+) -> dict[str, Any]:
+    group_rows = frame.loc[frame[group_field].isin([focal, reference])].copy()
+    if group_rows.empty:
+        raise HMDAContractError("hmda_group_denominator_empty")
+    unadjusted_rows = group_rows.dropna(subset=["favorable_action"])
+    unadjusted = unadjusted_estimate(unadjusted_rows, group_field, focal, reference)
+    unadjusted["row_set_digest"] = row_set_digest(unadjusted_rows)
+
+    standardized_rows = group_rows.loc[
+        (group_rows["loan_amount_numeric"] > 0)
+        & group_rows["income_numeric"].notna()
+        & group_rows["dti_band"].notna()
+        & group_rows["cltv_band"].notna()
+    ].copy()
+    standardized = standardized_estimate(standardized_rows, group_field, focal, reference)
+    supported_rows, _ = apply_common_support(standardized_rows, group_field, focal, reference)
+    bootstrap = cluster_bootstrap_differences(
+        standardized_rows,
+        lambda sample: standardized_estimate(sample, group_field, focal, reference),
+        replicates=bootstrap_replicates,
+    )
+    standardized.update(bootstrap)
+    standardized["row_set_digest"] = row_set_digest(supported_rows)
+
+    regression = regression_adjusted_estimate(group_rows, group_field, focal, reference)
+    regression_rows = group_rows.dropna(subset=[
+        "loan_amount_numeric", "income_numeric", "property_value_numeric", "loan_term_numeric",
+        "dti_band", "cltv_band", "applicant_age_band", "lei",
+    ])
+    regression_rows = regression_rows.loc[
+        (regression_rows["loan_amount_numeric"] > 0) & (regression_rows["income_numeric"] > 0)
+        & (regression_rows["property_value_numeric"] > 0) & regression_rows["loan_term_numeric"].between(1, 600)
+    ]
+    regression_rows, _ = apply_common_support(regression_rows, group_field, focal, reference)
+    regression["row_set_digest"] = row_set_digest(regression_rows)
+    return {"unadjusted": unadjusted, "standardized": standardized, "regression_adjusted": regression}
+
+
+def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Run the frozen three-group x three-estimand contract on synthetic/admitted rows."""
+    cohort, flow = construct_cohort(frame)
+    normalized = add_primary_strata(normalize_analysis_fields(cohort))
+    primary: dict[str, Any] = {}
+    for group_name, (field, focal, reference) in GROUPS.items():
+        primary[group_name] = _estimand_bundle(
+            normalized, field, focal, reference, bootstrap_replicates=bootstrap_replicates,
+        )
+    for estimand in ("unadjusted", "standardized", "regression_adjusted"):
+        adjusted = holm_adjust({group: primary[group][estimand]["raw_p_value"] for group in GROUPS})
+        if adjusted is None:
+            raise HMDAContractError("hmda_multiplicity_family_incomplete")
+        for group in GROUPS:
+            primary[group][estimand]["holm_adjusted_p_value"] = adjusted[group]
+
+    sensitivity_rows = normalized.loc[normalized["action_taken"].isin(["1", "3"])].copy()
+    sensitivity_rows["favorable_action"] = (sensitivity_rows["action_taken"] == "1").astype(int)
+    action_13: dict[str, Any] = {}
+    for group_name, (field, focal, reference) in GROUPS.items():
+        action_13[group_name] = _estimand_bundle(
+            sensitivity_rows, field, focal, reference, bootstrap_replicates=bootstrap_replicates,
+        )
+    return {"primary": primary, "sensitivities": {"HMDA-SENS-ACTION-13": action_13}}, flow
+
+
+def success_artifact(
+    source: SourceEvidence, estimands: Mapping[str, Any], cohort_flow: Mapping[str, Any], *,
+    configuration_sha256: str, command: list[str] | None = None, generated_at_utc: str | None = None,
+) -> dict[str, Any]:
+    artifact = {
+        "schema_version": "1.0.0", "contract_id": CONTRACT_ID,
+        "source": source.as_dict(), "configuration_sha256": configuration_sha256,
+        "constraint_status": "passed", "candidate_copy_status": LOCKED_STATUS,
+        "results_emitted": True, "reason_codes": [], "cohort_flow": cohort_flow,
+        "estimands": estimands,
+        "interpretation_limits": ["association_only", "no_causal_claim", "no_discrimination_finding", "no_legal_conclusion"],
+    }
+    artifact.update(artifact_identity(command=command, generated_at_utc=generated_at_utc))
+    return artifact
+
+
+def fail_closed_artifact(
+    source: SourceEvidence, reason_codes: Iterable[str], *, configuration_sha256: str,
+    command: list[str] | None = None, generated_at_utc: str | None = None,
+) -> dict[str, Any]:
+    artifact = {
         "schema_version": "1.0.0", "contract_id": CONTRACT_ID,
         "source": source.as_dict(), "configuration_sha256": configuration_sha256,
         "constraint_status": "failed", "candidate_copy_status": LOCKED_STATUS,
@@ -412,6 +628,8 @@ def fail_closed_artifact(source: SourceEvidence, reason_codes: Iterable[str], *,
         "cohort_flow": None, "estimands": None,
         "interpretation_limits": ["association_only", "no_causal_claim", "no_discrimination_finding", "no_legal_conclusion"],
     }
+    artifact.update(artifact_identity(command=command, generated_at_utc=generated_at_utc))
+    return artifact
 
 
 def configuration_sha256(manifest_directory: str | Path) -> str:

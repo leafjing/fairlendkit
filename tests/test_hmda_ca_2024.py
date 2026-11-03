@@ -24,10 +24,12 @@ from fairlendkit.research.hmda_ca_2024 import (
     standardized_estimate,
     unadjusted_estimate,
     admit_source_archive,
+    analyze_frame,
+    validate_header_bytes,
 )
 
 
-def _rows(per_cell: int = 120) -> pd.DataFrame:
+def _rows(per_cell: int = 300) -> pd.DataFrame:
     rows = []
     for group, ethnicity in (("focal", "Hispanic or Latino"), ("reference", "Not Hispanic or Latino")):
         for income in (25, 75, 125, 200, 300):
@@ -44,7 +46,8 @@ def _rows(per_cell: int = 120) -> pd.DataFrame:
                     "loan_term": str(120 + (index * 7) % 360),
                     "applicant_age": ("<25", "25-34", "35-44", "45-54", "55-64", "65-74", ">74")[index % 7],
                     "derived_ethnicity": ethnicity,
-                    "derived_race": "White", "derived_sex": "Female" if group == "focal" else "Male",
+                    "derived_race": "Black or African American" if group == "focal" else "White",
+                    "derived_sex": "Female" if group == "focal" else "Male",
                 })
     return pd.DataFrame(rows)
 
@@ -57,6 +60,28 @@ def test_cohort_normalization_and_unadjusted_contract():
     assert flow["cohort_rows"] == len(frame)
     assert result["counts"]["focal"]["rows"] == len(frame) // 2
     assert result["raw_p_value"] is not None
+    assert len(result["difference_ci"]) == 2
+    assert len(result["ratio_ci"]) == 2
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "reason"),
+    [
+        ("derived_ethnicity", "UNKNOWN_CODE", "hmda_code_value_invalid"),
+        ("loan_amount", "1,000", "hmda_numeric_value_invalid"),
+        ("loan_term", "NaN", "hmda_numeric_value_invalid"),
+    ],
+)
+def test_invalid_source_values_fail_closed(field, value, reason):
+    frame = _rows(per_cell=2)
+    frame.loc[0, field] = value
+    with pytest.raises(HMDAContractError, match=reason):
+        construct_cohort(frame)
+
+
+def test_reordered_header_fails_schema_digest_gate():
+    with pytest.raises(HMDAContractError, match="hmda_schema_digest_mismatch"):
+        validate_header_bytes(b"lei,activity_year")
 
 
 def test_independent_common_support_and_standardization():
@@ -77,6 +102,17 @@ def test_holm_and_undefined_family():
     adjusted = holm_adjust({"ethnicity": 0.01, "race": 0.04, "sex": 0.03})
     assert adjusted == {"ethnicity": 0.03, "sex": 0.06, "race": 0.06}
     assert holm_adjust({"ethnicity": 0.01, "race": None, "sex": 0.03}) is None
+
+
+def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
+    estimands, flow = analyze_frame(_rows(), bootstrap_replicates=5)
+    assert flow["reconciled"] is True
+    assert set(estimands["primary"]) == {"ethnicity", "race", "sex"}
+    for group in estimands["primary"].values():
+        assert set(group) == {"unadjusted", "standardized", "regression_adjusted"}
+        assert all("holm_adjusted_p_value" in value for value in group.values())
+        assert all(len(value["row_set_digest"]) == 64 for value in group.values())
+    assert set(estimands["sensitivities"]) == {"HMDA-SENS-ACTION-13"}
 
 
 def test_regression_and_cluster_bootstrap_contracts():
@@ -107,6 +143,10 @@ def test_disclosure_gate_never_emits_failed_results(tmp_path: Path):
     assert artifact["candidate_copy_status"] == "locked_research_only"
     assert artifact["results_emitted"] is False
     assert artifact["estimands"] is None
+    assert artifact["commit"]
+    assert artifact["command"]
+    assert artifact["generated_at_utc"].endswith("+00:00")
+    assert artifact["method_identity"]["multiplicity"].startswith("holm_")
     assert not any(isinstance(value, float) for value in artifact.values())
 
 
