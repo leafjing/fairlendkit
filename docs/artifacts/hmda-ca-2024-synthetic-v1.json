@@ -11,7 +11,7 @@
     "--bootstrap-replicates",
     "5"
   ],
-  "commit": "4df6be7b55fba9a27d9c781f65fa3c1cdf497956",
+  "commit": "cc11bc072228433ca6c387a9e496d917a552564d",
   "configuration_sha256": "83016efb709efc093d14a0025425e551f743983e41111e837c2159eb78fe83c1",
   "constraint_status": "failed",
   "contract_id": "HMDA-CA-2024-CD-V1",
@@ -40,16 +40,6 @@
   ],
   "results_emitted": false,
   "schema_version": "1.0.0",
-  "sensitivity_failures": [
-    "HMDA-SENS-BINS",
-    "HMDA-SENS-CONTROL-CORE",
-    "HMDA-SENS-CONTROL-EXTENDED",
-    "HMDA-SENS-GEOGRAPHY",
-    "HMDA-SENS-LENDER",
-    "HMDA-SENS-MISSING-CATEGORY",
-    "HMDA-SENS-MISSING-COMPLETE",
-    "HMDA-SENS-OVERLAP"
-  ],
   "source": {
     "archive_bytes": 1644190,
     "archive_sha256": "a22f570b9c3c474e2cd233e93137ec06179aa5694d8bf1c5ab365a659d0c6950",
