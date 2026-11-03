@@ -192,3 +192,16 @@ def test_real_source_evidence_is_frozen_and_results_are_locked():
     assert artifact["candidate_copy_status"] == "locked_research_only"
     assert artifact["results_emitted"] is False
     assert artifact["estimands"] is None
+
+
+def test_synthetic_execution_artifact_is_recomputable_and_complete():
+    artifact_path = Path(__file__).parents[1] / "docs" / "artifacts" / "hmda-ca-2024-synthetic-v1.json"
+    artifact = json.loads(artifact_path.read_text())
+    assert artifact["constraint_status"] == "passed"
+    assert artifact["candidate_copy_status"] == "locked_research_only"
+    assert artifact["results_emitted"] is True
+    assert artifact["commit"] == "f31d600e6c20e49f93492606d3555a1f2814d0cf"
+    assert artifact["command"][-1].endswith("test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity")
+    assert set(artifact["estimands"]["primary"]) == {"ethnicity", "race", "sex"}
+    assert len(artifact["estimands"]["sensitivities"]) == 10
+    assert artifact["cohort_flow"]["reconciled"] is True
