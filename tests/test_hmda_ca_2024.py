@@ -21,6 +21,7 @@ from fairlendkit.research.hmda_ca_2024 import (
     apply_common_support,
     construct_cohort,
     fail_closed_artifact,
+    geography_standardized_estimate,
     success_artifact,
     holm_adjust,
     normalize_analysis_fields,
@@ -40,9 +41,10 @@ def _rows(per_cell: int = 300) -> pd.DataFrame:
         for income in (25, 75, 125, 200, 300):
           for loan_amount in (75000, 200000, 400000, 600000):
             for index in range(per_cell):
+                county_06001 = (index % 5 != 0) if group == "focal" else (index % 5 < 2)
                 rows.append({
                     "activity_year": "2024", "lei": f"LEI{index:017d}", "state_code": "CA",
-                    "county_code": "06001" if ((index % 4 != 0) if group == "focal" else (index % 4 == 0)) else "06013", "census_tract": "06001000100", "action_taken": "1" if (index * 37) % 100 < ((65 if ((index % 4 != 0) if group == "focal" else (index % 4 == 0)) else 45) + (5 if group == "focal" else 0)) else "3",
+                    "county_code": "06001" if county_06001 else "06013", "census_tract": "06001000100", "action_taken": "1" if (index * 37) % 100 < ((65 if county_06001 else 45) + (5 if group == "focal" else 0)) else "3",
                     "loan_type": "1", "lien_status": "1", "loan_purpose": "1", "occupancy_type": "1",
                     "construction_method": "1", "total_units": "1", "loan_amount": str(loan_amount), "income": str(income),
                     "debt_to_income_ratio": "<20%" if index % 2 == 0 else "40",
@@ -183,10 +185,19 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
         assert result["method_identity"] == "alternate_registered_bins_lei_cluster_bootstrap_v1"
         assert result["flow"]["reconciled"] is True
         assert len(result["row_set_digest"]) == 64
+    geography = estimands["sensitivities"]["HMDA-SENS-GEOGRAPHY"]
+    assert geography["status"] == "executed"
+    for group in ("ethnicity", "race", "sex"):
+        result = geography["groups"][group]["standardized"]
+        assert result["method_identity"] == "exact_county_strata_lei_cluster_bootstrap_v1"
+        assert result["flow"]["reconciled"] is True
+        assert result["geography_coverage"]["reconciled"] is True
+        assert result["geography_coverage"]["included_units"] == ["06001", "06013"]
     unavailable = set(estimands["sensitivities"]) - {
         "HMDA-SENS-ACTION-13", "HMDA-SENS-MISSING-COMPLETE",
         "HMDA-SENS-MISSING-CATEGORY", "HMDA-SENS-CONTROL-CORE",
-        "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-BINS", "HMDA-SENS-YEAR",
+        "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-BINS", "HMDA-SENS-GEOGRAPHY",
+        "HMDA-SENS-YEAR",
     }
     for sensitivity_id in unavailable:
         sensitivity = estimands["sensitivities"][sensitivity_id]
@@ -290,6 +301,41 @@ def test_alternate_bins_sparse_support_fails_closed():
         standardized_estimate(
             data, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
         )
+
+
+def test_geography_changes_estimate_and_audits_excluded_county():
+    data = add_primary_strata(normalize_analysis_fields(_rows()))
+    primary = standardized_estimate(
+        data, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
+    )
+    extra = data.iloc[:50].copy()
+    extra["county_code"] = "06075"
+    extra["_source_row_id"] = np.arange(10_000_000, 10_000_050)
+    result = geography_standardized_estimate(
+        pd.concat([data, extra], ignore_index=True),
+        "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino",
+    )
+    assert result["difference"] != pytest.approx(primary["difference"], abs=1e-10)
+    assert result["geography_coverage"]["excluded_units"] == ["06075"]
+    assert result["geography_coverage"]["unit_counts"]["06075"]["focal"]["rows"] == 50
+    assert result["geography_coverage"]["reconciled"] is True
+
+
+def test_geography_missing_low_sample_single_unit_and_empty_fail_closed():
+    data = add_primary_strata(normalize_analysis_fields(_rows()))
+    data.loc[data.index[:10], "county_code"] = "NA"
+    result = geography_standardized_estimate(
+        data, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
+    )
+    assert "NA" not in result["geography_coverage"]["input_units"]
+    for reduced in (
+        data.loc[data["county_code"] == "06001"],
+        data.iloc[:0],
+    ):
+        with pytest.raises(HMDAContractError, match="hmda_common_support_insufficient"):
+            geography_standardized_estimate(
+                reduced, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
+            )
 
 def test_regression_and_cluster_bootstrap_contracts():
     data = add_primary_strata(normalize_analysis_fields(_rows()))

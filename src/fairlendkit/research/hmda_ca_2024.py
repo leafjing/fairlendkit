@@ -476,6 +476,79 @@ def standardized_estimate(frame: pd.DataFrame, group_field: str, focal: str, ref
     }
 
 
+def geography_standardized_estimate(
+    frame: pd.DataFrame, group_field: str, focal: str, reference: str,
+) -> dict[str, Any]:
+    """Run the registered exact-county standardization and expose coverage evidence."""
+    base_keys = ["income_band", "loan_amount_band", "dti_band", "cltv_band"]
+    keys = base_keys + ["county_code"]
+    selected = frame.loc[frame[group_field].isin([focal, reference])].dropna(subset=keys).copy()
+    selected = selected.loc[selected["county_code"] != "NA"].copy()
+    input_counties = sorted(selected["county_code"].unique().tolist())
+    grouped = selected.groupby(["county_code", group_field], observed=True)["favorable_action"].agg(["size", "sum"])
+    eligible_counties: list[str] = []
+    county_counts: dict[str, Any] = {}
+    for county in input_counties:
+        detail: dict[str, Any] = {}
+        valid = True
+        for label, group in (("focal", focal), ("reference", reference)):
+            try:
+                row = grouped.loc[(county, group)]
+                total, favorable = int(row["size"]), int(row["sum"])
+            except KeyError:
+                total = favorable = 0
+            detail[label] = {
+                "rows": total, "favorable": favorable, "unfavorable": total - favorable,
+            }
+            valid &= total >= 100 and favorable >= 10 and total - favorable >= 10
+        county_counts[county] = detail
+        if valid:
+            eligible_counties.append(county)
+    if len(eligible_counties) < 2:
+        raise HMDAContractError("hmda_common_support_insufficient", "fewer than two eligible counties")
+    county_rows = selected.loc[selected["county_code"].isin(eligible_counties)].copy()
+    strata = county_rows.groupby(keys + [group_field], observed=True)["favorable_action"].agg(["size", "sum"])
+    supported: list[tuple[Any, ...]] = []
+    for key, block in strata.groupby(level=keys, observed=True):
+        if all(group in block.index.get_level_values(group_field) for group in (focal, reference)):
+            supported.append(key if isinstance(key, tuple) else (key,))
+    supported_index = pd.MultiIndex.from_tuples(supported, names=keys)
+    retained = county_rows.loc[pd.MultiIndex.from_frame(county_rows[keys]).isin(supported_index)].copy()
+    fractions = {
+        label: len(retained.loc[retained[group_field] == group]) / max(1, len(selected.loc[selected[group_field] == group]))
+        for label, group in (("focal", focal), ("reference", reference))
+    }
+    overall = len(retained) / max(1, len(selected))
+    support = {
+        "input_rows": int(len(selected)), "supported_rows": int(len(retained)),
+        "support_excluded_rows": int(len(selected) - len(retained)),
+        "supported_strata": len(supported), "retained_fraction": fractions,
+        "overall_supported_fraction": overall,
+        "reconciled": len(selected) == len(retained) + (len(selected) - len(retained)),
+    }
+    if len(supported) < 20 or overall < 0.7 or min(fractions.values()) < 0.7:
+        raise HMDAContractError("hmda_common_support_insufficient", json.dumps(support, sort_keys=True))
+    focal_rate = reference_rate = 0.0
+    for _, block in retained.groupby(keys, observed=True):
+        rates = block.groupby(group_field, observed=True)["favorable_action"].mean()
+        weight = len(block) / len(retained)
+        focal_rate += weight * float(rates[focal])
+        reference_rate += weight * float(rates[reference])
+    coverage = {
+        "input_geographic_unit": "county_code", "input_units": input_counties,
+        "included_units": eligible_counties,
+        "excluded_units": sorted(set(input_counties) - set(eligible_counties)),
+        "unit_counts": county_counts, "input_rows": int(len(selected)),
+        "eligible_county_rows": int(len(county_rows)), "final_analysis_rows": int(len(retained)),
+        "reconciled": len(selected) == len(county_rows) + len(selected) - len(county_rows),
+    }
+    return {
+        "row_count": int(len(retained)), "focal_rate": focal_rate,
+        "reference_rate": reference_rate, "difference": focal_rate - reference_rate,
+        "support": support, "geography_coverage": coverage,
+    }
+
+
 def cluster_bootstrap_differences(
     frame: pd.DataFrame,
     estimator,
@@ -859,6 +932,59 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
     for group in GROUPS:
         bins_groups[group]["standardized"]["holm_adjusted_p_value"] = bins_adjusted[group]
 
+    geography_groups: dict[str, Any] = {}
+    for group_name, (field, focal, reference) in GROUPS.items():
+        group_rows = normalized.loc[normalized[field].isin([focal, reference])].copy()
+        complete_rows = group_rows.loc[
+            (group_rows["loan_amount_numeric"] > 0)
+            & group_rows["income_numeric"].notna()
+            & group_rows["dti_band"].notna()
+            & group_rows["cltv_band"].notna()
+            & (group_rows["county_code"] != "NA")
+        ].copy()
+        estimate = geography_standardized_estimate(complete_rows, field, focal, reference)
+        estimate.update(cluster_bootstrap_differences(
+            complete_rows,
+            lambda sample, gf=field, fo=focal, ref=reference: geography_standardized_estimate(sample, gf, fo, ref),
+            replicates=bootstrap_replicates,
+        ))
+        # Recompute the final deterministic row set from the audited included counties/support keys.
+        included = estimate["geography_coverage"]["included_units"]
+        county_rows = complete_rows.loc[complete_rows["county_code"].isin(included)]
+        keys = ["income_band", "loan_amount_band", "dti_band", "cltv_band", "county_code"]
+        counts = county_rows.groupby(keys + [field], observed=True).size()
+        valid_keys = []
+        for key, block in counts.groupby(level=keys, observed=True):
+            if all(value in block.index.get_level_values(field) for value in (focal, reference)):
+                valid_keys.append(key if isinstance(key, tuple) else (key,))
+        final_rows = county_rows.loc[pd.MultiIndex.from_frame(county_rows[keys]).isin(
+            pd.MultiIndex.from_tuples(valid_keys, names=keys)
+        )]
+        estimate["row_set_digest"] = row_set_digest(final_rows)
+        estimate["method_identity"] = "exact_county_strata_lei_cluster_bootstrap_v1"
+        estimate["flow"] = {
+            "named_group_input_rows": int(len(normalized)),
+            "named_group_excluded_rows": int(len(normalized) - len(group_rows)),
+            "complete_case_input_rows": int(len(group_rows)),
+            "complete_case_excluded_rows": int(len(group_rows) - len(complete_rows)),
+            "geography_excluded_rows": int(len(complete_rows) - len(county_rows)),
+            "support_excluded_rows": int(len(county_rows) - len(final_rows)),
+            "final_rows": int(len(final_rows)),
+            "reconciled": len(normalized) == (
+                len(normalized) - len(group_rows) + len(group_rows) - len(complete_rows)
+                + len(complete_rows) - len(county_rows) + len(county_rows) - len(final_rows)
+                + len(final_rows)
+            ),
+        }
+        geography_groups[group_name] = {"standardized": estimate}
+    geography_adjusted = holm_adjust({
+        group: geography_groups[group]["standardized"]["raw_p_value"] for group in GROUPS
+    })
+    if geography_adjusted is None:
+        raise HMDAContractError("hmda_multiplicity_family_incomplete")
+    for group in GROUPS:
+        geography_groups[group]["standardized"]["holm_adjusted_p_value"] = geography_adjusted[group]
+
     def unavailable() -> dict[str, Any]:
         return {
             "status": "failed",
@@ -874,7 +1000,7 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
         "HMDA-SENS-CONTROL-CORE": {"status": "executed", "groups": control_core},
         "HMDA-SENS-CONTROL-EXTENDED": {"status": "executed", "groups": control_extended},
         "HMDA-SENS-BINS": {"status": "executed", "groups": bins_groups},
-        "HMDA-SENS-GEOGRAPHY": unavailable(),
+        "HMDA-SENS-GEOGRAPHY": {"status": "executed", "groups": geography_groups},
         "HMDA-SENS-LENDER": unavailable(),
         "HMDA-SENS-OVERLAP": unavailable(),
         "HMDA-SENS-YEAR": {
@@ -930,6 +1056,21 @@ def success_artifact(
                     and estimate["valid_replicates"] >= 950
                 ):
                     return False
+                if sensitivity_id == "HMDA-SENS-GEOGRAPHY":
+                    coverage = estimate.get("geography_coverage")
+                    if not (
+                        isinstance(coverage, Mapping)
+                        and coverage.get("input_geographic_unit") == "county_code"
+                        and coverage.get("reconciled") is True
+                        and isinstance(coverage.get("input_units"), list)
+                        and isinstance(coverage.get("included_units"), list)
+                        and len(coverage["included_units"]) >= 2
+                        and isinstance(coverage.get("excluded_units"), list)
+                        and isinstance(coverage.get("unit_counts"), Mapping)
+                        and isinstance(coverage.get("final_analysis_rows"), int)
+                        and coverage["final_analysis_rows"] == estimate.get("row_count")
+                    ):
+                        return False
                 if estimand == "regression_adjusted" and not (
                     finite_interval(estimate.get("ci"))
                     and finite_number(estimate.get("standard_error"))
