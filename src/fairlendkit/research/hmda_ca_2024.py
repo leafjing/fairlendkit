@@ -724,6 +724,76 @@ def artifact_identity(*, command: list[str] | None = None, generated_at_utc: str
     }
 
 
+def lender_regression_estimate(
+    frame: pd.DataFrame, group_field: str, focal: str, reference: str,
+) -> dict[str, Any]:
+    """Apply registered lender eligibility and fit sum-coded LEI fixed effects."""
+    group_rows = frame.loc[frame[group_field].isin([focal, reference])].copy()
+    required = [
+        "loan_amount_numeric", "income_numeric", "property_value_numeric", "loan_term_numeric",
+        "dti_band", "cltv_band", "applicant_age_band", "lei",
+    ]
+    complete = group_rows.dropna(subset=required).copy()
+    complete = complete.loc[
+        (complete["loan_amount_numeric"] > 0) & (complete["income_numeric"] > 0)
+        & (complete["property_value_numeric"] > 0)
+        & complete["loan_term_numeric"].between(1, 600)
+    ].copy()
+    lender_counts: dict[str, Any] = {}
+    eligible: list[str] = []
+    for lender, rows in complete.groupby("lei", observed=True):
+        detail: dict[str, Any] = {"rows": int(len(rows))}
+        reasons: list[str] = []
+        if len(rows) < 100:
+            reasons.append("minimum_lender_rows")
+        for label, group in (("focal", focal), ("reference", reference)):
+            part = rows.loc[rows[group_field] == group]
+            favorable = int(part["favorable_action"].sum())
+            detail[label] = {
+                "rows": int(len(part)), "favorable": favorable,
+                "unfavorable": int(len(part) - favorable),
+            }
+            if part.empty:
+                reasons.append(f"missing_{label}_group")
+        detail["exclusion_reasons"] = reasons
+        lender_counts[str(lender)] = detail
+        if not reasons:
+            eligible.append(str(lender))
+    if len(eligible) < 30:
+        raise HMDAContractError("hmda_cluster_count_insufficient", "fewer than 30 eligible lenders")
+    eligible_rows = complete.loc[complete["lei"].isin(eligible)].copy()
+    estimate = regression_adjusted_estimate(
+        eligible_rows, group_field, focal, reference, fixed_effect="lei",
+    )
+    final_rows, _ = apply_common_support(eligible_rows, group_field, focal, reference)
+    estimate["row_set_digest"] = row_set_digest(final_rows)
+    estimate["method_identity"] = "logit_core_plus_lei_sum_to_zero_v1"
+    estimate["lender_coverage"] = {
+        "input_lender_field": "lei", "input_lenders": sorted(lender_counts),
+        "included_lenders": sorted(eligible),
+        "excluded_lenders": sorted(set(lender_counts) - set(eligible)),
+        "lender_counts": lender_counts, "complete_case_rows": int(len(complete)),
+        "eligible_lender_rows": int(len(eligible_rows)),
+        "final_analysis_rows": int(len(final_rows)),
+        "reconciled": len(complete) == len(eligible_rows) + len(complete) - len(eligible_rows),
+    }
+    estimate["flow"] = {
+        "named_group_input_rows": int(len(frame)),
+        "named_group_excluded_rows": int(len(frame) - len(group_rows)),
+        "complete_case_input_rows": int(len(group_rows)),
+        "complete_case_excluded_rows": int(len(group_rows) - len(complete)),
+        "lender_excluded_rows": int(len(complete) - len(eligible_rows)),
+        "support_excluded_rows": int(len(eligible_rows) - len(final_rows)),
+        "final_rows": int(len(final_rows)),
+        "reconciled": len(frame) == (
+            len(frame) - len(group_rows) + len(group_rows) - len(complete)
+            + len(complete) - len(eligible_rows) + len(eligible_rows) - len(final_rows)
+            + len(final_rows)
+        ),
+    }
+    return estimate
+
+
 def _estimand_bundle(
     frame: pd.DataFrame, group_field: str, focal: str, reference: str, *, bootstrap_replicates: int,
 ) -> dict[str, Any]:
@@ -985,6 +1055,19 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
     for group in GROUPS:
         geography_groups[group]["standardized"]["holm_adjusted_p_value"] = geography_adjusted[group]
 
+    lender_groups: dict[str, Any] = {}
+    for group_name, (field, focal, reference) in GROUPS.items():
+        lender_groups[group_name] = {
+            "regression_adjusted": lender_regression_estimate(normalized, field, focal, reference)
+        }
+    lender_adjusted = holm_adjust({
+        group: lender_groups[group]["regression_adjusted"]["raw_p_value"] for group in GROUPS
+    })
+    if lender_adjusted is None:
+        raise HMDAContractError("hmda_multiplicity_family_incomplete")
+    for group in GROUPS:
+        lender_groups[group]["regression_adjusted"]["holm_adjusted_p_value"] = lender_adjusted[group]
+
     def unavailable() -> dict[str, Any]:
         return {
             "status": "failed",
@@ -1001,7 +1084,7 @@ def analyze_frame(frame: pd.DataFrame, *, bootstrap_replicates: int = 1000) -> t
         "HMDA-SENS-CONTROL-EXTENDED": {"status": "executed", "groups": control_extended},
         "HMDA-SENS-BINS": {"status": "executed", "groups": bins_groups},
         "HMDA-SENS-GEOGRAPHY": {"status": "executed", "groups": geography_groups},
-        "HMDA-SENS-LENDER": unavailable(),
+        "HMDA-SENS-LENDER": {"status": "executed", "groups": lender_groups},
         "HMDA-SENS-OVERLAP": unavailable(),
         "HMDA-SENS-YEAR": {
             "status": "disabled_pending_separate_source_admission", "groups": None,
@@ -1069,6 +1152,19 @@ def success_artifact(
                         and isinstance(coverage.get("unit_counts"), Mapping)
                         and isinstance(coverage.get("final_analysis_rows"), int)
                         and coverage["final_analysis_rows"] == estimate.get("row_count")
+                    ):
+                        return False
+                if sensitivity_id == "HMDA-SENS-LENDER":
+                    coverage = estimate.get("lender_coverage")
+                    if not (
+                        isinstance(coverage, Mapping)
+                        and coverage.get("input_lender_field") == "lei"
+                        and coverage.get("reconciled") is True
+                        and isinstance(coverage.get("included_lenders"), list)
+                        and len(coverage["included_lenders"]) >= 30
+                        and isinstance(coverage.get("excluded_lenders"), list)
+                        and isinstance(coverage.get("lender_counts"), Mapping)
+                        and coverage.get("final_analysis_rows") == estimate.get("row_count")
                     ):
                         return False
                 if estimand == "regression_adjusted" and not (

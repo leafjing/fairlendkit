@@ -11,7 +11,7 @@
     "--bootstrap-replicates",
     "5"
   ],
-  "commit": "d221c886c3b6166c901e1ea36d637535869dba2d",
+  "commit": "a26dc0cfe88e957f75e64c7e135bea9b2c3af668",
   "configuration_sha256": "83016efb709efc093d14a0025425e551f743983e41111e837c2159eb78fe83c1",
   "constraint_status": "failed",
   "contract_id": "HMDA-CA-2024-CD-V1",
@@ -42,7 +42,7 @@
   "schema_version": "1.0.0",
   "source": {
     "archive_bytes": 1656190,
-    "archive_sha256": "73021c0aeb1759c5a4cf1d21f1146363d40fd8a16d39d97fb57e2f7af81efa92",
+    "archive_sha256": "3483c1a1fea56bbca0c437a537285a3d6d630206700b31fcb0c7c07976625616",
     "duplicate_row_count": 0,
     "header_sha256": "4dceed77082ab7481510af6fde86927b3a3f9b5509fb10d83724fff60d8cb299",
     "member_bytes": 1656190,

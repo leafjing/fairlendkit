@@ -22,6 +22,7 @@ from fairlendkit.research.hmda_ca_2024 import (
     construct_cohort,
     fail_closed_artifact,
     geography_standardized_estimate,
+    lender_regression_estimate,
     success_artifact,
     holm_adjust,
     normalize_analysis_fields,
@@ -38,12 +39,13 @@ from fairlendkit.research.hmda_ca_2024 import (
 def _rows(per_cell: int = 300) -> pd.DataFrame:
     rows = []
     for group, ethnicity in (("focal", "Hispanic or Latino"), ("reference", "Not Hispanic or Latino")):
-        for income in (25, 75, 125, 200, 300):
-          for loan_amount in (75000, 200000, 400000, 600000):
+        for income_index, income in enumerate((25, 75, 125, 200, 300)):
+          for loan_index, loan_amount in enumerate((75000, 200000, 400000, 600000)):
             for index in range(per_cell):
                 county_06001 = (index % 5 != 0) if group == "focal" else (index % 5 < 2)
+                lender_index = (index + 7 * income_index + 13 * loan_index + (17 if group == "focal" else 0)) % 100
                 rows.append({
-                    "activity_year": "2024", "lei": f"LEI{index:017d}", "state_code": "CA",
+                    "activity_year": "2024", "lei": f"LEI{lender_index:017d}", "state_code": "CA",
                     "county_code": "06001" if county_06001 else "06013", "census_tract": "06001000100", "action_taken": "1" if (index * 37) % 100 < ((65 if county_06001 else 45) + (5 if group == "focal" else 0)) else "3",
                     "loan_type": "1", "lien_status": "1", "loan_purpose": "1", "occupancy_type": "1",
                     "construction_method": "1", "total_units": "1", "loan_amount": str(loan_amount), "income": str(income),
@@ -86,6 +88,7 @@ def test_newcombe_wilson_difference_ci_exact_values():
     ("field", "value", "reason"),
     [
         ("derived_ethnicity", "UNKNOWN_CODE", "hmda_code_value_invalid"),
+        ("lei", "UNKNOWN_LENDER", "hmda_code_value_invalid"),
         ("loan_amount", "1,000", "hmda_numeric_value_invalid"),
         ("loan_term", "NaN", "hmda_numeric_value_invalid"),
     ],
@@ -193,10 +196,18 @@ def test_synthetic_end_to_end_three_groups_estimands_holm_and_sensitivity():
         assert result["flow"]["reconciled"] is True
         assert result["geography_coverage"]["reconciled"] is True
         assert result["geography_coverage"]["included_units"] == ["06001", "06013"]
+    lender = estimands["sensitivities"]["HMDA-SENS-LENDER"]
+    assert lender["status"] == "executed"
+    for group in ("ethnicity", "race", "sex"):
+        result = lender["groups"][group]["regression_adjusted"]
+        assert result["method_identity"] == "logit_core_plus_lei_sum_to_zero_v1"
+        assert result["flow"]["reconciled"] is True
+        assert result["lender_coverage"]["reconciled"] is True
+        assert len(result["lender_coverage"]["included_lenders"]) == 100
     unavailable = set(estimands["sensitivities"]) - {
         "HMDA-SENS-ACTION-13", "HMDA-SENS-MISSING-COMPLETE",
         "HMDA-SENS-MISSING-CATEGORY", "HMDA-SENS-CONTROL-CORE",
-        "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-BINS", "HMDA-SENS-GEOGRAPHY",
+        "HMDA-SENS-CONTROL-EXTENDED", "HMDA-SENS-BINS", "HMDA-SENS-GEOGRAPHY", "HMDA-SENS-LENDER",
         "HMDA-SENS-YEAR",
     }
     for sensitivity_id in unavailable:
@@ -334,6 +345,40 @@ def test_geography_missing_low_sample_single_unit_and_empty_fail_closed():
     ):
         with pytest.raises(HMDAContractError, match="hmda_common_support_insufficient"):
             geography_standardized_estimate(
+                reduced, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
+            )
+
+
+def test_lender_rules_change_model_and_audit_exclusions():
+    data = add_primary_strata(normalize_analysis_fields(_rows()))
+    data["_source_row_id"] = np.arange(len(data))
+    primary = regression_adjusted_estimate(
+        data, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
+    )
+    low_sample = data.iloc[:50].copy()
+    low_sample["lei"] = "LOWLENDER00000000000"
+    low_sample["_source_row_id"] = np.arange(20_000_000, 20_000_050)
+    result = lender_regression_estimate(
+        pd.concat([data, low_sample], ignore_index=True),
+        "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino",
+    )
+    assert result["difference"] != pytest.approx(primary["difference"], abs=1e-10)
+    assert result["lender_coverage"]["excluded_lenders"] == ["LOWLENDER00000000000"]
+    excluded = result["lender_coverage"]["lender_counts"]["LOWLENDER00000000000"]
+    assert "minimum_lender_rows" in excluded["exclusion_reasons"]
+    assert result["flow"]["reconciled"] is True
+
+
+def test_lender_low_sample_single_valid_and_empty_fail_closed():
+    data = add_primary_strata(normalize_analysis_fields(_rows()))
+    cases = (
+        data.assign(lei="SINGLELENDER000000000"),
+        data.iloc[:50],
+        data.iloc[:0],
+    )
+    for reduced in cases:
+        with pytest.raises(HMDAContractError, match="hmda_cluster_count_insufficient"):
+            lender_regression_estimate(
                 reduced, "derived_ethnicity", "Hispanic or Latino", "Not Hispanic or Latino"
             )
 
@@ -524,7 +569,7 @@ def test_synthetic_execution_artifact_fails_closed_on_incomplete_registry():
     assert artifact["constraint_status"] == "failed"
     assert artifact["candidate_copy_status"] == "locked_research_only"
     assert artifact["results_emitted"] is False
-    assert artifact["commit"] == "d221c886c3b6166c901e1ea36d637535869dba2d"
+    assert artifact["commit"] == "a26dc0cfe88e957f75e64c7e135bea9b2c3af668"
     assert artifact["command"][1] == "scripts/generate_hmda_synthetic_artifact.py"
     assert artifact["estimands"] is None
     assert artifact["reason_codes"] == ["hmda_sensitivity_registry_incomplete"]

@@ -19,12 +19,13 @@ from fairlendkit.research.hmda_ca_2024 import (
 def synthetic_rows(per_cell: int = 300) -> pd.DataFrame:
     rows = []
     for group, ethnicity in (("focal", "Hispanic or Latino"), ("reference", "Not Hispanic or Latino")):
-        for income in (25, 75, 125, 200, 300):
-            for loan_amount in (75000, 200000, 400000, 600000):
+        for income_index, income in enumerate((25, 75, 125, 200, 300)):
+            for loan_index, loan_amount in enumerate((75000, 200000, 400000, 600000)):
                 for index in range(per_cell):
                     county_06001 = (index % 5 != 0) if group == "focal" else (index % 5 < 2)
+                    lender_index = (index + 7 * income_index + 13 * loan_index + (17 if group == "focal" else 0)) % 100
                     rows.append({
-                        "activity_year": "2024", "lei": f"LEI{index:017d}", "state_code": "CA",
+                        "activity_year": "2024", "lei": f"LEI{lender_index:017d}", "state_code": "CA",
                         "county_code": "06001" if county_06001 else "06013", "census_tract": "06001000100",
                         "action_taken": "1" if (index * 37) % 100 < ((65 if county_06001 else 45) + (5 if group == "focal" else 0)) else "3",
                         "loan_type": "1", "lien_status": "1", "loan_purpose": "1", "occupancy_type": "1",
